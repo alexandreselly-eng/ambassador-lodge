@@ -764,7 +764,7 @@ async function inviteEmail(){
   m.textContent='Envoi de l\'invitation…'; m.className='formmsg';
   try{
     const {data:{session}}=await SUPA.auth.getSession();
-    const res=await fetch(EDGE_URL,{method:'POST',headers:{'Authorization':'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({invite:email})});
+    const res=await fetch(EDGE_URL,{method:'POST',headers:{'Authorization':'Bearer '+session.access_token,'apikey':SUPABASE_ANON_KEY,'Content-Type':'application/json'},body:JSON.stringify({invite:email})});
     const out=await res.json();
     if(!res.ok||out.error) throw new Error(out.error||('HTTP '+res.status));
     m.textContent = out.already? `✓ ${email} déjà inscrit, ajouté aux accès.` : `✓ Invitation envoyée à ${email}.`; m.className='formmsg ok';
