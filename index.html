@@ -90,6 +90,14 @@ td.actions{white-space:nowrap}
 .mini-act.del:hover{border-color:var(--red)}
 .mini-act.restore{color:var(--green);font-size:11.5px;font-weight:600}
 .vbadge{font-size:9.5px;background:rgba(88,166,255,.16);color:var(--blue);padding:1px 5px;border-radius:5px;font-weight:700}
+.objgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:14px}
+.objcol{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px}
+.objhead{font-weight:700;font-size:13px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.objhead.amb{color:var(--gold2)}.objhead.lodge{color:var(--lodge)}
+.objcol label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin:8px 0 3px}
+.objcol input{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:8px 10px;font-size:13.5px;outline:none}
+.objcol input:focus{border-color:var(--gold)}
+@media(max-width:680px){.objgrid{grid-template-columns:1fr}}
 #editBanner{background:rgba(88,166,255,.1);border:1px solid rgba(88,166,255,.4);color:var(--blue);border-radius:8px;padding:8px 12px;font-size:12.5px;font-weight:600;margin-bottom:12px}
 /* modale historique */
 #histModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:60;align-items:center;justify-content:center;padding:20px}
@@ -161,6 +169,7 @@ td.actions{white-space:nowrap}
     <div class="fg"><label>Mois</label><select id="fMonth"></select></div>
     <div class="fg"><label>Canal</label><select id="fChan"></select></div>
     <div class="fg"><label>Affichage</label><button id="tLabels" class="toggle on">Valeurs affichées</button></div>
+    <div class="fg"><label>Unité</label><div class="seg" id="fUnit"><button data-v="eur" class="on">€</button><button data-v="pct">%</button></div></div>
   </div>
 </header>
 
@@ -238,6 +247,27 @@ td.actions{white-space:nowrap}
 
 <!-- OBJECTIFS -->
 <div class="view" id="v-obj">
+  <div class="card" id="objEditor" style="display:none">
+    <h3>Ajuster les objectifs — exercice <span id="objYear"></span> <span class="hint" id="objSource"></span></h3>
+    <div class="desc">Modifiez les objectifs mensuels et points morts pour cette année. Sans modification, les valeurs par défaut s'appliquent (Ambassador 9 125 / 1 825 / 6 416 · Lodge 4 000 / 1 825 / 2 000).</div>
+    <div class="objgrid">
+      <div class="objcol"><div class="objhead amb">Ambassador</div>
+        <label>Objectif mensuel (€)</label><input id="objAObj" type="number" step="1">
+        <label>Objectif commission (€)</label><input id="objAComm" type="number" step="1">
+        <label>Point mort mensuel (€)</label><input id="objAPm" type="number" step="1">
+      </div>
+      <div class="objcol"><div class="objhead lodge">Lodge</div>
+        <label>Objectif mensuel (€)</label><input id="objLObj" type="number" step="1">
+        <label>Objectif commission (€)</label><input id="objLComm" type="number" step="1">
+        <label>Point mort mensuel (€)</label><input id="objLPm" type="number" step="1">
+      </div>
+    </div>
+    <div class="formactions">
+      <button class="btn" id="btnSaveObj">Enregistrer les objectifs</button>
+      <button class="btn sec" id="btnResetObj">Valeurs par défaut</button>
+      <span class="formmsg" id="objMsg"></span>
+    </div>
+  </div>
   <div class="kpis" id="kpisObj"></div>
   <div class="card"><h3>Cumul bénéfice net vs objectif <span class="hint">€ cumulés</span></h3><div class="desc">Objectif Ambassador 9 125 €/mois · Lodge 4 000 €/mois. Point mort Ambassador 6 416 € · Lodge 2 000 €/mois.</div><div class="chartbox"><canvas id="cCumul"></canvas></div></div>
   <div class="grid g2">
@@ -346,7 +376,14 @@ const SUPABASE_URL = 'https://okehchypcrhpkcptnyxq.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_2hvzAvSDxckuY80zHHVdYg_he3n2E9f';
 
 // --------------------------------------------------------------------
-const OBJ = { Ambassador:{obj:9125,comm:1825,pm:6416}, Lodge:{obj:4000,comm:1825,pm:2000} };
+const OBJ_DEFAULTS = { Ambassador:{obj:9125,comm:1825,pm:6416}, Lodge:{obj:4000,comm:1825,pm:2000} };
+let OBJECTIVES = {}; // `${annee}|${logement}` -> {obj,comm,pm}
+function objFor(year,bien){ return OBJECTIVES[year+'|'+bien] || OBJ_DEFAULTS[bien]; }
+async function loadObjectives(){
+  OBJECTIVES={};
+  if(SUPA){ try{ const {data}=await SUPA.from('objectives').select('*'); (data||[]).forEach(r=>OBJECTIVES[r.annee+'|'+r.logement]={obj:+r.obj_mois,comm:+r.obj_comm,pm:+r.point_mort}); }catch(e){} }
+  else { try{ OBJECTIVES=JSON.parse(localStorage.getItem('al_obj')||'{}'); }catch(e){} }
+}
 const MONTHS = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'];
 const CHANNELS = ['Immosphera','Airbnb','Site web','Booking','Bibizfamily','Abritel','Direct FM','Facebook','Google Adwords'];
 const CHAN_COLORS = {Immosphera:'#d4af37',Airbnb:'#f85149','Site web':'#58a6ff',Booking:'#3fb6c9',Bibizfamily:'#bc8cff',Abritel:'#e3893b','Direct FM':'#3fb950','Google Adwords':'#8b97a8',Facebook:'#4267B2',Inconnu:'#555'};
@@ -359,7 +396,7 @@ let ROWS=[];   // données calculées en mémoire
 let CURRENT_USER=null;
 const state={ year:null, log:'all', chan:'all', month:'all', labels:true, commChan:'all',
   sortChan:'val-desc', sortLog:'val-desc', expDim:'mois', expMes:'montant', expSort:'val-desc',
-  rsort:{key:'entree',dir:-1}, editId:null };
+  rsort:{key:'entree',dir:-1}, editId:null, unit:'eur' };
 const charts={};
 
 // ---------- moteur de calcul (remplace les formules Excel) ----------
@@ -507,7 +544,7 @@ function wireSetPassword(){
     }catch(e){ m.textContent='Erreur : '+e.message; m.className='authmsg err'; }
   };
 }
-async function reload(){ const raw=await Store.list(); ROWS=raw.map(compute); }
+async function reload(){ await loadObjectives(); const raw=await Store.list(); ROWS=raw.map(compute); }
 
 function wireAuth(){
   const msg=document.getElementById('authMsg');
@@ -654,6 +691,9 @@ function initUI(){
   document.getElementById('tLabels').onclick=function(){ state.labels=!state.labels; this.classList.toggle('on',state.labels); this.textContent=state.labels?'Valeurs affichées':'Afficher les valeurs'; render(); };
   document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); document.querySelectorAll('.view').forEach(v=>v.classList.remove('on')); document.getElementById('v-'+b.dataset.t).classList.add('on'); if(b.dataset.t==='trash'){ renderTrash(); } else if(b.dataset.t==='admin'){ renderAdmin(); } else { setTimeout(render,30); } });
   const bi=document.getElementById('btnInvite'); if(bi) bi.onclick=inviteEmail;
+  document.querySelectorAll('#fUnit button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#fUnit button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); state.unit=b.dataset.v; render(); });
+  const bso=document.getElementById('btnSaveObj'); if(bso) bso.onclick=saveObjectives;
+  const bro=document.getElementById('btnResetObj'); if(bro) bro.onclick=resetObjectives;
   document.getElementById('histClose').onclick=()=>document.getElementById('histModal').style.display='none';
   document.getElementById('histModal').onclick=(e)=>{ if(e.target.id==='histModal') e.target.style.display='none'; };
   bindSort('sortChan'); bindSort('sortLog');
@@ -700,7 +740,7 @@ const DIMS={
 function currentRows(){ return ROWS.filter(d=>d.annee===state.year && (state.log==='all'||d.logement===state.log) && (state.chan==='all'||d.origine===state.chan) && (state.month==='all'||d.mois===+state.month)); }
 function monthly(rows,f){ const a=Array(12).fill(0); rows.forEach(d=>{ if(d.mois&&d[f]) a[d.mois-1]+=d[f]; }); return a; }
 function cumul(a){ let s=0; return a.map(v=>s+=v); }
-function activeObj(){ let o=0,c=0,pm=0; (state.log==='all'?['Ambassador','Lodge']:[state.log]).forEach(b=>{o+=OBJ[b].obj;c+=OBJ[b].comm;pm+=OBJ[b].pm;}); return {obj:o,comm:c,pm}; }
+function activeObj(){ let o=0,c=0,pm=0; (state.log==='all'?['Ambassador','Lodge']:[state.log]).forEach(b=>{const x=objFor(state.year,b); o+=x.obj;c+=x.comm;pm+=x.pm;}); return {obj:o,comm:c,pm}; }
 function destroy(id){ if(charts[id]){charts[id].destroy(); delete charts[id];} }
 function mk(id,cfg){ destroy(id); const el=document.getElementById(id); if(el) charts[id]=new Chart(el,cfg); }
 function DL(fmt,color){ return state.labels?{display:true,anchor:'end',align:'end',clamp:true,color:color||css('--txt'),font:{size:10,weight:'600'},formatter:v=>{ if(v==null||v===0)return ''; return fmt?fmt(v):v; }}:{display:false}; }
@@ -726,14 +766,19 @@ function render(){
   mk('cBenef',{type:'bar',data:{labels:MONTHS,datasets:[
     {label:'Bénéfice net',data:benefM,backgroundColor:css('--gold'),borderRadius:5,order:2,datalabels:DL(eur,css('--gold2'))},
     {label:'Objectif',type:'line',data:Array(12).fill(ob.obj),borderColor:css('--red'),borderWidth:2,borderDash:[6,4],pointRadius:0,order:1,datalabels:{display:false}}]},options:baseOpt({money:true,legend:true})});
+  const PCT=state.unit==='pct';
   const byChan={}; rows.forEach(d=>{byChan[d.origine]=(byChan[d.origine]||0)+(d.montant||0);});
   let chP=applySort(Object.entries(byChan),state.sortChan);
-  mk('cChan',{type:'bar',data:{labels:chP.map(p=>p[0]),datasets:[{label:'CA',data:chP.map(p=>p[1]),backgroundColor:chP.map(p=>CHAN_COLORS[p[0]]||'#888'),borderRadius:5,datalabels:DL(eur)}]},
-    options:Object.assign(baseOpt({money:true,legend:false}),{indexAxis:'y',scales:{x:{grid:{color:'rgba(40,48,64,.5)'},ticks:{callback:v=>eur(v)}},y:{grid:{display:false}}}})});
+  const chTot=chP.reduce((s,p)=>s+p[1],0);
+  const chData=PCT?chP.map(p=>chTot?p[1]/chTot*100:0):chP.map(p=>p[1]);
+  const chFmt=v=>v? (PCT? v.toFixed(1)+' %' : eur(v)) : '';
+  mk('cChan',{type:'bar',data:{labels:chP.map(p=>p[0]),datasets:[{label:PCT?'% du CA':'CA',data:chData,backgroundColor:chP.map(p=>CHAN_COLORS[p[0]]||'#888'),borderRadius:5,datalabels:DL(chFmt)}]},
+    options:Object.assign(baseOpt({legend:false}),{indexAxis:'y',scales:{x:{grid:{color:'rgba(40,48,64,.5)'},ticks:{callback:v=>PCT?v+' %':eur(v)}},y:{grid:{display:false}}},plugins:{legend:{display:false},datalabels:DL(chFmt),tooltip:{callbacks:{label:c=>' '+chFmt(c.parsed.x)}}}})});
   const byLog={}; rows.forEach(d=>{byLog[d.logement]=(byLog[d.logement]||0)+(d.montant||0);});
   let lgP=applySort(Object.entries(byLog),state.sortLog);
-  mk('cLog',{type:'doughnut',data:{labels:lgP.map(p=>p[0]),datasets:[{data:lgP.map(p=>p[1]),backgroundColor:lgP.map(p=>p[0]==='Ambassador'?css('--gold'):css('--lodge')),borderColor:css('--panel'),borderWidth:2,datalabels:state.labels?{display:true,color:'#0d1117',font:{size:11,weight:'700'},formatter:v=>eur(v)}:{display:false}}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'bottom',labels:{boxWidth:11,padding:10}},datalabels:state.labels?{display:true}:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${eur(c.parsed)}`}}}}});
+  const lgTot=lgP.reduce((s,p)=>s+p[1],0);
+  mk('cLog',{type:'doughnut',data:{labels:lgP.map(p=>p[0]),datasets:[{data:lgP.map(p=>p[1]),backgroundColor:lgP.map(p=>p[0]==='Ambassador'?css('--gold'):css('--lodge')),borderColor:css('--panel'),borderWidth:2,datalabels:state.labels?{display:true,color:'#0d1117',font:{size:11,weight:'700'},formatter:v=>PCT?(lgTot?(v/lgTot*100).toFixed(1)+' %':''):eur(v)}:{display:false}}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'bottom',labels:{boxWidth:11,padding:10}},datalabels:state.labels?{display:true}:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${eur(c.parsed)} (${lgTot?(c.parsed/lgTot*100).toFixed(1):0} %)`}}}}});
   const occM=Array(12).fill(0);
   for(let m=1;m<=12;m++){const r=rows.filter(d=>d.mois===m&&d.tx_rempl!=null); if(r.length) occM[m-1]=r.reduce((s,d)=>s+d.tx_rempl,0)/r.length*100;}
   mk('cOcc',{type:'bar',data:{labels:MONTHS,datasets:[{label:'Occupation',data:occM,backgroundColor:css('--lodge'),borderRadius:5,datalabels:DL(v=>Math.round(v)+'%')}]},options:baseOpt({suffix:' %',legend:false,max:110})});
@@ -786,7 +831,44 @@ function renderCommission(rows){
   mk('cComm',{type:'bar',data:{labels:MONTHS,datasets},options:Object.assign(baseOpt({money:true,legend:stacked}),{scales:{x:{stacked,grid:{display:false}},y:{stacked,beginAtZero:true,grid:{color:'rgba(40,48,64,.5)'},ticks:{callback:v=>eur(v)}}},plugins:{legend:{display:stacked,position:'bottom',labels:{boxWidth:10,padding:7,font:{size:9.5}}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${eur(c.parsed.y)}`}}}})});
 }
 
+function renderObjEditor(){
+  const box=document.getElementById('objEditor'); if(!box) return;
+  if(!IS_ADMIN){ box.style.display='none'; return; }
+  box.style.display='block';
+  document.getElementById('objYear').textContent=state.year;
+  const a=objFor(state.year,'Ambassador'), l=objFor(state.year,'Lodge');
+  const def=(OBJECTIVES[state.year+'|Ambassador']||OBJECTIVES[state.year+'|Lodge'])?'valeurs personnalisées':'valeurs par défaut';
+  document.getElementById('objSource').textContent=def;
+  setVal('objAObj',a.obj); setVal('objAComm',a.comm); setVal('objAPm',a.pm);
+  setVal('objLObj',l.obj); setVal('objLComm',l.comm); setVal('objLPm',l.pm);
+}
+async function saveObjectives(){
+  const m=document.getElementById('objMsg');
+  const y=state.year;
+  const A={obj:numOrNull('objAObj'),comm:numOrNull('objAComm'),pm:numOrNull('objAPm')};
+  const L={obj:numOrNull('objLObj'),comm:numOrNull('objLComm'),pm:numOrNull('objLPm')};
+  if([A.obj,A.comm,A.pm,L.obj,L.comm,L.pm].some(v=>v==null||v<0)) { m.textContent='Toutes les valeurs doivent être des nombres ≥ 0.'; m.className='formmsg err'; return; }
+  m.textContent='Enregistrement…'; m.className='formmsg';
+  const recs=[{annee:y,logement:'Ambassador',obj_mois:A.obj,obj_comm:A.comm,point_mort:A.pm,updated_by:(CURRENT_USER&&CURRENT_USER.email)},
+              {annee:y,logement:'Lodge',obj_mois:L.obj,obj_comm:L.comm,point_mort:L.pm,updated_by:(CURRENT_USER&&CURRENT_USER.email)}];
+  try{
+    if(SUPA){ const {error}=await SUPA.from('objectives').upsert(recs); if(error)throw error; }
+    else { OBJECTIVES[y+'|Ambassador']={obj:A.obj,comm:A.comm,pm:A.pm}; OBJECTIVES[y+'|Lodge']={obj:L.obj,comm:L.comm,pm:L.pm}; localStorage.setItem('al_obj',JSON.stringify(OBJECTIVES)); }
+    await reload(); render(); m.textContent='✓ Objectifs enregistrés pour '+y+'.'; m.className='formmsg ok';
+  }catch(e){ m.textContent='Erreur : '+e.message; m.className='formmsg err'; }
+}
+function resetObjectives(){
+  if(!confirm(`Réinitialiser les objectifs ${state.year} aux valeurs par défaut ?`)) return;
+  const y=state.year;
+  (async()=>{ try{
+    if(SUPA){ await SUPA.from('objectives').delete().eq('annee',y); }
+    else { delete OBJECTIVES[y+'|Ambassador']; delete OBJECTIVES[y+'|Lodge']; localStorage.setItem('al_obj',JSON.stringify(OBJECTIVES)); }
+    await reload(); render(); document.getElementById('objMsg').textContent='✓ Valeurs par défaut rétablies pour '+y+'.'; document.getElementById('objMsg').className='formmsg ok';
+  }catch(e){ document.getElementById('objMsg').textContent='Erreur : '+e.message; } })();
+}
+
 function renderObjectives(rows,benefM,ob,benef,objAnnual){
+  renderObjEditor();
   const commM=monthly(rows,'commission'); const objAcum=cumul(Array(12).fill(ob.obj)),benefAcum=cumul(benefM);
   const deltaM=benefM.map(v=>v-ob.obj),pmM=benefM.map(v=>v-ob.pm);
   const lastMonth=Math.max(0,...rows.filter(d=>d.mois).map(d=>d.mois)); const objNow=objAcum[Math.max(0,lastMonth-1)]||0;
@@ -826,10 +908,13 @@ function renderExplorer(){
   const labels=pairs.map(p=>dim.fmtKey(p[0])); const color=state.expDim==='origine'?pairs.map(p=>CHAN_COLORS[p[0]]||'#888'):css('--gold');
   document.getElementById('expTitle').textContent=`${mes.label} par ${dim.label.toLowerCase()}`;
   const total=pairs.reduce((a,b)=>a+b[1],0);
-  document.getElementById('expSummary').textContent=(mes.agg==='avg'||mes.agg==='ratio')?`${pairs.length} ${dim.label.toLowerCase()}s`:`Total : ${mes.fmt(total)} · ${pairs.length} ${dim.label.toLowerCase()}s`;
+  const showPct = state.unit==='pct' && (mes.agg==='sum'||mes.agg==='count');
+  const fmt = showPct? (v=>(v||0).toFixed(1)+' %') : mes.fmt;
+  const plot = showPct? pairs.map(p=>total?p[1]/total*100:0) : pairs.map(p=>p[1]);
+  document.getElementById('expSummary').textContent=(mes.agg==='avg'||mes.agg==='ratio')?`${pairs.length} ${dim.label.toLowerCase()}s`:`Total : ${mes.fmt(total)} · ${pairs.length} ${dim.label.toLowerCase()}s${showPct?' · affichage en %':''}`;
   const horiz=labels.length>8;
-  mk('cExp',{type:'bar',data:{labels,datasets:[{label:mes.label,data:pairs.map(p=>p[1]),backgroundColor:color,borderRadius:5,datalabels:{display:true,anchor:'end',align:'end',clamp:true,color:css('--txt'),font:{size:10,weight:'600'},formatter:v=>v?mes.fmt(v):''}}]},
-    options:Object.assign(baseOpt({legend:false}),{indexAxis:horiz?'y':'x',scales:horiz?{x:{grid:{color:'rgba(40,48,64,.5)'},ticks:{callback:v=>mes.fmt(v)}},y:{grid:{display:false}}}:{x:{grid:{display:false}},y:{beginAtZero:true,grid:{color:'rgba(40,48,64,.5)'},ticks:{callback:v=>mes.fmt(v)}}},plugins:{legend:{display:false},datalabels:{display:true},tooltip:{callbacks:{label:c=>` ${mes.label}: ${mes.fmt(c.parsed[horiz?'x':'y'])}`}}}})});
+  mk('cExp',{type:'bar',data:{labels,datasets:[{label:mes.label,data:plot,backgroundColor:color,borderRadius:5,datalabels:{display:true,anchor:'end',align:'end',clamp:true,color:css('--txt'),font:{size:10,weight:'600'},formatter:v=>v?fmt(v):''}}]},
+    options:Object.assign(baseOpt({legend:false}),{indexAxis:horiz?'y':'x',scales:horiz?{x:{grid:{color:'rgba(40,48,64,.5)'},ticks:{callback:v=>fmt(v)}},y:{grid:{display:false}}}:{x:{grid:{display:false}},y:{beginAtZero:true,grid:{color:'rgba(40,48,64,.5)'},ticks:{callback:v=>fmt(v)}}},plugins:{legend:{display:false},datalabels:{display:true},tooltip:{callbacks:{label:c=>` ${mes.label}: ${fmt(c.parsed[horiz?'x':'y'])}`}}}})});
 }
 
 function renderReservs(rows){
