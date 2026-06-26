@@ -7,6 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1c2330;--line:#283040;--txt:#e6edf3;--muted:#8b97a8;--gold:#d4af37;--gold2:#f1d27a;--amb:#d4af37;--lodge:#3fb6c9;--green:#3fb950;--red:#f85149;--blue:#58a6ff;--violet:#bc8cff;--orange:#e3893b;}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -41,7 +42,14 @@ select.mini{background:var(--panel2);border:1px solid var(--line);color:var(--mu
 .kpi .val{font-size:23px;font-weight:700}.kpi .sub{font-size:11.5px;color:var(--muted);margin-top:5px}
 .grid{display:grid;gap:16px}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1.4fr 1fr 1fr}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:16px 18px;margin-bottom:16px}
-.card h3{font-size:14px;font-weight:600;margin-bottom:3px;display:flex;justify-content:space-between;align-items:center}
+.card h3{font-size:14px;font-weight:600;margin-bottom:3px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.cardtools{display:inline-flex;gap:4px;margin-left:auto}
+.ctool{background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:6px;padding:2px 7px;font-size:11px;font-weight:700;cursor:pointer;line-height:1.4}
+.ctool:hover{border-color:var(--gold);color:var(--gold)}
+.card:fullscreen{background:var(--bg);padding:30px 40px;overflow:auto}
+.card:fullscreen .chartbox,.card:fullscreen .chartbox.sm{height:82vh !important}
+.tbl td.hl{background:rgba(212,175,55,.20);font-weight:700;color:var(--gold2) !important}
+canvas{cursor:pointer}
 .card h3 .hint{font-size:11px;color:var(--muted);font-weight:400}
 .card .desc{font-size:11.5px;color:var(--muted);margin-bottom:12px}
 .chartbox{position:relative;height:280px}.chartbox.sm{height:230px}
@@ -281,7 +289,7 @@ td.actions{white-space:nowrap}
 <!-- EXPLORATEUR -->
 <div class="view" id="v-explore">
   <div class="card">
-    <h3 id="expTitle">Explorateur</h3>
+    <h3><span id="expTitle">Explorateur</span></h3>
     <div class="desc">Croisez librement n'importe quelle mesure avec n'importe quelle variable, et triez dans tous les sens. Les filtres du bandeau s'appliquent.</div>
     <div class="exprow">
       <div class="fg"><label>Mesure (Y)</label><select id="expMes"></select></div>
@@ -508,6 +516,43 @@ const Store={
 if(window.ChartDataLabels) Chart.register(window.ChartDataLabels);
 Chart.defaults.color=css('--muted'); Chart.defaults.font.family="-apple-system,Segoe UI,Roboto,sans-serif"; Chart.defaults.font.size=11;
 Chart.defaults.plugins.datalabels={display:false};
+Chart.defaults.onClick=(e,els,chart)=>{ if(els&&els.length) drillFromChart(chart.canvas.id, els[0].index, chart); };
+
+// ===== Plein écran + export + drill-down =====
+let HILITE=null;
+const MONTHLY_METRIC={cBenef:'benefice',cComm:'commission',cTaxe:'taxe',cPrix:'cout_nuit',cOcc:null,cDelta:'benefice',cPM:'benefice',cCumul:'benefice',cSolde:'reste_a_payer'};
+function syncFilters(){ const fM=document.getElementById('fMonth'); if(fM)fM.value=state.month; const fC=document.getElementById('fChan'); if(fC)fC.value=state.chan; const fY=document.getElementById('fYear'); if(fY)fY.value=state.year; document.querySelectorAll('#fLog button').forEach(b=>b.classList.toggle('on',b.dataset.v===state.log)); }
+function gotoReservs(){ const t=document.querySelector('.tabs button[data-t="reservs"]'); if(t){ document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('on')); t.classList.add('on'); document.querySelectorAll('.view').forEach(v=>v.classList.remove('on')); document.getElementById('v-reservs').classList.add('on'); } }
+function drillFromChart(id,i,chart){
+  const lab=(chart.data.labels||[])[i];
+  if(id in MONTHLY_METRIC){ state.month=String(i+1); HILITE=MONTHLY_METRIC[id]; }
+  else if(id==='cChan'){ state.chan=lab; HILITE='montant'; }
+  else if(id==='cLog'){ state.log=lab; HILITE='montant'; }
+  else if(id==='cExp'){ const dim=state.expDim; if(dim==='mois'){ state.month=String(MONTHS.indexOf(lab)+1); } else if(dim==='origine'){ state.chan=lab; } else if(dim==='logement'){ state.log=lab; } else if(dim==='annee'){ state.year=+lab; } HILITE=(MEASURES[state.expMes]&&MEASURES[state.expMes].field)||null; }
+  else { return; }
+  syncFilters(); gotoReservs(); render();
+  setTimeout(()=>{ const c=document.querySelector('#v-reservs .card'); if(c) c.scrollIntoView({behavior:'smooth',block:'start'}); },60);
+}
+function download(name,type,content){ const b=new Blob([content],{type}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(u),1500); }
+function chartTitle(id){ const cv=document.getElementById(id); const card=cv&&cv.closest('.card'); const h=card&&card.querySelector('h3'); return h? h.childNodes[0].textContent.trim() : id; }
+function exportCSV(id){ const c=charts[id]; if(!c)return; const labs=c.data.labels||[]; const ds=c.data.datasets.filter(d=>d.data&&d.data.length); const header=['Catégorie',...ds.map(d=>d.label||'Série')]; const lines=[header.join(';')]; labs.forEach((lab,i)=>{ lines.push([lab,...ds.map(d=>{const v=d.data[i]; return v==null?'':String(v).replace('.',',');})].join(';')); }); download(chartTitle(id).replace(/[^\w]+/g,'_')+'.csv','text/csv;charset=utf-8','﻿'+lines.join('\n')); }
+function exportPDF(id){ const cv=document.getElementById(id); if(!cv||!window.jspdf)return; const img=cv.toDataURL('image/png',1.0); const {jsPDF}=window.jspdf; const pdf=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'}); pdf.setFontSize(15); pdf.setTextColor(30); pdf.text('Ambassador & Lodge — '+chartTitle(id),14,16); pdf.setFontSize(9); pdf.setTextColor(120); pdf.text('Exercice '+state.year+' · '+(state.log==='all'?'Ambassador + Lodge':state.log)+' · '+new Date().toLocaleDateString('fr-FR'),14,22); const W=270,H=Math.min(W*cv.height/cv.width,165); pdf.setFillColor(13,17,23); pdf.rect(12,26,W+4,H+6,'F'); pdf.addImage(img,'PNG',14,29,W,H); pdf.save(chartTitle(id).replace(/[^\w]+/g,'_')+'.pdf'); }
+function toggleFull(card){ if(document.fullscreenElement===card){ document.exitFullscreen(); } else if(card.requestFullscreen){ card.requestFullscreen().catch(()=>{}); } }
+function injectCardTools(){
+  document.querySelectorAll('.card').forEach(card=>{
+    const cv=card.querySelector('canvas'); const h3=card.querySelector('h3');
+    if(!cv||!h3||h3.querySelector('.cardtools')) return;
+    const id=cv.id;
+    const t=document.createElement('span'); t.className='cardtools';
+    t.innerHTML='<button class="ctool" title="Exporter en Excel (CSV)">⤓</button><button class="ctool" title="Exporter en PDF">PDF</button><button class="ctool" title="Plein écran">⤢</button>';
+    h3.appendChild(t);
+    const b=t.querySelectorAll('.ctool');
+    b[0].onclick=(e)=>{e.stopPropagation();exportCSV(id);};
+    b[1].onclick=(e)=>{e.stopPropagation();exportPDF(id);};
+    b[2].onclick=(e)=>{e.stopPropagation();toggleFull(card);};
+  });
+  document.addEventListener('fullscreenchange',()=>{ Object.values(charts).forEach(c=>{try{c.resize();}catch(e){}}); });
+}
 
 document.addEventListener('DOMContentLoaded', boot);
 async function boot(){
@@ -709,7 +754,7 @@ function initUI(){
   if(_uiDone){ render(); return; } _uiDone=true;
   document.querySelectorAll('#fLog button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#fLog button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); state.log=b.dataset.v; render(); });
   document.getElementById('tLabels').onclick=function(){ state.labels=!state.labels; this.classList.toggle('on',state.labels); this.textContent=state.labels?'Valeurs affichées':'Afficher les valeurs'; render(); };
-  document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); document.querySelectorAll('.view').forEach(v=>v.classList.remove('on')); document.getElementById('v-'+b.dataset.t).classList.add('on'); if(b.dataset.t==='trash'){ renderTrash(); } else if(b.dataset.t==='admin'){ renderAdmin(); } else { setTimeout(render,30); } });
+  document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{ HILITE=null; document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); document.querySelectorAll('.view').forEach(v=>v.classList.remove('on')); document.getElementById('v-'+b.dataset.t).classList.add('on'); if(b.dataset.t==='trash'){ renderTrash(); } else if(b.dataset.t==='admin'){ renderAdmin(); } else { setTimeout(render,30); } });
   const bi=document.getElementById('btnInvite'); if(bi) bi.onclick=inviteEmail;
   document.querySelectorAll('#fUnit button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#fUnit button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); state.unit=b.dataset.v; render(); });
   const tcu=document.getElementById('tCumul'); if(tcu) tcu.onclick=function(){ state.cumul=!state.cumul; this.classList.toggle('on',state.cumul); this.textContent=state.cumul?'Cumul affiché':'Cumul masqué'; render(); };
@@ -726,6 +771,7 @@ function initUI(){
   document.getElementById('commChan').onchange=e=>{state.commChan=e.target.value; render();};
   renderErrors();
   render();
+  injectCardTools();
 }
 function buildFilters(){
   const years=[...new Set(ROWS.filter(d=>d.annee).map(d=>d.annee))].sort();
@@ -975,18 +1021,19 @@ function renderExplorer(){
 function renderReservs(rows){
   const {key,dir}=state.rsort; const v=(d)=>key==='client'?((d.nom||'')+' '+(d.prenom||'')).trim():(key==='saisi'?(d.created_by_email||''):d[key]);
   const sorted=[...rows].sort((a,b)=>{let x=v(a),y=v(b); if(x==null)x=-Infinity; if(y==null)y=-Infinity; if(typeof x==='number'&&typeof y==='number')return (x-y)*dir; return (''+x).localeCompare(''+y)*dir;});
-  document.getElementById('rcount').textContent=`${sorted.length} lignes`;
+  const HLABEL={montant:'Montant',commission:'Commission',benefice:'Bénéfice net',reste_a_payer:'Reste à payer',nuitees:'Nuitées'};
+  document.getElementById('rcount').textContent=`${sorted.length} lignes`+(HILITE&&HLABEL[HILITE]?` · colonne « ${HLABEL[HILITE]} » mise en évidence`:'');
   document.querySelectorAll('#rthead th[data-k]').forEach(th=>{ th.classList.toggle('sorted',th.dataset.k===key); const base=th.getAttribute('data-base')||th.textContent.replace(/[ ▲▼]+$/,''); th.setAttribute('data-base',base); th.textContent=base+(th.dataset.k===key?(dir>0?' ▲':' ▼'):''); });
   document.getElementById('rtbody').innerHTML=sorted.map(d=>{
     const canAct = d.id!=null;
     const acts = canAct ? `<button class="mini-act" title="Modifier" data-act="edit" data-id="${d.id}">✏️</button><button class="mini-act" title="Historique" data-act="hist" data-id="${d.id}">🕑</button><button class="mini-act del" title="Supprimer" data-act="del" data-id="${d.id}">🗑️</button>` : '<span style="color:var(--muted);font-size:11px">—</span>';
     return `<tr>
     <td><span class="pill ${d.logement==='Ambassador'?'amb':'lodge'}">${d.logement}</span>${(d.version>1)?` <span class="vbadge">v${d.version}</span>`:''}</td>
-    <td>${fmtDate(d.entree)}</td><td>${fmtDate(d.sortie)}</td><td>${d.nuitees??'—'}</td>
+    <td>${fmtDate(d.entree)}</td><td>${fmtDate(d.sortie)}</td><td class="num${HILITE==='nuitees'?' hl':''}">${d.nuitees??'—'}</td>
     <td>${(d.nom||'')+' '+(d.prenom||'')}</td><td>${d.origine}</td>
-    <td class="num">${eur(d.montant)}</td><td class="num">${eur(d.commission)}</td>
-    <td class="num" style="color:${css('--green')}">${eur(d.benefice)}</td>
-    <td class="num" style="color:${(d.reste_a_payer||0)>1?css('--orange'):'var(--muted)'}">${d.reste_a_payer?eur(d.reste_a_payer):'—'}</td>
+    <td class="num${HILITE==='montant'?' hl':''}">${eur(d.montant)}</td><td class="num${HILITE==='commission'?' hl':''}">${eur(d.commission)}</td>
+    <td class="num${HILITE==='benefice'?' hl':''}" style="color:${css('--green')}">${eur(d.benefice)}</td>
+    <td class="num${HILITE==='reste_a_payer'?' hl':''}" style="color:${(d.reste_a_payer||0)>1?css('--orange'):'var(--muted)'}">${d.reste_a_payer?eur(d.reste_a_payer):'—'}</td>
     <td style="color:var(--muted);font-size:11px">${d.created_by_email||'—'}</td>
     <td class="actions">${acts}</td></tr>`;}).join('');
   document.querySelectorAll('#rtbody .mini-act').forEach(b=>b.onclick=()=>{
