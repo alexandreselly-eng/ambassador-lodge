@@ -75,7 +75,7 @@ select.mini{background:var(--panel2);border:1px solid var(--line);color:var(--mu
 .formmsg{font-size:13px;font-weight:600}.formmsg.ok{color:var(--green)}.formmsg.err{color:var(--red)}
 .sectitle{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--gold2);font-weight:700;margin:8px 0 2px;grid-column:1/-1;border-top:1px solid var(--line);padding-top:14px}
 /* auth */
-#authOverlay{display:none;position:fixed;inset:0;background:var(--bg);z-index:50;align-items:center;justify-content:center}
+#authOverlay,#deniedOverlay,#pwdOverlay{display:none;position:fixed;inset:0;background:var(--bg);z-index:50;align-items:center;justify-content:center}
 .authcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:34px 32px;width:380px;max-width:92vw}
 .authcard h2{font-size:21px;margin-bottom:4px}.authcard h2 .acc{color:var(--gold)}
 .authcard p{color:var(--muted);font-size:12.5px;margin-bottom:20px}
@@ -125,6 +125,27 @@ td.actions{white-space:nowrap}
   </div>
 </div>
 
+<!-- ACCÈS REFUSÉ -->
+<div id="deniedOverlay" style="display:none">
+  <div class="authcard">
+    <h2>Accès <span class="acc">restreint</span></h2>
+    <p id="deniedMsg">Accès non autorisé.</p>
+    <button class="btn sec" id="btnDeniedLogout">Se déconnecter</button>
+  </div>
+</div>
+
+<!-- DÉFINIR MOT DE PASSE (invitation) -->
+<div id="pwdOverlay" style="display:none">
+  <div class="authcard">
+    <h2>Bienvenue <span class="acc">!</span></h2>
+    <p>Définissez votre mot de passe pour accéder à l'outil Ambassador &amp; Lodge.</p>
+    <input id="newPwd" type="password" placeholder="Nouveau mot de passe" autocomplete="new-password">
+    <input id="newPwd2" type="password" placeholder="Confirmer le mot de passe" autocomplete="new-password">
+    <button class="btn" id="btnSetPwd" style="width:100%;margin-top:4px">Définir mon mot de passe</button>
+    <div class="authmsg" id="pwdMsg"></div>
+  </div>
+</div>
+
 <!-- APPLICATION -->
 <div id="app" style="display:none">
 <div class="wrap">
@@ -151,6 +172,7 @@ td.actions{white-space:nowrap}
   <button data-t="reservs">Réservations</button>
   <button data-t="trash">Corbeille</button>
   <button data-t="err">Qualité des données</button>
+  <button data-t="admin" style="display:none;color:var(--gold)">⚙ Admin</button>
 </div>
 
 <!-- SAISIE -->
@@ -254,6 +276,22 @@ td.actions{white-space:nowrap}
   </div>
 </div>
 
+<!-- ADMIN -->
+<div class="view" id="v-admin">
+  <div class="card">
+    <h3>Gestion des accès <span class="hint" id="adminCount"></span></h3>
+    <div class="desc">Saisissez l'e-mail d'une personne à autoriser : elle reçoit automatiquement une invitation pour créer son mot de passe et se connecter. Seuls les e-mails listés ici (et vous) peuvent accéder à l'outil.</div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+      <input id="adminEmail" type="email" placeholder="adresse@exemple.com" style="flex:1;min-width:240px;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:9px 11px;font-size:13.5px;outline:none">
+      <button class="btn" id="btnInvite">Inviter</button>
+      <span class="formmsg" id="adminMsg"></span>
+    </div>
+    <div class="scroll">
+      <table class="tbl"><thead><tr><th>E-mail autorisé</th><th>Statut</th><th>Ajouté le</th><th>Action</th></tr></thead><tbody id="adminBody"></tbody></table>
+    </div>
+  </div>
+</div>
+
 <!-- CORBEILLE -->
 <div class="view" id="v-trash">
   <div class="card">
@@ -351,6 +389,8 @@ function compute(r){
 let SUPA=null;
 if(SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase){ SUPA=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY); }
 const ONLINE=!!SUPA;
+const EDGE_URL = SUPABASE_URL ? SUPABASE_URL.replace(/\/$/,'')+'/functions/v1/invite' : '';
+let IS_ADMIN=false, NEEDS_PASSWORD=false;
 const FIELDS=['logement','date_resa','entree','sortie','origine','nom','prenom','nb_pers','nb_adultes','montant','taxe','ac1','ac1_date','ac2','ac2_date','ac3','ac3_date','frais_menage','obs'];
 
 // --- mode local : base matérialisée dans le navigateur (fallback) ---
@@ -416,23 +456,56 @@ document.addEventListener('DOMContentLoaded', boot);
 async function boot(){
   document.getElementById('modeBadge').textContent = ONLINE?'En ligne (Supabase)':'Mode local (démo)';
   document.getElementById('modeBadge').className='modebadge '+(ONLINE?'on':'off');
-  wireAuth(); wireForm();
+  if(/type=(invite|recovery)/.test(window.location.hash||'')) NEEDS_PASSWORD=true;
+  wireAuth(); wireForm(); wireSetPassword();
   if(SUPA){
     const {data:{session}}=await SUPA.auth.getSession();
     session? enterApp(session.user) : showAuth();
-    SUPA.auth.onAuthStateChange((_e,s)=>{ s? enterApp(s.user) : showAuth(); });
+    SUPA.auth.onAuthStateChange((e,s)=>{ if(e==='PASSWORD_RECOVERY') NEEDS_PASSWORD=true; s? enterApp(s.user) : showAuth(); });
   } else {
     enterApp({email:'mode local'});
   }
 }
-function showAuth(){ document.getElementById('authOverlay').style.display='flex'; document.getElementById('app').style.display='none'; }
+function hideAll(){ ['authOverlay','app','deniedOverlay','pwdOverlay'].forEach(id=>{const e=document.getElementById(id); if(e)e.style.display='none';}); }
+function showAuth(){ hideAll(); document.getElementById('authOverlay').style.display='flex'; }
+async function checkAccess(email){
+  if(!SUPA) return {admin:true, authorized:true};
+  try{
+    const {data:adm}=await SUPA.from('app_admins').select('email').eq('email',email).maybeSingle();
+    if(adm) return {admin:true, authorized:true};
+    const {data:au}=await SUPA.from('authorized_emails').select('email').eq('email',email).maybeSingle();
+    return {admin:false, authorized:!!au};
+  }catch(e){ return {admin:false, authorized:false}; }
+}
 async function enterApp(user){
   CURRENT_USER=user;
-  document.getElementById('authOverlay').style.display='none';
-  document.getElementById('app').style.display='block';
-  document.getElementById('userBadge').textContent=user.email||'connecté';
+  if(NEEDS_PASSWORD){ showSetPassword(); return; }
+  const acc=await checkAccess(user.email); IS_ADMIN=acc.admin;
+  if(!acc.authorized){ showDenied(user.email); return; }
+  hideAll(); document.getElementById('app').style.display='block';
+  document.getElementById('userBadge').textContent=(user.email||'connecté')+(IS_ADMIN?' · admin':'');
   document.getElementById('btnLogout').style.display = ONLINE?'inline-block':'none';
+  const at=document.querySelector('.tabs button[data-t="admin"]'); if(at) at.style.display=IS_ADMIN?'inline-block':'none';
   await reload(); initUI();
+}
+function showDenied(email){
+  hideAll(); const o=document.getElementById('deniedOverlay'); o.style.display='flex';
+  document.getElementById('deniedMsg').textContent=`L'accès n'est pas (ou plus) autorisé pour ${email}. Contactez l'administrateur pour être ajouté.`;
+  document.getElementById('btnDeniedLogout').onclick=async()=>{ if(SUPA) await SUPA.auth.signOut(); };
+}
+function showSetPassword(){ hideAll(); document.getElementById('pwdOverlay').style.display='flex'; }
+function wireSetPassword(){
+  const b=document.getElementById('btnSetPwd'); if(!b) return;
+  b.onclick=async()=>{
+    const p=document.getElementById('newPwd').value, p2=document.getElementById('newPwd2').value;
+    const m=document.getElementById('pwdMsg');
+    if(p.length<6) return (m.textContent='Mot de passe trop court (6 caractères min).', m.className='authmsg err');
+    if(p!==p2) return (m.textContent='Les deux mots de passe diffèrent.', m.className='authmsg err');
+    try{ const {error}=await SUPA.auth.updateUser({password:p}); if(error) throw error;
+      NEEDS_PASSWORD=false; history.replaceState(null,'',window.location.pathname);
+      const {data:{user}}=await SUPA.auth.getUser(); enterApp(user);
+    }catch(e){ m.textContent='Erreur : '+e.message; m.className='authmsg err'; }
+  };
 }
 async function reload(){ const raw=await Store.list(); ROWS=raw.map(compute); }
 
@@ -506,8 +579,11 @@ async function saveForm(){
   if(new Date(r.sortie)<new Date(r.entree)) return formMsg('La date de sortie ne peut pas être avant l\'entrée.','err');
   if(r.montant==null) return formMsg('Le montant est obligatoire.','err');
   if(!r.nom) return formMsg('Le nom est obligatoire.','err');
+  const editing=!!state.editId;
+  if(editing){
+    if(!confirm(`Confirmer la modification de la réservation de ${r.nom} (${fmtDate(r.entree)}) ?\nLes changements seront enregistrés et historisés (nouvelle version).`)) return formMsg('Modification non confirmée.');
+  }
   try{
-    const editing=!!state.editId;
     formMsg(editing?'Mise à jour…':'Enregistrement…');
     if(editing){ await Store.update(state.editId,r); } else { await Store.add(r); }
     await reload(); buildFilters(); render();
@@ -576,7 +652,8 @@ function initUI(){
   if(_uiDone){ render(); return; } _uiDone=true;
   document.querySelectorAll('#fLog button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#fLog button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); state.log=b.dataset.v; render(); });
   document.getElementById('tLabels').onclick=function(){ state.labels=!state.labels; this.classList.toggle('on',state.labels); this.textContent=state.labels?'Valeurs affichées':'Afficher les valeurs'; render(); };
-  document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); document.querySelectorAll('.view').forEach(v=>v.classList.remove('on')); document.getElementById('v-'+b.dataset.t).classList.add('on'); if(b.dataset.t==='trash'){ renderTrash(); } else { setTimeout(render,30); } });
+  document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); document.querySelectorAll('.view').forEach(v=>v.classList.remove('on')); document.getElementById('v-'+b.dataset.t).classList.add('on'); if(b.dataset.t==='trash'){ renderTrash(); } else if(b.dataset.t==='admin'){ renderAdmin(); } else { setTimeout(render,30); } });
+  const bi=document.getElementById('btnInvite'); if(bi) bi.onclick=inviteEmail;
   document.getElementById('histClose').onclick=()=>document.getElementById('histModal').style.display='none';
   document.getElementById('histModal').onclick=(e)=>{ if(e.target.id==='histModal') e.target.style.display='none'; };
   bindSort('sortChan'); bindSort('sortLog');
@@ -665,6 +742,39 @@ function render(){
   renderCommission(rows);
   mk('cTaxe',{type:'bar',data:{labels:MONTHS,datasets:[{label:'Taxes séjour',data:monthly(rows,'taxe'),backgroundColor:css('--violet'),borderRadius:5,datalabels:DL(eur,css('--violet'))}]},options:baseOpt({money:true,legend:false})});
   renderObjectives(rows,benefM,ob,benef,objAnnual); renderReservs(rows); renderExplorer();
+}
+
+// ---------- Section admin : liste blanche + invitations ----------
+async function renderAdmin(){
+  if(!IS_ADMIN) return;
+  let rows=[];
+  try{ const {data,error}=await SUPA.from('authorized_emails').select('*').order('added_at',{ascending:false}); if(error)throw error; rows=data||[]; }
+  catch(e){ document.getElementById('adminBody').innerHTML=`<tr><td colspan="4">Erreur : ${e.message}</td></tr>`; }
+  document.getElementById('adminCount').textContent=`${rows.length} accès`;
+  document.getElementById('adminBody').innerHTML = rows.length? rows.map(r=>`<tr>
+      <td>${r.email}</td><td>${r.status||''}</td><td>${fmtDateTime(r.added_at)}</td>
+      <td><button class="mini-act del" data-em="${r.email}">Révoquer</button></td></tr>`).join('')
+    : '<tr><td colspan="4" style="color:var(--muted)">Aucun accès autorisé pour l\'instant.</td></tr>';
+  document.querySelectorAll('#adminBody .mini-act').forEach(b=>b.onclick=()=>removeAuthorized(b.dataset.em));
+}
+async function inviteEmail(){
+  const inp=document.getElementById('adminEmail'); const email=(inp.value||'').trim().toLowerCase();
+  const m=document.getElementById('adminMsg');
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ m.textContent='Adresse e-mail invalide.'; m.className='formmsg err'; return; }
+  m.textContent='Envoi de l\'invitation…'; m.className='formmsg';
+  try{
+    const {data:{session}}=await SUPA.auth.getSession();
+    const res=await fetch(EDGE_URL,{method:'POST',headers:{'Authorization':'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({invite:email})});
+    const out=await res.json();
+    if(!res.ok||out.error) throw new Error(out.error||('HTTP '+res.status));
+    m.textContent = out.already? `✓ ${email} déjà inscrit, ajouté aux accès.` : `✓ Invitation envoyée à ${email}.`; m.className='formmsg ok';
+    inp.value=''; renderAdmin();
+  }catch(e){ m.textContent='Erreur : '+e.message; m.className='formmsg err'; }
+}
+async function removeAuthorized(email){
+  if(!confirm(`Révoquer l'accès de ${email} ?\nLa personne ne pourra plus consulter ni saisir.`)) return;
+  try{ const {error}=await SUPA.from('authorized_emails').delete().eq('email',email); if(error)throw error; renderAdmin(); toast('Accès révoqué.'); }
+  catch(e){ alert('Erreur : '+e.message); }
 }
 
 function renderCommission(rows){
