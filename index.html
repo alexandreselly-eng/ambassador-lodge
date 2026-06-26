@@ -169,6 +169,7 @@ td.actions{white-space:nowrap}
     <div class="fg"><label>Mois</label><select id="fMonth"></select></div>
     <div class="fg"><label>Canal</label><select id="fChan"></select></div>
     <div class="fg"><label>Affichage</label><button id="tLabels" class="toggle on">Valeurs affichées</button></div>
+    <div class="fg"><label>Cumul</label><button id="tCumul" class="toggle on">Cumul affiché</button></div>
     <div class="fg"><label>Unité</label><div class="seg" id="fUnit"><button data-v="eur" class="on">€</button><button data-v="pct">%</button></div></div>
   </div>
 </header>
@@ -396,7 +397,9 @@ let ROWS=[];   // données calculées en mémoire
 let CURRENT_USER=null;
 const state={ year:null, log:'all', chan:'all', month:'all', labels:true, commChan:'all',
   sortChan:'val-desc', sortLog:'val-desc', expDim:'mois', expMes:'montant', expSort:'val-desc',
-  rsort:{key:'entree',dir:-1}, editId:null, unit:'eur' };
+  rsort:{key:'entree',dir:-1}, editId:null, unit:'eur', cumul:true };
+function cumulDS(label,arr,color){ return {label, type:'line', data:cumul(arr), borderColor:color, borderWidth:2, pointRadius:2, pointBackgroundColor:color, tension:.25, yAxisID:'y1', order:0, datalabels: state.labels?{display:true,align:'top',color, font:{size:9,weight:'600'}, formatter:v=>eur(v)}:{display:false}}; }
+function addY1(opts,color){ opts.scales=opts.scales||{}; opts.scales.y1={position:'right',beginAtZero:true,grid:{display:false},ticks:{callback:v=>eur(v),font:{size:9},color}}; return opts; }
 const charts={};
 
 // ---------- moteur de calcul (remplace les formules Excel) ----------
@@ -692,6 +695,7 @@ function initUI(){
   document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); document.querySelectorAll('.view').forEach(v=>v.classList.remove('on')); document.getElementById('v-'+b.dataset.t).classList.add('on'); if(b.dataset.t==='trash'){ renderTrash(); } else if(b.dataset.t==='admin'){ renderAdmin(); } else { setTimeout(render,30); } });
   const bi=document.getElementById('btnInvite'); if(bi) bi.onclick=inviteEmail;
   document.querySelectorAll('#fUnit button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#fUnit button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); state.unit=b.dataset.v; render(); });
+  const tcu=document.getElementById('tCumul'); if(tcu) tcu.onclick=function(){ state.cumul=!state.cumul; this.classList.toggle('on',state.cumul); this.textContent=state.cumul?'Cumul affiché':'Cumul masqué'; render(); };
   const bso=document.getElementById('btnSaveObj'); if(bso) bso.onclick=saveObjectives;
   const bro=document.getElementById('btnResetObj'); if(bro) bro.onclick=resetObjectives;
   document.getElementById('histClose').onclick=()=>document.getElementById('histModal').style.display='none';
@@ -763,9 +767,12 @@ function render(){
     kpiCard('Reste à encaisser',eur(reste),'soldes clients ouverts','b5'),
   ].join('');
   const benefM=monthly(rows,'benefice');
-  mk('cBenef',{type:'bar',data:{labels:MONTHS,datasets:[
+  const benefDS=[
     {label:'Bénéfice net',data:benefM,backgroundColor:css('--gold'),borderRadius:5,order:2,datalabels:DL(eur,css('--gold2'))},
-    {label:'Objectif',type:'line',data:Array(12).fill(ob.obj),borderColor:css('--red'),borderWidth:2,borderDash:[6,4],pointRadius:0,order:1,datalabels:{display:false}}]},options:baseOpt({money:true,legend:true})});
+    {label:'Objectif',type:'line',data:Array(12).fill(ob.obj),borderColor:css('--red'),borderWidth:2,borderDash:[6,4],pointRadius:0,order:1,datalabels:{display:false}}];
+  let benefOpt=baseOpt({money:true,legend:true});
+  if(state.cumul){ benefDS.push(cumulDS('Bénéfice cumulé',benefM,css('--green'))); addY1(benefOpt,css('--green')); }
+  mk('cBenef',{type:'bar',data:{labels:MONTHS,datasets:benefDS},options:benefOpt});
   const PCT=state.unit==='pct';
   const byChan={}; rows.forEach(d=>{byChan[d.origine]=(byChan[d.origine]||0)+(d.montant||0);});
   let chP=applySort(Object.entries(byChan),state.sortChan);
@@ -785,7 +792,11 @@ function render(){
   const caM=monthly(rows,'montant'),nuitM=monthly(rows,'nuitees'); const prixM=caM.map((v,i)=>nuitM[i]?v/nuitM[i]:0);
   mk('cPrix',{type:'line',data:{labels:MONTHS,datasets:[{label:'Prix/nuit',data:prixM,borderColor:css('--blue'),backgroundColor:'rgba(88,166,255,.12)',fill:true,tension:.3,pointRadius:3,pointBackgroundColor:css('--blue'),datalabels:DL(eur,css('--blue'))}]},options:baseOpt({money:true,legend:false})});
   renderCommission(rows);
-  mk('cTaxe',{type:'bar',data:{labels:MONTHS,datasets:[{label:'Taxes séjour',data:monthly(rows,'taxe'),backgroundColor:css('--violet'),borderRadius:5,datalabels:DL(eur,css('--violet'))}]},options:baseOpt({money:true,legend:false})});
+  const taxeM=monthly(rows,'taxe');
+  const taxeDS=[{label:'Taxes séjour',data:taxeM,backgroundColor:css('--violet'),borderRadius:5,datalabels:DL(eur,css('--violet'))}];
+  let taxeOpt=baseOpt({money:true,legend:state.cumul});
+  if(state.cumul){ taxeDS.push(cumulDS('Taxes cumulées',taxeM,css('--green'))); addY1(taxeOpt,css('--green')); }
+  mk('cTaxe',{type:'bar',data:{labels:MONTHS,datasets:taxeDS},options:taxeOpt});
   renderObjectives(rows,benefM,ob,benef,objAnnual); renderReservs(rows); renderExplorer();
 }
 
@@ -828,7 +839,10 @@ function renderCommission(rows){
     const chans=[...new Set(rows.map(d=>d.origine))].map(c=>[c,rows.filter(d=>d.origine===c).reduce((s,d)=>s+(d.commission||0),0)]).sort((a,b)=>b[1]-a[1]).map(p=>p[0]);
     datasets=chans.map(c=>{ const arr=Array(12).fill(0); rows.filter(d=>d.origine===c).forEach(d=>{if(d.mois&&d.commission)arr[d.mois-1]+=d.commission;}); return {label:c,data:arr,backgroundColor:CHAN_COLORS[c]||'#888',borderRadius:3,stack:'c',datalabels:state.labels?{display:ctx=>ctx.dataset.data[ctx.dataIndex]>120,color:'#0d1117',font:{size:9,weight:'700'},formatter:v=>v?Math.round(v):''}:{display:false}}; });
   } else { const arr=Array(12).fill(0); rows.filter(d=>d.origine===state.commChan).forEach(d=>{if(d.mois&&d.commission)arr[d.mois-1]+=d.commission;}); datasets=[{label:'Commission '+state.commChan,data:arr,backgroundColor:CHAN_COLORS[state.commChan]||css('--orange'),borderRadius:5,datalabels:DL(eur)}]; }
-  mk('cComm',{type:'bar',data:{labels:MONTHS,datasets},options:Object.assign(baseOpt({money:true,legend:stacked}),{scales:{x:{stacked,grid:{display:false}},y:{stacked,beginAtZero:true,grid:{color:'rgba(40,48,64,.5)'},ticks:{callback:v=>eur(v)}}},plugins:{legend:{display:stacked,position:'bottom',labels:{boxWidth:10,padding:7,font:{size:9.5}}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${eur(c.parsed.y)}`}}}})});
+  const commTotM=monthly(rows.filter(d=>state.commChan==='all'||d.origine===state.commChan),'commission');
+  const opt=Object.assign(baseOpt({money:true,legend:stacked}),{scales:{x:{stacked,grid:{display:false}},y:{stacked,beginAtZero:true,grid:{color:'rgba(40,48,64,.5)'},ticks:{callback:v=>eur(v)}}},plugins:{legend:{display:stacked||state.cumul,position:'bottom',labels:{boxWidth:10,padding:7,font:{size:9.5}}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${eur(c.parsed.y)}`}}}});
+  if(state.cumul){ datasets=datasets.concat([cumulDS('Commission cumulée',commTotM,css('--green'))]); addY1(opt,css('--green')); }
+  mk('cComm',{type:'bar',data:{labels:MONTHS,datasets},options:opt});
 }
 
 function renderObjEditor(){
