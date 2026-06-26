@@ -321,6 +321,13 @@ td.actions{white-space:nowrap}
       <table class="tbl"><thead><tr><th>E-mail autorisé</th><th>Statut</th><th>Ajouté le</th><th>Action</th></tr></thead><tbody id="adminBody"></tbody></table>
     </div>
   </div>
+  <div class="card">
+    <h3>Connexions &amp; temps passé <span class="hint" id="connCount"></span></h3>
+    <div class="desc">Historique des 3 derniers mois (purge automatique au-delà). Le temps est une estimation du temps onglet actif, à la minute près.</div>
+    <div class="scroll">
+      <table class="tbl"><thead><tr><th>Utilisateur</th><th>Dernière connexion</th><th class="num">Sessions</th><th class="num">Temps total</th></tr></thead><tbody id="connBody"></tbody></table>
+    </div>
+  </div>
 </div>
 
 <!-- CORBEILLE -->
@@ -398,8 +405,8 @@ let CURRENT_USER=null;
 const state={ year:null, log:'all', chan:'all', month:'all', labels:true, commChan:'all',
   sortChan:'val-desc', sortLog:'val-desc', expDim:'mois', expMes:'montant', expSort:'val-desc',
   rsort:{key:'entree',dir:-1}, editId:null, unit:'eur', cumul:true };
-function cumulDS(label,arr,color){ return {label, type:'line', data:cumul(arr), borderColor:color, borderWidth:2, pointRadius:2, pointBackgroundColor:color, tension:.25, yAxisID:'y1', order:0, datalabels: state.labels?{display:true,align:'top',color, font:{size:9,weight:'600'}, formatter:v=>eur(v)}:{display:false}}; }
-function addY1(opts,color){ opts.scales=opts.scales||{}; opts.scales.y1={position:'right',beginAtZero:true,grid:{display:false},ticks:{callback:v=>eur(v),font:{size:9},color}}; return opts; }
+function cumulDS(label,arr,color,fmt){ fmt=fmt||eur; return {label, type:'line', data:cumul(arr), borderColor:color, borderWidth:2, pointRadius:2, pointBackgroundColor:color, tension:.25, yAxisID:'y1', order:0, datalabels: state.labels?{display:true,align:'top',color, font:{size:9,weight:'600'}, formatter:v=>fmt(v)}:{display:false}}; }
+function addY1(opts,color,fmt){ fmt=fmt||eur; opts.scales=opts.scales||{}; opts.scales.y1={position:'right',beginAtZero:true,grid:{display:false},ticks:{callback:v=>fmt(v),font:{size:9},color}}; return opts; }
 const charts={};
 
 // ---------- moteur de calcul (remplace les formules Excel) ----------
@@ -431,6 +438,16 @@ if(SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase){ SUPA=window.supabase.c
 const ONLINE=!!SUPA;
 const EDGE_URL = SUPABASE_URL ? SUPABASE_URL.replace(/\/$/,'')+'/functions/v1/invite' : '';
 let IS_ADMIN=false, NEEDS_PASSWORD=false;
+let SESSION_ID=null, HEARTBEAT=null, SESS_WIRED=false;
+async function startSession(){
+  if(!SUPA||!CURRENT_USER||!CURRENT_USER.email) return;
+  try{ const {data}=await SUPA.from('user_sessions').insert({user_email:CURRENT_USER.email}).select('id').single(); SESSION_ID=data?data.id:null;
+    if(HEARTBEAT) clearInterval(HEARTBEAT); HEARTBEAT=setInterval(beat,60000);
+    if(!SESS_WIRED){ SESS_WIRED=true; document.addEventListener('visibilitychange',()=>{ if(!document.hidden) beat(); }); window.addEventListener('beforeunload', beat); }
+  }catch(e){}
+}
+async function beat(){ if(SUPA&&SESSION_ID&&!document.hidden){ try{ await SUPA.from('user_sessions').update({last_seen:new Date().toISOString()}).eq('id',SESSION_ID); }catch(e){} } }
+function fmtDuration(min){ min=Math.round(min); if(min<1)return '< 1 min'; if(min<60) return min+' min'; const h=Math.floor(min/60),m=min%60; return h+' h '+(m<10?'0':'')+m; }
 const FIELDS=['logement','date_resa','entree','sortie','origine','nom','prenom','nb_pers','nb_adultes','montant','taxe','ac1','ac1_date','ac2','ac2_date','ac3','ac3_date','frais_menage','obs'];
 
 // --- mode local : base matérialisée dans le navigateur (fallback) ---
@@ -526,7 +543,7 @@ async function enterApp(user){
   document.getElementById('userBadge').textContent=(user.email||'connecté')+(IS_ADMIN?' · admin':'');
   document.getElementById('btnLogout').style.display = ONLINE?'inline-block':'none';
   const at=document.querySelector('.tabs button[data-t="admin"]'); if(at) at.style.display=IS_ADMIN?'inline-block':'none';
-  await reload(); initUI();
+  await reload(); initUI(); startSession();
 }
 function showDenied(email){
   hideAll(); const o=document.getElementById('deniedOverlay'); o.style.display='flex';
@@ -812,6 +829,21 @@ async function renderAdmin(){
       <td><button class="mini-act del" data-em="${r.email}">Révoquer</button></td></tr>`).join('')
     : '<tr><td colspan="4" style="color:var(--muted)">Aucun accès autorisé pour l\'instant.</td></tr>';
   document.querySelectorAll('#adminBody .mini-act').forEach(b=>b.onclick=()=>removeAuthorized(b.dataset.em));
+  renderConnections();
+}
+async function renderConnections(){
+  if(!IS_ADMIN||!SUPA) return;
+  const since=new Date(Date.now()-92*864e5).toISOString();
+  let data=[];
+  try{ const r=await SUPA.from('user_sessions').select('*').gte('started_at',since).order('started_at',{ascending:false}); if(r.error)throw r.error; data=r.data||[]; }
+  catch(e){ const el=document.getElementById('connBody'); if(el) el.innerHTML=`<tr><td colspan="4">Erreur : ${e.message}</td></tr>`; return; }
+  const by={};
+  data.forEach(s=>{ const dur=Math.max(0,(new Date(s.last_seen)-new Date(s.started_at))/60000); const u=by[s.user_email]||(by[s.user_email]={n:0,min:0,last:null}); u.n++; u.min+=dur; if(!u.last||s.started_at>u.last) u.last=s.started_at; });
+  const rows=Object.entries(by).sort((a,b)=>(b[1].last||'').localeCompare(a[1].last||''));
+  const cc=document.getElementById('connCount'); if(cc) cc.textContent=`${rows.length} utilisateur(s) · ${data.length} sessions sur 3 mois`;
+  const tb=document.getElementById('connBody'); if(!tb) return;
+  tb.innerHTML = rows.length? rows.map(([email,u])=>`<tr><td>${email}</td><td>${fmtDateTime(u.last)}</td><td class="num">${u.n}</td><td class="num">${fmtDuration(u.min)}</td></tr>`).join('')
+    : '<tr><td colspan="4" style="color:var(--muted)">Aucune connexion enregistrée pour l\'instant.</td></tr>';
 }
 async function inviteEmail(){
   const inp=document.getElementById('adminEmail'); const email=(inp.value||'').trim().toLowerCase();
@@ -898,8 +930,14 @@ function renderObjectives(rows,benefM,ob,benef,objAnnual){
     {label:'Bénéfice cumulé',data:benefAcum,borderColor:css('--gold'),backgroundColor:'rgba(212,175,55,.12)',fill:true,tension:.25,pointRadius:3,pointBackgroundColor:css('--gold'),datalabels:DL(eur,css('--gold2'))},
     {label:'Objectif cumulé',data:objAcum,borderColor:css('--red'),borderWidth:2,borderDash:[6,4],pointRadius:0,datalabels:{display:false}},
     {label:'Point mort cumulé',data:cumul(Array(12).fill(ob.pm)),borderColor:css('--muted'),borderWidth:1.5,borderDash:[3,3],pointRadius:0,datalabels:{display:false}}]},options:baseOpt({money:true,legend:true})});
-  mk('cDelta',{type:'bar',data:{labels:MONTHS,datasets:[{label:'Δ objectif',data:deltaM,backgroundColor:deltaM.map(v=>v>=0?css('--green'):css('--red')),borderRadius:4,datalabels:DL(eur)}]},options:baseOpt({money:true,legend:false})});
-  mk('cPM',{type:'bar',data:{labels:MONTHS,datasets:[{label:'Δ point mort',data:pmM,backgroundColor:pmM.map(v=>v>=0?css('--green'):css('--orange')),borderRadius:4,datalabels:DL(eur)}]},options:baseOpt({money:true,legend:false})});
+  const deltaDS=[{label:'Δ objectif',data:deltaM,backgroundColor:deltaM.map(v=>v>=0?css('--green'):css('--red')),borderRadius:4,datalabels:DL(eur)}];
+  let deltaOpt=baseOpt({money:true,legend:state.cumul});
+  if(state.cumul){ deltaDS.push(cumulDS('Écart cumulé',deltaM,css('--blue'))); addY1(deltaOpt,css('--blue')); }
+  mk('cDelta',{type:'bar',data:{labels:MONTHS,datasets:deltaDS},options:deltaOpt});
+  const pmDS=[{label:'Δ point mort',data:pmM,backgroundColor:pmM.map(v=>v>=0?css('--green'):css('--orange')),borderRadius:4,datalabels:DL(eur)}];
+  let pmOpt=baseOpt({money:true,legend:state.cumul});
+  if(state.cumul){ pmDS.push(cumulDS('Marge cumulée',pmM,css('--blue'))); addY1(pmOpt,css('--blue')); }
+  mk('cPM',{type:'bar',data:{labels:MONTHS,datasets:pmDS},options:pmOpt});
   const acM=Array(12).fill(0),reM=Array(12).fill(0); rows.forEach(d=>{if(d.mois){acM[d.mois-1]+=(d.ac1||0)+(d.ac2||0)+(d.ac3||0); reM[d.mois-1]+=(d.reste_a_payer||0);}});
   mk('cSolde',{type:'bar',data:{labels:MONTHS,datasets:[
     {label:'Acomptes perçus',data:acM,backgroundColor:css('--green'),borderRadius:4,stack:'s',datalabels:DL(eur)},
@@ -927,8 +965,11 @@ function renderExplorer(){
   const plot = showPct? pairs.map(p=>total?p[1]/total*100:0) : pairs.map(p=>p[1]);
   document.getElementById('expSummary').textContent=(mes.agg==='avg'||mes.agg==='ratio')?`${pairs.length} ${dim.label.toLowerCase()}s`:`Total : ${mes.fmt(total)} · ${pairs.length} ${dim.label.toLowerCase()}s${showPct?' · affichage en %':''}`;
   const horiz=labels.length>8;
-  mk('cExp',{type:'bar',data:{labels,datasets:[{label:mes.label,data:plot,backgroundColor:color,borderRadius:5,datalabels:{display:true,anchor:'end',align:'end',clamp:true,color:css('--txt'),font:{size:10,weight:'600'},formatter:v=>v?fmt(v):''}}]},
-    options:Object.assign(baseOpt({legend:false}),{indexAxis:horiz?'y':'x',scales:horiz?{x:{grid:{color:'rgba(40,48,64,.5)'},ticks:{callback:v=>fmt(v)}},y:{grid:{display:false}}}:{x:{grid:{display:false}},y:{beginAtZero:true,grid:{color:'rgba(40,48,64,.5)'},ticks:{callback:v=>fmt(v)}}},plugins:{legend:{display:false},datalabels:{display:true},tooltip:{callbacks:{label:c=>` ${mes.label}: ${fmt(c.parsed[horiz?'x':'y'])}`}}}})});
+  const expDS=[{label:mes.label,data:plot,backgroundColor:color,borderRadius:5,datalabels:{display:true,anchor:'end',align:'end',clamp:true,color:css('--txt'),font:{size:10,weight:'600'},formatter:v=>v?fmt(v):''}}];
+  const expOpt=Object.assign(baseOpt({legend:false}),{indexAxis:horiz?'y':'x',scales:horiz?{x:{grid:{color:'rgba(40,48,64,.5)'},ticks:{callback:v=>fmt(v)}},y:{grid:{display:false}}}:{x:{grid:{display:false}},y:{beginAtZero:true,grid:{color:'rgba(40,48,64,.5)'},ticks:{callback:v=>fmt(v)}}},plugins:{legend:{display:false},datalabels:{display:true},tooltip:{callbacks:{label:c=>` ${mes.label}: ${fmt(c.parsed[horiz?'x':'y'])}`}}}});
+  const expCumulable = state.cumul && !showPct && !horiz && (mes.agg==='sum'||mes.agg==='count') && (state.expDim==='mois'||state.expDim==='annee') && state.expSort==='key-asc';
+  if(expCumulable){ expDS.push(cumulDS(mes.label+' cumulé',plot,css('--green'),mes.fmt)); addY1(expOpt,css('--green'),mes.fmt); expOpt.plugins.legend={display:true,labels:{boxWidth:10,padding:7,font:{size:9.5}}}; }
+  mk('cExp',{type:'bar',data:{labels,datasets:expDS},options:expOpt});
 }
 
 function renderReservs(rows){
