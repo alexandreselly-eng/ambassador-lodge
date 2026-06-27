@@ -1760,9 +1760,12 @@ const AL_PRICE = (function(){
       for(let w=1;w<=52;w++){
         const jan4=new Date(Date.UTC(anticipYear,0,4)); const day=(jan4.getUTCDay()+6)%7;
         const week1Mon=new Date(jan4); week1Mon.setUTCDate(jan4.getUTCDate()-day);
-        const thu=new Date(week1Mon); thu.setUTCDate(week1Mon.getUTCDate()+(w-1)*7+3);
-        const dRef=thu.toISOString().slice(0,10);
-        const ctx=holCtx?holCtx(dRef):{};
+        const mon=new Date(week1Mon); mon.setUTCDate(week1Mon.getUTCDate()+(w-1)*7); // lundi de la semaine ISO
+        const dRef=mon.toISOString().slice(0,10);
+        // contexte = union vacances/fériés/ponts sur les 7 jours (lun→dim)
+        let ctx={vacMetro:false,vacReunion:false,ferie:false,pont:false};
+        if(holCtx){ for(let i=0;i<7;i++){ const dd=new Date(mon); dd.setUTCDate(mon.getUTCDate()+i); const c=holCtx(dd.toISOString().slice(0,10))||{};
+          ctx.vacMetro=ctx.vacMetro||!!c.vacMetro; ctx.vacReunion=ctx.vacReunion||!!c.vacReunion; ctx.ferie=ctx.ferie||!!c.ferie; ctx.pont=ctx.pont||!!c.pont; } }
         out.push(Object.assign({bien:b, week:w, dateRef:dRef, ctx}, suggest(stats,b,w,ctx,o)));
       }});
     return {grid:out, years, stats, perYearOcc:H.perYearOcc, wePremium}; }
@@ -1982,7 +1985,11 @@ const AL_TARIF = (function(){
     st.PONT=new Set(); if(typeof AL_HOL!=='undefined') AL_HOL.ponts('reunion').forEach(p=>st.PONT.add(p.date));
     st.G=AL_PRICE.grid(rows(), st.year, holCtx, {aggr:AGGR[st.aggr]});
     st.LU={}; st.G.grid.forEach(g=>{ st.LU[g.bien+'|'+g.week]=g; });
+    // carte des nuits réalisées : bien|date -> tarif/nuit (sinon vide)
+    st.nightMap={}; AL_PRICE.nights(rows()).forEach(x=>{ st.nightMap[x.bien+'|'+x.date]=Math.round(x.rate); });
   }
+  function realized(d){ return st.nightMap[st.bien+'|'+d]; } // €/nuit si loué, sinon undefined
+  function sameDateYr(d,delta){ const y=(+d.slice(0,4))+delta; return y+d.slice(4); }
   function priceForDay(d){ const w=AL_PRICE.isoWeek(d).week; const g=st.LU[st.bien+'|'+w]; if(!g||g.mid==null)return null;
     const we=dowMon(d); return (we===4||we===5)? g.midWE : g.mid; }
   // tarif actuel (ADR médian réalisé) + 3 scénarios pour une semaine
@@ -2037,9 +2044,11 @@ const AL_TARIF = (function(){
         const we=dowMon(d); const cx=holCtx(d); const mark=cx.ferie?'•':cx.pont?'▴':'';
         const w=AL_PRICE.isoWeek(d).week; const sc=(p!=null)?scenarios(w,cx):null; const wknd=(we===4||we===5);
         const we2=v=>wknd?Math.round(v*((st.G.wePremium&&st.G.wePremium[st.bien])||1.12)):v;
-        const scTip=sc?`|Tarif actuel (ADR médian) ${sc.base} €|Prudent ${we2(sc.pru.mid)} €|Équilibré ${we2(sc.equ.mid)} €|Agressif ${we2(sc.agr.mid)} €${wknd?' (week-end)':''}`:'';
+        const scTip=sc?`|Conseillé ${wknd?'(week-end) ':''}— Prudent ${we2(sc.pru.mid)} € · Équilibré ${we2(sc.equ.mid)} € · Agressif ${we2(sc.agr.mid)} €`:'';
+        const rThis=realized(d), r1=realized(sameDateYr(d,-1)), r2=realized(sameDateYr(d,-2));
+        const histTip=`|· Réalisé par nuit ·|${st.year} : ${rThis?'loué '+rThis+' €':(d<today?'vide':'à venir')}|${st.year-1} : ${r1?'loué '+r1+' €':'vide'}|${st.year-2} : ${r2?'loué '+r2+' €':'vide'}`;
         const ctxTip=`${cx.vacMetro?'Vac. métropole':''}${cx.vacReunion?' · Vac. Réunion':''}${cx.ferie?' · Férié':''}${cx.pont?' · Pont':''}`;
-        h+=`<div class="tfd ${d<today?'past':''}" style="background:${p!=null?bg:'#161b22'}" data-tip="${st.bien} · ${fd(d)}${scTip}${ctxTip?'|'+ctxTip:''}"><span class="tfdn">${dd}</span><span class="tfdp">${p!=null?p:''}</span><span class="tfmk">${mark}</span></div>`; }
+        h+=`<div class="tfd ${d<today?'past':''}" style="background:${p!=null?bg:'#161b22'}" data-tip="${st.bien} · ${fd(d)}${scTip}${histTip}${ctxTip?'|'+ctxTip:''}"><span class="tfdn">${dd}</span><span class="tfdp">${p!=null?p:''}</span><span class="tfmk">${mark}</span></div>`; }
       h+='</div></div>'; }
     h+='</div>';
     h+=`<div class="tflegend"><span>Prix bas</span><span class="tfbar"></span><span>Prix élevé</span> &nbsp;·&nbsp; <span>• férié</span> <span>▴ pont</span></div>`;
