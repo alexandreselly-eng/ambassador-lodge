@@ -1512,7 +1512,7 @@ function _shWire(){
 //   - vacances     : https://data.education.gouv.fr (dataset fr-en-calendrier-scolaire)
 // Fetch live au chargement, cache localStorage (refresh si année change ou > 30 j), fallback embarqué.
 const AL_HOL = (function(){
-  const CACHE_KEY='al_holidays_v1', MAX_AGE=30*864e5;
+  const CACHE_KEY='al_holidays_v2', MAX_AGE=30*864e5;
   const ZONES=['Réunion','A','B','C'];
   let DATA={feries:{reunion:{},metropole:{}}, bands:[], loadedYears:[]};
 
