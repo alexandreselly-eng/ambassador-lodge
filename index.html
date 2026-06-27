@@ -341,20 +341,30 @@ td.actions{white-space:nowrap}
   #v-calendar .mg.sm .mgdow{font-size:9px}
   #v-calendar .mgweek{position:relative}
   #v-calendar .mgdays{display:grid;grid-template-columns:repeat(7,1fr)}
-  #v-calendar .mgday{position:relative;height:84px;border:1px solid rgba(40,48,64,.55);background:var(--panel2);display:flex;flex-direction:column;justify-content:space-between;padding:5px 7px;overflow:hidden}
-  #v-calendar .mg.sm .mgday{height:44px;padding:3px 4px}
+  #v-calendar .mgday{position:relative;height:86px;border:1px solid rgba(40,48,64,.55);background:var(--panel2);display:flex;flex-direction:column;justify-content:space-between;padding:13px 7px 5px;overflow:hidden}
+  #v-calendar .mg.sm .mgday{height:46px;padding:10px 4px 2px}
   #v-calendar .mgday.empty{background:transparent;border:none}
+  #v-calendar .mgtop{display:flex;align-items:center;justify-content:space-between;gap:3px}
   #v-calendar .mgnum{font-size:12px;font-weight:600;color:var(--txt)}
   #v-calendar .mg.sm .mgnum{font-size:9.5px}
   #v-calendar .mgday.past .mgnum{color:var(--muted);text-decoration:line-through}
   #v-calendar .mgday.fer .mgnum{color:var(--red)}
+  #v-calendar .mgbadge{font-size:8.5px;font-weight:800;line-height:1;padding:2px 5px;border-radius:8px;white-space:nowrap}
+  #v-calendar .mgbadge.f{background:var(--red);color:#fff}
+  #v-calendar .mgbadge.p{background:var(--orange);color:#0d1117}
+  #v-calendar .mg.sm .mgbadge{font-size:0;width:7px;height:7px;padding:0;border-radius:50%}
   #v-calendar .mgprice{font-size:11px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
   #v-calendar .mg.sm .mgprice{font-size:8px}
-  #v-calendar .mgday.vmet{background:rgba(188,140,255,.13)}
-  #v-calendar .mgday.vreu{background-color:var(--panel2);background-image:repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(63,182,201,.2) 6px,rgba(63,182,201,.2) 12px)}
-  #v-calendar .mgday.vreu.vmet{background-color:rgba(188,140,255,.13);background-image:repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(63,182,201,.2) 6px,rgba(63,182,201,.2) 12px)}
-  #v-calendar .mgbars{position:absolute;left:0;right:0;top:30px;pointer-events:none}
-  #v-calendar .mg.sm .mgbars{top:18px}
+  #v-calendar .mgday.vmet{background:rgba(188,140,255,.07)}
+  #v-calendar .mgday.vreu{background:rgba(63,182,201,.07)}
+  #v-calendar .mgday.vreu.vmet{background:rgba(188,140,255,.07)}
+  #v-calendar .mgribbon{position:absolute;left:0;right:0;top:2px;height:9px;pointer-events:none;z-index:2}
+  #v-calendar .rbar{position:absolute;height:4px;border-radius:3px;box-shadow:0 0 4px rgba(0,0,0,.3)}
+  #v-calendar .rbar.reu{top:0;background:#10c8ec}
+  #v-calendar .rbar.met{top:5px;background:#d06bff}
+  #v-calendar .mg.sm .rbar{height:3px}#v-calendar .mg.sm .rbar.met{top:4px}
+  #v-calendar .mgbars{position:absolute;left:0;right:0;top:34px;pointer-events:none}
+  #v-calendar .mg.sm .mgbars{top:22px}
   #v-calendar .mgresa{position:absolute;height:26px;background:#3a4150;display:flex;align-items:center;gap:5px;padding:0 6px;color:#e6edf3;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;cursor:pointer;pointer-events:auto;box-shadow:0 1px 2px rgba(0,0,0,.45)}
   #v-calendar .mg.sm .mgresa{height:15px;font-size:8px;gap:3px;padding:0 3px}
   #v-calendar .mgresa.rl{border-top-left-radius:13px;border-bottom-left-radius:13px}
@@ -1535,8 +1545,8 @@ const AL_HOL = (function(){
     return out;
   }
   function feriesReunionFrom(metro){ const o=Object.assign({},metro);
-    const y=Object.keys(metro)[0]?Object.keys(metro)[0].slice(0,4):null;
-    if(y){ o[y+'-12-20']='Abolition de l\'esclavage'; } return o; }
+    const years=new Set(Object.keys(metro).map(k=>k.slice(0,4)));
+    years.forEach(y=>{ o[y+'-12-20']='Abolition de l\'esclavage'; }); return o; }
 
   // ---- ponts & longs week-ends ----
   function computePonts(feriesMap){
@@ -1560,7 +1570,8 @@ const AL_HOL = (function(){
       try{ const m=await fetchJSON('https://calendrier.api.gouv.fr/jours-feries/metropole/'+y+'.json',opt.fetchImpl); Object.assign(feries.metropole,m);}catch(e){}
       try{ const r=await fetchJSON('https://calendrier.api.gouv.fr/jours-feries/reunion/'+y+'.json',opt.fetchImpl); Object.assign(feries.reunion,r);}catch(e){}
     }
-    if(!Object.keys(feries.reunion).length && Object.keys(feries.metropole).length) feries.reunion=feriesReunionFrom(feries.metropole);
+    // Réunion = national (métropole) + 20 décembre (toutes années), fusionné avec l'éventuel live
+    if(Object.keys(feries.metropole).length) feries.reunion=Object.assign(feriesReunionFrom(feries.metropole),feries.reunion);
     let bands=[];
     for(const sy of schoolYearsFor(years)){
       try{ const j=await fetchJSON('https://data.education.gouv.fr/api/records/1.0/search/?dataset=fr-en-calendrier-scolaire&rows=300&refine.annee_scolaire='+sy,opt.fetchImpl);
@@ -1725,15 +1736,25 @@ const AL_CAL = (function(){
     h+='<div class="mgdow">'+DOW.map(x=>`<span>${x}</span>`).join('')+'</div>';
     weeks.forEach(wk=>{
       // cellules
+      const wkDays=wk.filter(Boolean);
       let days='';
       wk.forEach(d=>{ if(!d){ days+='<div class="mgday empty"></div>'; return; }
-        const past=d<today, fer=(typeof AL_HOL!=='undefined')&&AL_HOL.isFerie(d,'reunion'), v=dayVac(d);
+        const past=d<today, fer=(typeof AL_HOL!=='undefined')&&AL_HOL.isFerie(d,'reunion'), pont=PONT.has(d), v=dayVac(d);
         const price=priceCell(d,bien); const showP=price!=null && !booked.has(d);
-        const cls=['mgday',past?'past':'',fer?'fer':'',v.reu?'vreu':'',v.met?'vmet':''].filter(Boolean).join(' ');
-        days+=`<div class="${cls}" title="${fer?AL_HOL.ferieName(d,'reunion'):''}"><div class="mgnum">${+d.slice(8)}</div>`+
+        const cls=['mgday',past?'past':'',fer?'fer':'',pont?'pont':'',v.reu?'vreu':'',v.met?'vmet':''].filter(Boolean).join(' ');
+        const ttl=fer?AL_HOL.ferieName(d,'reunion'):pont?'Pont / long week-end':(v.reu?'Vacances scolaires Réunion':v.met?'Vacances scolaires métropole':'');
+        let badge=''; if(fer)badge=`<span class="mgbadge f" title="${AL_HOL.ferieName(d,'reunion')||''}">F</span>`; else if(pont)badge='<span class="mgbadge p">Pont</span>';
+        days+=`<div class="${cls}" title="${ttl}"><div class="mgtop"><span class="mgnum">${+d.slice(8)}</span>${badge}</div>`+
           `<div class="mgprice">${showP?price+' €':''}</div></div>`; });
-      // barres réservations de la semaine
-      let bars=''; const wkDays=wk.filter(Boolean); if(wkDays.length){ const wkStart=wkDays[0], wkEnd=wkDays[wkDays.length-1];
+      // bandeau vacances (haut de semaine)
+      let rib='';
+      if(wkDays.length){
+        const segs=fn=>{ const o=[]; let run=null; wk.forEach((d,i)=>{ const on=d?fn(d):false; if(on){ if(!run)run={a:i,b:i}; else run.b=i; } else if(run){o.push(run);run=null;} }); if(run)o.push(run); return o; };
+        segs(d=>dayVac(d).reu).forEach(s=>{ rib+=`<div class="rbar reu" style="left:${s.a/7*100}%;width:${(s.b-s.a+1)/7*100}%" title="Vacances scolaires Réunion"></div>`; });
+        segs(d=>dayVac(d).met).forEach(s=>{ rib+=`<div class="rbar met" style="left:${s.a/7*100}%;width:${(s.b-s.a+1)/7*100}%" title="Vacances scolaires métropole"></div>`; });
+      }
+      // réservations de la semaine
+      let bars=''; if(wkDays.length){ const wkStart=wkDays[0], wkEnd=wkDays[wkDays.length-1];
         resas.forEach(r=>{ const cs=r.entree>wkStart?r.entree:wkStart; const lastNight=addDays(r.sortie,-1); const ce=lastNight<wkEnd?lastNight:wkEnd;
           if(cs>ce) return; const a=wk.indexOf(cs), b=wk.indexOf(ce); if(a<0||b<0) return;
           const left=a/7*100, width=(b-a+1)/7*100; const rl=(cs===r.entree), rr=(ce===lastNight);
@@ -1742,7 +1763,7 @@ const AL_CAL = (function(){
           bars+=`<div class="mgresa ${rl?'rl':''} ${rr?'rr':''}" style="left:${left}%;width:${width}%" data-k="${(r.logement||'')+'|'+r.entree+'|'+(r.nom||'')}">`+
             (rl?`<span class="mgav" style="background:${col}">${init}</span><span class="mgnm">${nm}${extra}</span>`:'')+`</div>`; });
       }
-      h+=`<div class="mgweek"><div class="mgdays">${days}</div><div class="mgbars">${bars}</div></div>`;
+      h+=`<div class="mgweek"><div class="mgribbon">${rib}</div><div class="mgdays">${days}</div><div class="mgbars">${bars}</div></div>`;
     });
     h+='</div>';
     return h;
@@ -1760,7 +1781,7 @@ const AL_CAL = (function(){
       <div class="calzones">Vacances : ${['Réunion','A','B','C'].map(zchk).join('')}</div>
     </div><div class="callegend" id="calLegend"></div>`;
   }
-  function legend(){ const items=[['Réservation','#3a4150'],['Vac. Réunion','rgba(63,182,201,.35)'],['Vac. métropole','rgba(188,140,255,.3)'],['Férié','var(--red)'],['Pont','var(--orange)'],['Passé','transparent']];
+  function legend(){ const items=[['Réservation','#3a4150'],['Vac. Réunion','#10c8ec'],['Vac. métropole','#d06bff'],['Férié','var(--red)'],['Pont','var(--orange)']];
     return items.map(i=>`<span class="lgi"><span class="dot" style="background:${i[1]}"></span>${i[0]}</span>`).join(''); }
 
   // ---------- panneau prix ----------
