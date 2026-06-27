@@ -420,6 +420,9 @@ td.actions{white-space:nowrap}
   #v-tarif .ptag.met{background:rgba(188,140,255,.18);color:var(--violet)}#v-tarif .ptag.reu{background:rgba(63,182,201,.18);color:var(--lodge)}
   #v-tarif .ptag.fer{background:rgba(248,81,73,.18);color:var(--red)}#v-tarif .ptag.pont{background:rgba(227,137,59,.18);color:var(--orange)}
   #v-tarif .muted{color:var(--muted)}
+  #v-tarif .tfgrid td.tfbase{color:var(--gold2);font-weight:600}
+  #v-tarif .tfgrid td.tfact{background:rgba(212,175,55,.13);font-weight:700}
+  #v-tarif .tfd2{font-size:9px;font-weight:700;margin-left:2px}#v-tarif .tfd2.up{color:var(--green)}#v-tarif .tfd2.dn{color:var(--orange)}
   #tarifTip{display:none;position:fixed;z-index:9999;background:#0b0f16;border:1px solid var(--gold);border-radius:9px;padding:9px 11px;font-size:11.5px;box-shadow:0 8px 28px rgba(0,0,0,.55);max-width:260px;pointer-events:none}
   #tarifTip .ttl{font-weight:700;margin-bottom:5px}
   @media(max-width:1100px){#v-tarif .kpis{grid-template-columns:repeat(2,1fr)}#v-tarif .g2{grid-template-columns:1fr}#v-tarif .tfcal{grid-template-columns:repeat(2,1fr)}}
@@ -430,8 +433,8 @@ td.actions{white-space:nowrap}
     <div class="desc">Couleur = niveau de prix conseillé (vert = bas, rouge = élevé). Survolez un jour pour le détail. À programmer dans Superhote.</div>
     <div id="tarifCal"></div></div>
   <div class="g2">
-    <div class="card"><h3>Occupation par semaine <span class="hint">2 dernières années</span></h3><div class="chartbox"><canvas id="tfOccChart"></canvas></div></div>
-    <div class="card"><h3>ADR médian vs prix conseillé</h3><div class="chartbox"><canvas id="tfAdrChart"></canvas></div></div>
+    <div class="card"><h3>Occupation par mois <span class="hint">moyenne mensuelle, par année</span></h3><div class="chartbox"><canvas id="tfOccChart"></canvas></div></div>
+    <div class="card"><h3>ADR médian vs prix conseillé <span class="hint">par mois</span></h3><div class="chartbox"><canvas id="tfAdrChart"></canvas></div></div>
   </div>
   <div id="tarifPeriods"></div>
   <div id="tarifGrid"></div>
@@ -1982,6 +1985,10 @@ const AL_TARIF = (function(){
   }
   function priceForDay(d){ const w=AL_PRICE.isoWeek(d).week; const g=st.LU[st.bien+'|'+w]; if(!g||g.mid==null)return null;
     const we=dowMon(d); return (we===4||we===5)? g.midWE : g.mid; }
+  // tarif actuel (ADR médian réalisé) + 3 scénarios pour une semaine
+  function scenarios(week, ctx){ const wp=(st.G.wePremium&&st.G.wePremium[st.bien])||1.12;
+    const f=a=>AL_PRICE.suggest(st.G.stats, st.bien, week, ctx, {aggr:a, wePremium:wp});
+    return {base:f(1).base, pru:f(0.5), equ:f(1), agr:f(1.5)}; }
 
   // ---------- contrôles ----------
   function controls(){
@@ -2028,25 +2035,32 @@ const AL_TARIF = (function(){
       for(let dd=1;dd<=dim;dd++){ const d=ymd(new Date(Date.UTC(st.year,m,dd))); const p=priceForDay(d);
         const t=(p!=null&&mx>mn)?(p-mn)/(mx-mn):0; const bg=p!=null?heatColor(t):'transparent';
         const we=dowMon(d); const cx=holCtx(d); const mark=cx.ferie?'•':cx.pont?'▴':'';
-        h+=`<div class="tfd ${d<today?'past':''}" style="background:${p!=null?bg:'#161b22'}" data-tip="${st.bien} · ${fd(d)}|Prix conseillé ${p!=null?p+' €':'—'}${(we===4||we===5)?' (week-end)':''}|${cx.vacMetro?'Vac. métropole':''}${cx.vacReunion?' · Vac. Réunion':''}${cx.ferie?' · Férié':''}${cx.pont?' · Pont':''}"><span class="tfdn">${dd}</span><span class="tfdp">${p!=null?p:''}</span><span class="tfmk">${mark}</span></div>`; }
+        const w=AL_PRICE.isoWeek(d).week; const sc=(p!=null)?scenarios(w,cx):null; const wknd=(we===4||we===5);
+        const we2=v=>wknd?Math.round(v*((st.G.wePremium&&st.G.wePremium[st.bien])||1.12)):v;
+        const scTip=sc?`|Tarif actuel (ADR médian) ${sc.base} €|Prudent ${we2(sc.pru.mid)} €|Équilibré ${we2(sc.equ.mid)} €|Agressif ${we2(sc.agr.mid)} €${wknd?' (week-end)':''}`:'';
+        const ctxTip=`${cx.vacMetro?'Vac. métropole':''}${cx.vacReunion?' · Vac. Réunion':''}${cx.ferie?' · Férié':''}${cx.pont?' · Pont':''}`;
+        h+=`<div class="tfd ${d<today?'past':''}" style="background:${p!=null?bg:'#161b22'}" data-tip="${st.bien} · ${fd(d)}${scTip}${ctxTip?'|'+ctxTip:''}"><span class="tfdn">${dd}</span><span class="tfdp">${p!=null?p:''}</span><span class="tfmk">${mark}</span></div>`; }
       h+='</div></div>'; }
     h+='</div>';
     h+=`<div class="tflegend"><span>Prix bas</span><span class="tfbar"></span><span>Prix élevé</span> &nbsp;·&nbsp; <span>• férié</span> <span>▴ pont</span></div>`;
     return h;
   }
 
-  // ---------- courbes occupation / ADR ----------
-  function renderCharts(){ const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-    const yrs=st.G.years; const wk=Array.from({length:52},(_,i)=>i+1);
-    const colors=['#58a6ff','#d4af37','#bc8cff','#3fb950'];
-    const occDs=yrs.map((y,i)=>({label:String(y),data:wk.map(w=>{const v=st.G.perYearOcc[st.bien+'|'+w+'|'+y];return v!=null?Math.round(v*100):null;}),borderColor:colors[i%4],backgroundColor:'transparent',tension:.3,spanGaps:true,pointRadius:0,borderWidth:2}));
-    mkch('tfOccChart',{type:'line',data:{labels:wk,datasets:occDs},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:11}}},scales:{y:{min:0,max:100,ticks:{callback:v=>v+'%'},grid:{color:'rgba(40,48,64,.5)'}},x:{title:{display:true,text:'Semaine'},grid:{display:false}}}}});
-    const adr=wk.map(w=>{const s=st.G.stats[st.bien+'|'+w];return s&&s.adr?Math.round(s.adr):null;});
-    const reco=wk.map(w=>{const g=st.LU[st.bien+'|'+w];return g&&g.mid?g.mid:null;});
-    mkch('tfAdrChart',{type:'line',data:{labels:wk,datasets:[
-      {label:'ADR médian historique',data:adr,borderColor:css('--muted')||'#8b97a8',backgroundColor:'transparent',tension:.3,spanGaps:true,pointRadius:0,borderWidth:2},
-      {label:'Prix conseillé '+st.year,data:reco,borderColor:'#d4af37',backgroundColor:'rgba(212,175,55,.08)',fill:true,tension:.3,spanGaps:true,pointRadius:0,borderWidth:2}
-    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:11}}},scales:{y:{ticks:{callback:v=>v+' €'},grid:{color:'rgba(40,48,64,.5)'}},x:{title:{display:true,text:'Semaine'},grid:{display:false}}}}});
+  // ---------- courbes mensuelles (occupation par mois / ADR vs conseillé) ----------
+  function renderCharts(){ const med=AL_PRICE._median; const yrs=st.G.years; const colors=['#58a6ff','#d4af37','#bc8cff','#3fb950'];
+    const N=AL_PRICE.nights(rows()).filter(x=>x.bien===st.bien);
+    // occupation moyenne par mois, une barre par année
+    const occYM={}; N.forEach(x=>{ const d=new Date(x.date+'T00:00:00Z'); const y=d.getUTCFullYear(); if(y>=st.year)return; occYM[y+'|'+d.getUTCMonth()]=(occYM[y+'|'+d.getUTCMonth()]||0)+1; });
+    const occDs=yrs.map((y,i)=>({label:String(y),data:MOIS.map((_,mo)=>Math.round((occYM[y+'|'+mo]||0)/daysInMonth(y,mo)*100)),backgroundColor:colors[i%4],borderRadius:4,maxBarThickness:22}));
+    mkch('tfOccChart',{type:'bar',data:{labels:MOIS,datasets:occDs},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:11}},tooltip:{callbacks:{label:c=>c.dataset.label+' : '+c.parsed.y+'%'}}},scales:{y:{min:0,max:100,ticks:{callback:v=>v+'%'},grid:{color:'rgba(40,48,64,.5)'}},x:{grid:{display:false}}}}});
+    // ADR médian par mois (historique) vs prix conseillé moyen par mois
+    const ratesM={}; N.forEach(x=>{ const d=new Date(x.date+'T00:00:00Z'); if(d.getUTCFullYear()>=st.year)return; (ratesM[d.getUTCMonth()]=ratesM[d.getUTCMonth()]||[]).push(x.rate); });
+    const adrM=MOIS.map((_,mo)=>{ const a=ratesM[mo]; return a&&a.length?Math.round(med(a)):null; });
+    const recoM=MOIS.map((_,mo)=>{ const dim=daysInMonth(st.year,mo); const ps=[]; for(let dd=1;dd<=dim;dd++){ const w=AL_PRICE.isoWeek(ymd(new Date(Date.UTC(st.year,mo,dd)))).week; const g=st.LU[st.bien+'|'+w]; if(g&&g.mid!=null)ps.push(g.mid);} return ps.length?Math.round(med(ps)):null; });
+    mkch('tfAdrChart',{type:'line',data:{labels:MOIS,datasets:[
+      {label:'ADR médian historique',data:adrM,borderColor:'#8b97a8',backgroundColor:'transparent',tension:.35,pointRadius:2,borderWidth:2},
+      {label:'Prix conseillé '+st.year,data:recoM,borderColor:'#d4af37',backgroundColor:'rgba(212,175,55,.1)',fill:true,tension:.35,pointRadius:2,borderWidth:2.5}
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:11}},tooltip:{callbacks:{label:c=>c.dataset.label+' : '+(c.parsed.y!=null?c.parsed.y+' €':'—')}}},scales:{y:{ticks:{callback:v=>v+' €'},grid:{color:'rgba(40,48,64,.5)'}},x:{grid:{display:false}}}}});
   }
 
   // ---------- périodes creuses & fortes ----------
@@ -2060,14 +2074,23 @@ const AL_TARIF = (function(){
     return `<div class="g2">${tbl('🔻 Périodes creuses récurrentes (vacance locative)',cre,'cre')}${tbl('🔺 Périodes fortes à valoriser',fort,'fort')}</div>`;
   }
 
-  // ---------- grille prix conseillés ----------
+  // ---------- grille prix conseillés (tarif actuel + 3 scénarios) ----------
   function gridTable(){ const g=st.G.grid.filter(x=>x.bien===st.bien);
+    const ah=a=>st.aggr===a?'tfact':''; // colonne active surlignée
     const body=g.map(x=>{ const tags=[]; if(x.ctx){if(x.ctx.vacMetro)tags.push('<span class="ptag met">Métro</span>');if(x.ctx.vacReunion)tags.push('<span class="ptag reu">Réú</span>');if(x.ctx.ferie)tags.push('<span class="ptag fer">Férié</span>');if(x.ctx.pont)tags.push('<span class="ptag pont">Pont</span>');}
       const cf=x.confidence==='élevée'?'#3fb950':x.confidence==='moyenne'?'#e3893b':'#8b97a8';
-      return `<tr><td>S${x.week}<br><span class="muted">${fd(x.dateRef)}</span></td><td>${x.occ!=null?Math.round(x.occ*100)+'%':'—'}</td><td>${x.base?x.base+' €':'<span class="muted">—</span>'}</td><td><b>${x.mid?x.mid+' €':'—'}</b></td><td>${x.midWE?x.midWE+' €':'—'}</td><td><span style="color:${cf}">●</span> ${x.confidence}</td><td>${tags.join(' ')||'<span class="muted">—</span>'}</td></tr>`; }).join('');
+      const sc=scenarios(x.week,x.ctx||{}); if(sc.base==null) return '';
+      const d=(v,b)=>{ if(v==null)return '—'; const delta=b?Math.round((v/b-1)*100):0; return v+' €'+(b&&delta!==0?` <span class="tfd2 ${delta>0?'up':'dn'}">${delta>0?'+':''}${delta}%</span>`:''); };
+      return `<tr><td>S${x.week}<br><span class="muted">${fd(x.dateRef)}</span></td><td>${x.occ!=null?Math.round(x.occ*100)+'%':'—'}</td>`+
+        `<td class="tfbase">${sc.base} €</td>`+
+        `<td class="${ah('prudent')}">${d(sc.pru.mid,sc.base)}</td>`+
+        `<td class="${ah('equilibre')}">${d(sc.equ.mid,sc.base)}</td>`+
+        `<td class="${ah('agressif')}">${d(sc.agr.mid,sc.base)}</td>`+
+        `<td class="muted">${sc.equ.midWE} €</td>`+
+        `<td><span style="color:${cf}">●</span> ${x.confidence}</td><td>${tags.join(' ')||'<span class="muted">—</span>'}</td></tr>`; }).join('');
     return `<div class="card"><h3>Grille de prix conseillés ${st.year} — <span class="pill ${st.bien==='Ambassador'?'amb':'lodge'}">${st.bien}</span> <button class="tfexp" id="tfExport">⌄ Exporter CSV</button></h3>
-      <div class="desc">Prix/nuit à programmer dans Superhote, par semaine. « Semaine » = tarif lun-jeu/dim, « Week-end » = ven-sam (premium observé).</div>
-      <div class="scroll" style="max-height:420px"><table class="tbl"><thead><tr><th>Semaine</th><th>Occ. hist.</th><th>ADR médian</th><th>Prix semaine</th><th>Prix week-end</th><th>Confiance</th><th>Contexte</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
+      <div class="desc">« Tarif actuel » = ADR médian réalisé (référence). Les 3 scénarios montrent le prix/nuit conseillé et l'écart vs l'actuel. La colonne du curseur choisi est surlignée. « WE » = prix week-end (premium observé), scénario équilibré.</div>
+      <div class="scroll" style="max-height:440px"><table class="tbl tfgrid"><thead><tr><th>Semaine</th><th>Occ. hist.</th><th>Tarif actuel</th><th>Prudent</th><th>Équilibré</th><th>Agressif</th><th>WE</th><th>Confiance</th><th>Contexte</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
   }
 
   function render(){
@@ -2082,8 +2105,8 @@ const AL_TARIF = (function(){
   }
   function tip(html,x,y){const t=document.getElementById('tarifTip');if(!t)return;t.innerHTML=html;t.style.display='block';const w=t.offsetWidth,h=t.offsetHeight;let nx=x+14,ny=y+14;if(nx+w>window.innerWidth)nx=x-w-14;if(ny+h>window.innerHeight)ny=y-h-14;t.style.left=nx+'px';t.style.top=ny+'px';}
   function exportCSV(){ const g=st.G.grid.filter(x=>x.bien===st.bien);
-    const lines=[['Bien','Semaine','Date','Occ_hist_%','ADR_median','Prix_semaine','Prix_weekend','Confiance','Vac_metro','Vac_reunion','Ferie','Pont']];
-    g.forEach(x=>lines.push([st.bien,'S'+x.week,x.dateRef,x.occ!=null?Math.round(x.occ*100):'',x.base||'',x.mid||'',x.midWE||'',x.confidence,x.ctx&&x.ctx.vacMetro?1:0,x.ctx&&x.ctx.vacReunion?1:0,x.ctx&&x.ctx.ferie?1:0,x.ctx&&x.ctx.pont?1:0]));
+    const lines=[['Bien','Semaine','Date','Occ_hist_%','Tarif_actuel_ADR_median','Prudent','Equilibre','Agressif','Prix_weekend_eq','Confiance','Vac_metro','Vac_reunion','Ferie','Pont']];
+    g.forEach(x=>{ const sc=scenarios(x.week,x.ctx||{}); lines.push([st.bien,'S'+x.week,x.dateRef,x.occ!=null?Math.round(x.occ*100):'',sc.base||'',sc.pru.mid||'',sc.equ.mid||'',sc.agr.mid||'',sc.equ.midWE||'',x.confidence,x.ctx&&x.ctx.vacMetro?1:0,x.ctx&&x.ctx.vacReunion?1:0,x.ctx&&x.ctx.ferie?1:0,x.ctx&&x.ctx.pont?1:0]); });
     const csv=lines.map(r=>r.join(';')).join('\n'); const blob=new Blob(['﻿'+csv],{type:'text/csv'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='prix-conseilles-'+st.bien+'-'+st.year+'.csv'; a.click();
   }
