@@ -1512,7 +1512,7 @@ function _shWire(){
 //   - vacances     : https://data.education.gouv.fr (dataset fr-en-calendrier-scolaire)
 // Fetch live au chargement, cache localStorage (refresh si année change ou > 30 j), fallback embarqué.
 const AL_HOL = (function(){
-  const CACHE_KEY='al_holidays_v2', MAX_AGE=30*864e5;
+  const CACHE_KEY='al_holidays_v3', MAX_AGE=30*864e5;
   const ZONES=['Réunion','A','B','C'];
   let DATA={feries:{reunion:{},metropole:{}}, bands:[], loadedYears:[]};
 
@@ -1585,14 +1585,18 @@ const AL_HOL = (function(){
   function readCache(){ const s=store(); if(!s)return null; try{ const o=JSON.parse(s.getItem(CACHE_KEY)); if(!o||!o.t)return null; if(Date.now()-o.t>MAX_AGE)return null; return o.d; }catch(e){return null;} }
   function writeCache(d){ const s=store(); if(!s)return; try{ s.setItem(CACHE_KEY,JSON.stringify({t:Date.now(),d})); }catch(e){} }
 
+  // garantit le 20 décembre (Réunion) pour chaque année présente — quelle que soit la source
+  function normalize(){ if(!DATA.feries)DATA.feries={metropole:{},reunion:{}}; if(!DATA.feries.reunion)DATA.feries.reunion={};
+    const years=new Set(); Object.keys(DATA.feries.metropole||{}).forEach(k=>years.add(k.slice(0,4))); Object.keys(DATA.feries.reunion).forEach(k=>years.add(k.slice(0,4)));
+    years.forEach(y=>{ if(!DATA.feries.reunion[y+'-12-20']) DATA.feries.reunion[y+'-12-20']="Abolition de l'esclavage"; }); return DATA; }
   // ---- API publique ----
   async function load(years, opt){ opt=opt||{};
     const cached=opt.force?null:readCache();
-    if(cached && years.every(y=>(cached.loadedYears||[]).includes(y))){ DATA=cached; return DATA; }
-    try{ const live=await loadLive(years,opt); if(Object.keys(live.feries.metropole).length){ DATA=live; writeCache(DATA); return DATA; } }catch(e){}
-    if(cached){ DATA=cached; return DATA; }
+    if(cached && years.every(y=>(cached.loadedYears||[]).includes(y))){ DATA=cached; return normalize(); }
+    try{ const live=await loadLive(years,opt); if(Object.keys(live.feries.metropole).length){ DATA=live; normalize(); writeCache(DATA); return DATA; } }catch(e){}
+    if(cached){ DATA=cached; return normalize(); }
     if(opt.fallback){ DATA=opt.fallback; } // jeu embarqué
-    return DATA;
+    return normalize();
   }
   function setData(d){ DATA=d; }
   function feries(scope){ return DATA.feries[scope==='reunion'?'reunion':'metropole']||{}; }
