@@ -330,39 +330,40 @@ td.actions{white-space:nowrap}
   #v-calendar .calz{display:flex;align-items:center;gap:3px;cursor:pointer}
   #v-calendar .callegend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-bottom:10px;padding:0 4px}
   #v-calendar .lgi{display:flex;align-items:center;gap:5px}#v-calendar .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
-  #v-calendar .calscrollx{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
-  #v-calendar .calhead{display:flex;border-bottom:1px solid var(--line);width:max-content}
-  #v-calendar .calcorner{flex:none;position:sticky;left:0;z-index:5;background:var(--panel);border-right:1px solid var(--line);display:flex;align-items:flex-end;padding:4px 6px;font-size:10px;color:var(--muted);text-transform:uppercase}
-  #v-calendar .calheaddays{display:flex}
-  #v-calendar .cald{flex:none;text-align:center;font-size:10px;color:var(--muted);padding:3px 0 5px;border-right:1px solid rgba(40,48,64,.4);position:relative}
-  #v-calendar .cald.we{background:rgba(40,48,64,.35)}#v-calendar .cald.fer{background:rgba(248,81,73,.14)}
-  #v-calendar .calmlabel{font-size:9px;color:var(--gold2);font-weight:700;text-transform:uppercase;min-height:11px}
-  #v-calendar .caldnum{font-variant-numeric:tabular-nums}
-  #v-calendar .ferdot{position:absolute;bottom:1px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--red)}
-  #v-calendar .calbienrow{display:flex;align-items:stretch;border-top:1px solid rgba(40,48,64,.5);width:max-content}
-  #v-calendar .calbienlbl{flex:none;position:sticky;left:0;z-index:4;background:var(--panel);border-right:1px solid var(--line);display:flex;align-items:center;padding-left:8px}
-  #v-calendar .calrowwrap{position:relative;height:40px;flex:none}
-  #v-calendar .calrowbg{position:absolute;inset:0;display:flex}
-  #v-calendar .calcell{flex:none;border-right:1px solid rgba(40,48,64,.3)}
-  #v-calendar .calcell.we{background:rgba(40,48,64,.22)}
-  #v-calendar .calcell.vmet{background:rgba(188,140,255,.14)}
-  #v-calendar .calcell.vreu{background:repeating-linear-gradient(45deg,rgba(63,182,201,.22),rgba(63,182,201,.22) 5px,transparent 5px,transparent 10px)}
-  #v-calendar .calcell.vreu.vmet{background:rgba(188,140,255,.14),repeating-linear-gradient(45deg,rgba(63,182,201,.22),rgba(63,182,201,.22) 5px,transparent 5px,transparent 10px)}
-  #v-calendar .calorphan{position:absolute;top:7px;height:26px;background:repeating-linear-gradient(45deg,rgba(248,81,73,.4),rgba(248,81,73,.4) 4px,transparent 4px,transparent 8px);border-radius:4px;z-index:2}
-  #v-calendar .calresa{position:absolute;top:6px;height:28px;border-radius:5px;display:flex;align-items:center;padding:0 6px;color:#0d1117;font-size:11px;font-weight:700;overflow:hidden;cursor:pointer;z-index:3;box-shadow:0 1px 3px rgba(0,0,0,.3);white-space:nowrap}
-  #v-calendar .calresa:hover{filter:brightness(1.08);outline:1px solid #fff;z-index:6}
-  #v-calendar .calyear{border-collapse:collapse;width:100%;min-width:760px}
-  #v-calendar .calyear th{font-size:10px;color:var(--muted);text-transform:uppercase;padding:7px 4px;text-align:center}
-  #v-calendar .calyear td{text-align:center;padding:0}
-  #v-calendar .calhcell{height:46px;font-size:11px;font-weight:700;color:#fff;cursor:pointer;border:1px solid var(--bg);min-width:52px}
-  #v-calendar .calhcell:hover{outline:2px solid var(--gold)}
-  #v-calendar .calytot{font-size:11px;font-weight:700;padding:0 8px;background:var(--panel2)}#v-calendar .calytot span{color:var(--muted);font-weight:400;font-size:10px}
-  #v-calendar .calribbon{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;overflow-x:auto}
-  #v-calendar .ribttl{font-size:12px;color:var(--muted);margin-bottom:8px}
-  #v-calendar .ribwrap{position:relative;height:34px}
-  #v-calendar .rib{position:absolute;top:0;height:18px;border-radius:3px}#v-calendar .rib.reu{background:rgba(63,182,201,.4)}#v-calendar .rib.met{background:rgba(188,140,255,.35)}
-  #v-calendar .ribf{position:absolute;top:0;width:2px;height:18px;background:var(--red)}
-  #v-calendar .ribmonths{position:absolute;top:20px;left:0;display:flex;font-size:9px;color:var(--muted)}#v-calendar .ribmonths span{text-align:center}
+  /* grille mensuelle type Airbnb */
+  #v-calendar .mggrid{display:grid;gap:28px 22px}
+  #v-calendar .mggrid.one{grid-template-columns:minmax(0,660px)}
+  #v-calendar .mggrid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+  #v-calendar .mgttl{font-size:16px;font-weight:700;margin-bottom:8px;text-transform:capitalize}
+  #v-calendar .mg.sm .mgttl{font-size:13.5px;margin-bottom:5px}
+  #v-calendar .mgyr{color:var(--muted);font-weight:400;font-size:.8em}
+  #v-calendar .mgdow{display:grid;grid-template-columns:repeat(7,1fr);font-size:11px;color:var(--muted);text-align:center;padding-bottom:4px}
+  #v-calendar .mg.sm .mgdow{font-size:9px}
+  #v-calendar .mgweek{position:relative}
+  #v-calendar .mgdays{display:grid;grid-template-columns:repeat(7,1fr)}
+  #v-calendar .mgday{position:relative;height:84px;border:1px solid rgba(40,48,64,.55);background:var(--panel2);display:flex;flex-direction:column;justify-content:space-between;padding:5px 7px;overflow:hidden}
+  #v-calendar .mg.sm .mgday{height:44px;padding:3px 4px}
+  #v-calendar .mgday.empty{background:transparent;border:none}
+  #v-calendar .mgnum{font-size:12px;font-weight:600;color:var(--txt)}
+  #v-calendar .mg.sm .mgnum{font-size:9.5px}
+  #v-calendar .mgday.past .mgnum{color:var(--muted);text-decoration:line-through}
+  #v-calendar .mgday.fer .mgnum{color:var(--red)}
+  #v-calendar .mgprice{font-size:11px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+  #v-calendar .mg.sm .mgprice{font-size:8px}
+  #v-calendar .mgday.vmet{background:rgba(188,140,255,.13)}
+  #v-calendar .mgday.vreu{background-color:var(--panel2);background-image:repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(63,182,201,.2) 6px,rgba(63,182,201,.2) 12px)}
+  #v-calendar .mgday.vreu.vmet{background-color:rgba(188,140,255,.13);background-image:repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(63,182,201,.2) 6px,rgba(63,182,201,.2) 12px)}
+  #v-calendar .mgbars{position:absolute;left:0;right:0;top:30px;pointer-events:none}
+  #v-calendar .mg.sm .mgbars{top:18px}
+  #v-calendar .mgresa{position:absolute;height:26px;background:#3a4150;display:flex;align-items:center;gap:5px;padding:0 6px;color:#e6edf3;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;cursor:pointer;pointer-events:auto;box-shadow:0 1px 2px rgba(0,0,0,.45)}
+  #v-calendar .mg.sm .mgresa{height:15px;font-size:8px;gap:3px;padding:0 3px}
+  #v-calendar .mgresa.rl{border-top-left-radius:13px;border-bottom-left-radius:13px}
+  #v-calendar .mgresa.rr{border-top-right-radius:13px;border-bottom-right-radius:13px}
+  #v-calendar .mgresa:hover{filter:brightness(1.18);z-index:6}
+  #v-calendar .mgav{flex:none;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#0d1117}
+  #v-calendar .mg.sm .mgav{width:11px;height:11px;font-size:6.5px}
+  #v-calendar .mgnm{overflow:hidden;text-overflow:ellipsis}
+  @media(max-width:1050px){#v-calendar .mggrid.three{grid-template-columns:repeat(2,minmax(0,1fr))}}
   #v-calendar .calpcard{margin-top:16px}
   #v-calendar .calptbl td{font-size:12px}#v-calendar .calptbl .muted,#v-calendar .muted{color:var(--muted)}
   #v-calendar .prange{color:var(--muted);font-size:10.5px}
@@ -1673,49 +1674,81 @@ const AL_PRICE = (function(){
 })();
 if(typeof module!=='undefined') module.exports=AL_PRICE;
 
-// ===== Onglet Calendrier location courte durée =====
+// ===== Onglet Calendrier location courte durée (présentation type Airbnb) =====
 const AL_CAL = (function(){
   const DAY=864e5;
-  const MOIS=['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
   const MOISL=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
-  const JOUR=['L','M','M','J','V','S','D'];
+  const DOW=['L','M','M','J','V','S','D'];
   const CHAN={Airbnb:'#ff5a5f',Booking:'#003580','Site web':'#3fb950',Direct:'#d4af37',Immosphera:'#bc8cff',Bibizfamily:'#58a6ff',Abritel:'#e3893b','Direct FM':'#f1d27a'};
-  function chanColor(o){ return CHAN[o]|| (typeof CHAN_COLORS!=='undefined'&&CHAN_COLORS[o]) || '#8b97a8'; }
+  function chanColor(o){ return CHAN[o]||(typeof CHAN_COLORS!=='undefined'&&CHAN_COLORS[o])||'#8b97a8'; }
   const _eur=(typeof eur==='function')?eur:(n=>n==null?'—':Math.round(n).toLocaleString('fr-FR')+' €');
   function ymd(d){return d.toISOString().slice(0,10);}
   function addDays(s,n){const d=new Date(s+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return ymd(d);}
   function diffDays(a,b){return Math.round((new Date(b+'T00:00:00Z')-new Date(a+'T00:00:00Z'))/DAY);}
-  function dow(s){return (new Date(s+'T00:00:00Z').getUTCDay()+6)%7;} // 0=lundi
   function fd(s){if(!s)return '—';const[y,m,d]=s.split('-');return `${d}/${m}/${y.slice(2)}`;}
   function daysInMonth(y,m){return new Date(Date.UTC(y,m+1,0)).getUTCDate();}
 
-  let st={view:'month', year:null, month:null, bien:'all', zones:{'Réunion':true,'A':false,'B':false,'C':true}, holReady:false};
+  let st={view:'month', year:null, month:null, bien:null, zones:{'Réunion':true,'A':false,'B':false,'C':true}, holReady:false};
+  let LU={}, PONT=new Set(); // prix par (bien|semaine), dates de pont
 
-  // ---------- données ----------
   function rows(){ return (typeof ROWS!=='undefined'?ROWS:[]).filter(r=>r.entree&&r.sortie); }
-  function biens(){ return [...new Set(rows().map(r=>r.logement).filter(Boolean))].sort(); }
-  function resaInRange(bien,start,end){ return rows().filter(r=>(bien==='all'||r.logement===bien)&&r.entree< end && r.sortie> start); }
+  function biens(){ const b=[...new Set(rows().map(r=>r.logement).filter(Boolean))].sort(); return b.length?b:['Ambassador','Lodge']; }
+  function resaInRange(bien,start,end){ return rows().filter(r=>r.logement===bien && r.entree<end && r.sortie>start); }
   function leadTime(r){ return r.date_resa? diffDays(r.date_resa,r.entree): null; }
   function adr(r){ const n=r.nuitees||diffDays(r.entree,r.sortie); return n? r.montant/n : null; }
-  function reste(r){ const n0=v=>v||0; return r.reste_a_payer!=null?r.reste_a_payer: (n0(r.montant)+n0(r.taxe)-n0(r.ac1)-n0(r.ac2)-n0(r.ac3)-n0(r.frais_menage)); }
-
-  // trous & nuits orphelines pour un bien sur une plage
-  function gaps(bien,start,end){ const rs=resaInRange(bien,start,end).map(r=>({s:r.entree<start?start:r.entree,e:r.sortie>end?end:r.sortie})).sort((a,b)=>a.s.localeCompare(b.s));
-    const out=[]; let cur=start;
-    rs.forEach(r=>{ if(r.s>cur){ out.push({start:cur,end:r.s,nights:diffDays(cur,r.s)}); } if(r.e>cur)cur=r.e; });
-    if(cur<end) out.push({start:cur,end,nights:diffDays(cur,end)});
-    return out.map(g=>Object.assign(g,{orphan:g.nights<=2})); }
-
-  // ---------- contexte calendaire (pour pricing + superpositions) ----------
-  function holCtx(d){ if(typeof AL_HOL==='undefined')return {};
-    const vMetro=AL_HOL.inVacation(d,['A','B','C']).length>0;
-    const vReu=AL_HOL.inVacation(d,['Réunion']).length>0;
-    const ferie=AL_HOL.isFerie(d,'reunion');
-    const ponts=AL_HOL.ponts('reunion'); const pont=ponts.some(p=>p.date===d);
-    return {vacMetro:vMetro, vacReunion:vReu, ferie, pont}; }
+  function reste(r){ const z=v=>v||0; return r.reste_a_payer!=null?r.reste_a_payer:(z(r.montant)+z(r.taxe)-z(r.ac1)-z(r.ac2)-z(r.ac3)-z(r.frais_menage)); }
   function activeZones(){ return Object.keys(st.zones).filter(z=>st.zones[z]); }
+  function dayVac(d){ if(typeof AL_HOL==='undefined')return {reu:false,met:false};
+    const z=activeZones(); const reuZ=z.filter(x=>x==='Réunion'), metZ=z.filter(x=>x!=='Réunion');
+    return {reu:reuZ.length?AL_HOL.inVacation(d,reuZ).length>0:false, met:metZ.length?AL_HOL.inVacation(d,metZ).length>0:false}; }
+  function holCtx(d){ if(typeof AL_HOL==='undefined')return {};
+    const v=dayVac(d); return {vacMetro:v.met, vacReunion:v.reu, ferie:AL_HOL.isFerie(d,'reunion'), pont:PONT.has(d)}; }
 
-  // ---------- rendu : barre de contrôle ----------
+  // ---- préparation prix (par semaine, pour l'année affichée) ----
+  function buildPrice(){ LU={}; if(typeof AL_PRICE==='undefined')return;
+    try{ const G=AL_PRICE.grid(rows(),st.year,holCtx); G.grid.forEach(g=>{ LU[g.bien+'|'+g.week]=g; }); G._years=G.years; AL_CAL._priceYears=G.years; }catch(e){}
+    PONT=new Set(); if(typeof AL_HOL!=='undefined'){ AL_HOL.ponts('reunion').forEach(p=>PONT.add(p.date)); } }
+  function priceCell(d,bien){ if(typeof AL_PRICE==='undefined')return null; const w=AL_PRICE.isoWeek(d).week; const g=LU[bien+'|'+w]; return g?g.mid:null; }
+
+  // ---------- une grille de mois ----------
+  function monthGrid(y,m,bien,size){
+    const dim=daysInMonth(y,m); const lead=(new Date(Date.UTC(y,m,1)).getUTCDay()+6)%7;
+    const today=ymd(new Date());
+    const cells=[]; for(let i=0;i<lead;i++)cells.push(null); for(let d=1;d<=dim;d++)cells.push(ymd(new Date(Date.UTC(y,m,d)))); while(cells.length%7)cells.push(null);
+    const weeks=[]; for(let i=0;i<cells.length;i+=7)weeks.push(cells.slice(i,i+7));
+    const mStart=ymd(new Date(Date.UTC(y,m,1))), mEnd=ymd(new Date(Date.UTC(y,m+1,1)));
+    const resas=resaInRange(bien,mStart,mEnd);
+    // jours bookés (pour masquer le prix)
+    const booked=new Set(); resas.forEach(r=>{ for(let d=r.entree; d<r.sortie; d=addDays(d,1)) booked.add(d); });
+
+    let h=`<div class="mg ${size}"><div class="mgttl">${MOISL[m].toLowerCase()} <span class="mgyr">${y}</span></div>`;
+    h+='<div class="mgdow">'+DOW.map(x=>`<span>${x}</span>`).join('')+'</div>';
+    weeks.forEach(wk=>{
+      // cellules
+      let days='';
+      wk.forEach(d=>{ if(!d){ days+='<div class="mgday empty"></div>'; return; }
+        const past=d<today, fer=(typeof AL_HOL!=='undefined')&&AL_HOL.isFerie(d,'reunion'), v=dayVac(d);
+        const price=priceCell(d,bien); const showP=price!=null && !booked.has(d);
+        const cls=['mgday',past?'past':'',fer?'fer':'',v.reu?'vreu':'',v.met?'vmet':''].filter(Boolean).join(' ');
+        days+=`<div class="${cls}" title="${fer?AL_HOL.ferieName(d,'reunion'):''}"><div class="mgnum">${+d.slice(8)}</div>`+
+          `<div class="mgprice">${showP?price+' €':''}</div></div>`; });
+      // barres réservations de la semaine
+      let bars=''; const wkDays=wk.filter(Boolean); if(wkDays.length){ const wkStart=wkDays[0], wkEnd=wkDays[wkDays.length-1];
+        resas.forEach(r=>{ const cs=r.entree>wkStart?r.entree:wkStart; const lastNight=addDays(r.sortie,-1); const ce=lastNight<wkEnd?lastNight:wkEnd;
+          if(cs>ce) return; const a=wk.indexOf(cs), b=wk.indexOf(ce); if(a<0||b<0) return;
+          const left=a/7*100, width=(b-a+1)/7*100; const rl=(cs===r.entree), rr=(ce===lastNight);
+          const col=chanColor(r.origine); const nm=((r.prenom||r.nom||'').trim()); const init=(nm[0]||'?').toUpperCase();
+          const extra=r.nb_pers?' +'+r.nb_pers:'';
+          bars+=`<div class="mgresa ${rl?'rl':''} ${rr?'rr':''}" style="left:${left}%;width:${width}%" data-k="${(r.logement||'')+'|'+r.entree+'|'+(r.nom||'')}">`+
+            (rl?`<span class="mgav" style="background:${col}">${init}</span><span class="mgnm">${nm}${extra}</span>`:'')+`</div>`; });
+      }
+      h+=`<div class="mgweek"><div class="mgdays">${days}</div><div class="mgbars">${bars}</div></div>`;
+    });
+    h+='</div>';
+    return h;
+  }
+
+  // ---------- contrôles ----------
   function controls(){
     const lab = st.view==='year'? String(st.year) : st.view==='quarter'? ('T'+(Math.floor(st.month/3)+1)+' '+st.year) : (MOISL[st.month]+' '+st.year);
     const seg=(id,opts,cur)=>`<div class="seg" id="${id}">`+opts.map(o=>`<button data-v="${o[0]}" class="${o[0]===cur?'on':''}">${o[1]}</button>`).join('')+'</div>';
@@ -1723,123 +1756,59 @@ const AL_CAL = (function(){
     return `<div class="calctrls">
       ${seg('calViewSeg',[['month','Mois'],['quarter','Trimestre'],['year','Année']],st.view)}
       <div class="calnav"><button id="calPrev">‹</button><span id="calLabel">${lab}</span><button id="calNext">›</button><button id="calToday">Aujourd'hui</button></div>
-      ${seg('calBienSeg',[['all','Tous']].concat(biens().map(b=>[b,b])),st.bien)}
+      ${seg('calBienSeg',biens().map(b=>[b,b]),st.bien)}
       <div class="calzones">Vacances : ${['Réunion','A','B','C'].map(zchk).join('')}</div>
-    </div>
-    <div class="callegend" id="calLegend"></div>`;
+    </div><div class="callegend" id="calLegend"></div>`;
   }
-  function legend(){ const items=[['Réservation','#d4af37'],['Nuit orpheline','rgba(248,81,73,.5)'],['Vac. Réunion','rgba(63,182,201,.25)'],['Vac. métropole','rgba(188,140,255,.22)'],['Férié','#f85149'],['Pont','#e3893b']];
+  function legend(){ const items=[['Réservation','#3a4150'],['Vac. Réunion','rgba(63,182,201,.35)'],['Vac. métropole','rgba(188,140,255,.3)'],['Férié','var(--red)'],['Pont','var(--orange)'],['Passé','transparent']];
     return items.map(i=>`<span class="lgi"><span class="dot" style="background:${i[1]}"></span>${i[0]}</span>`).join(''); }
 
-  // ---------- rendu : timeline (mois / trimestre) ----------
-  function timeline(start,end,cellW){
-    const nd=diffDays(start,end); const days=[]; for(let i=0;i<nd;i++)days.push(addDays(start,i));
-    const zones=activeZones(); const LBL=92;
-    const reuZ=zones.filter(z=>z==='Réunion'), metZ=zones.filter(z=>z!=='Réunion');
-    // contexte par jour
-    const dctx=days.map(d=>{ const ferie=(typeof AL_HOL!=='undefined')&&AL_HOL.isFerie(d,'reunion');
-      let reu=false,met=false,reuLbl='',metLbl='';
-      if(typeof AL_HOL!=='undefined'){ const rb=reuZ.length?AL_HOL.inVacation(d,reuZ):[]; const mb=metZ.length?AL_HOL.inVacation(d,metZ):[];
-        reu=rb.length>0; met=mb.length>0; if(reu)reuLbl=rb[0].label; if(met)metLbl=mb.map(x=>'Zone '+x.zone).join(', '); }
-      return {d,we:dow(d)>=5,ferie,reu,met,reuLbl,metLbl}; });
-    // entête
-    let head=`<div class="calhead"><div class="calcorner" style="width:${LBL}px">Bien</div><div class="calheaddays" style="width:${nd*cellW}px">`;
-    dctx.forEach((c,i)=>{ const num=c.d.slice(8); const first=num==='01'||i===0;
-      head+=`<div class="cald ${c.we?'we':''} ${c.ferie?'fer':''}" style="width:${cellW}px" title="${c.ferie?AL_HOL.ferieName(c.d,'reunion'):(c.reu?c.reuLbl:c.met?c.metLbl:'')}">`+
-        `<div class="calmlabel">${first?MOIS[+c.d.slice(5,7)-1]:'&nbsp;'}</div>`+
-        `<div class="caldnum">${cellW>=22?JOUR[dow(c.d)]+' ':''}${num}</div>`+(c.ferie?'<span class="ferdot"></span>':'')+'</div>'; });
-    head+='</div></div>';
-    // lignes par bien
-    const bs = st.bien==='all'? biens() : [st.bien];
-    let body='';
-    bs.forEach(b=>{
-      let cells=''; dctx.forEach(c=>{ const cls=[c.we?'we':'',c.reu?'vreu':'',c.met?'vmet':''].filter(Boolean).join(' ');
-        cells+=`<div class="calcell ${cls}" style="width:${cellW}px"></div>`; });
-      let bars='';
-      gaps(b,start,end).filter(g=>g.orphan).forEach(g=>{ const left=diffDays(start,g.start)*cellW;
-        bars+=`<div class="calorphan" style="left:${left}px;width:${g.nights*cellW}px" title="Nuit(s) orpheline(s) : ${g.nights}"></div>`; });
-      resaInRange(b,start,end).forEach(r=>{ const s=r.entree<start?start:r.entree; const e=r.sortie>end?end:r.sortie;
-        const left=diffDays(start,s)*cellW; const w=Math.max(diffDays(s,e)*cellW-2,cellW-2); const col=chanColor(r.origine);
-        bars+=`<div class="calresa" style="left:${left}px;width:${w}px;background:${col}" data-k="${(r.logement||'')+'|'+r.entree+'|'+(r.nom||'')}"><span class="calresnm">${cellW>=18?((r.prenom||'')+' '+(r.nom||'')).trim():''}</span></div>`; });
-      body+=`<div class="calbienrow"><div class="calbienlbl" style="width:${LBL}px"><span class="pill ${b==='Ambassador'?'amb':'lodge'}">${b}</span></div><div class="calrowwrap" style="width:${nd*cellW}px"><div class="calrowbg">${cells}</div>${bars}</div></div>`;
-    });
-    return `<div class="calscrollx">${head}${body}</div>`;
-  }
-
-  // ---------- rendu : heatmap année ----------
-  function monthAgg(b,y,m){ const start=ymd(new Date(Date.UTC(y,m,1))); const end=ymd(new Date(Date.UTC(y,m+1,1)));
-    const dim=daysInMonth(y,m); let nights=0,rev=0,nb=0;
-    resaInRange(b,start,end).forEach(r=>{ const s=r.entree<start?start:r.entree; const e=r.sortie>end?end:r.sortie; const nn=diffDays(s,e); if(nn>0){nights+=nn; const a=adr(r)||0; rev+=a*nn; nb++;} });
-    return {nights,occ:nights/dim,adr:nights?rev/nights:null,revpar:rev/dim,nb}; }
-  function heat(occ){ if(!occ)return '#161b22'; const t=Math.min(occ,1); const r=Math.round(22+t*(212-22)),g=Math.round(27+t*(175-27)),bl=Math.round(34+t*(55-34)); return `rgb(${r},${g},${bl})`; }
-  function yearView(){ const y=st.year; const bs= st.bien==='all'?biens():[st.bien];
-    let h='<div class="calscrollx"><table class="calyear"><thead><tr><th>Bien</th>'+MOIS.map((m,i)=>`<th>${m}</th>`).join('')+'<th>Année</th></tr></thead><tbody>';
-    bs.forEach(b=>{ let yn=0,yr=0; h+=`<tr><td><span class="pill ${b==='Ambassador'?'amb':'lodge'}">${b}</span></td>`;
-      for(let m=0;m<12;m++){ const a=monthAgg(b,y,m); yn+=a.nights; yr+=a.revpar*daysInMonth(y,m);
-        h+=`<td class="calhcell" style="background:${heat(a.occ)}" data-tip="${b} · ${MOISL[m]} ${y}|Occupation ${Math.round(a.occ*100)}%|${a.nb} résa · ${a.nights} nuits|ADR ${a.adr?Math.round(a.adr)+' €':'—'}|RevPAR ${Math.round(a.revpar)} €">${Math.round(a.occ*100)}%</td>`; }
-      const occY=yn/(daysInMonth(y,1)>=28?365:365); h+=`<td class="calytot">${Math.round(yn/365*100)}%<br><span>${_eur(yr)}</span></td></tr>`; });
-    h+='</tbody></table></div>';
-    // ruban vacances/fériés sur l'année
-    h+='<div class="calribbon"><div class="ribttl">Vacances & fériés '+y+'</div>'+ribbon(y)+'</div>';
-    return h; }
-  function ribbon(y){ const start=y+'-01-01', end=(y+1)+'-01-01'; const W=12*60; const out=[];
-    if(typeof AL_HOL!=='undefined'){ AL_HOL.bands(activeZones()).forEach(b=>{ if(b.end<start||b.start>=end)return; const s=b.start<start?start:b.start; const e=b.end>=end?addDays(end,-1):b.end;
-      const left=diffDays(start,s)/365*W; const w=(diffDays(s,e)+1)/365*W; const reu=b.zone==='Réunion';
-      out.push(`<div class="rib ${reu?'reu':'met'}" style="left:${left}px;width:${Math.max(w,2)}px" title="${b.label} (${reu?'Réunion':'Zone '+b.zone})"></div>`); });
-      Object.keys(AL_HOL.feries('reunion')).filter(d=>d>=start&&d<end).forEach(d=>{ const left=diffDays(start,d)/365*W; out.push(`<div class="ribf" style="left:${left}px" title="${AL_HOL.ferieName(d,'reunion')}"></div>`); }); }
-    let mlab='<div class="ribmonths">'+MOIS.map(m=>`<span style="width:${W/12}px">${m}</span>`).join('')+'</div>';
-    return `<div class="ribwrap" style="width:${W}px">${out.join('')}${mlab}</div>`; }
-
-  // ---------- panneau prix conseillés ----------
-  function pricingPanel(){ if(typeof AL_PRICE==='undefined')return '';
-    const y=st.year; const G=AL_PRICE.grid(rows(),y,holCtx); const bs= st.bien==='all'?biens():[st.bien];
-    // semaines visibles selon la vue
+  // ---------- panneau prix ----------
+  function pricingPanel(){ if(typeof AL_PRICE==='undefined')return ''; const y=st.year; const b=st.bien;
     let wMin=1,wMax=52;
-    if(st.view==='month'){ const c=AL_PRICE.isoWeek(ymd(new Date(Date.UTC(y,st.month,15)))); wMin=Math.max(1,c.week-2); wMax=Math.min(52,c.week+3); }
-    else if(st.view==='quarter'){ const q=Math.floor(st.month/3); const a=AL_PRICE.isoWeek(ymd(new Date(Date.UTC(y,q*3,5)))).week, b=AL_PRICE.isoWeek(ymd(new Date(Date.UTC(y,q*3+2,25)))).week; wMin=a; wMax=b; }
+    if(st.view==='month'){ const c=AL_PRICE.isoWeek(ymd(new Date(Date.UTC(y,st.month,15)))).week; wMin=Math.max(1,c-1); wMax=Math.min(52,c+4); }
+    else if(st.view==='quarter'){ const q=Math.floor(st.month/3); wMin=AL_PRICE.isoWeek(ymd(new Date(Date.UTC(y,q*3,5)))).week; wMax=AL_PRICE.isoWeek(ymd(new Date(Date.UTC(y,q*3+2,25)))).week; }
     let rowsH='';
-    bs.forEach(b=>{ G.grid.filter(g=>g.bien===b&&g.week>=wMin&&g.week<=wMax).forEach(g=>{
-      const tags=[]; if(g.ctx.vacMetro)tags.push('<span class="ptag met">Vac. métro</span>'); if(g.ctx.vacReunion)tags.push('<span class="ptag reu">Vac. Réu</span>'); if(g.ctx.ferie)tags.push('<span class="ptag fer">Férié</span>'); if(g.ctx.pont)tags.push('<span class="ptag pont">Pont</span>');
-      const occ=g.occ!=null?Math.round(g.occ*100)+'%':'—';
-      const prix=g.mid!=null?`<b>${g.mid} €</b> <span class="prange">(${g.low}–${g.high})</span>`:'<span class="muted">hist. insuffisant</span>';
-      rowsH+=`<tr><td><span class="pill ${b==='Ambassador'?'amb':'lodge'}">${b}</span></td><td>S${g.week}<br><span class="muted">${fd(g.dateRef)}</span></td><td>${occ}</td><td>${g.base?g.base+' €':'—'}</td><td>${prix}</td><td>${tags.join(' ')||'<span class="muted">—</span>'}</td></tr>`; }); });
-    return `<div class="card calpcard"><h3>Prix conseillés & vacances locatives <span class="hint">période visible · base historique ${G.years.join(', ')||'—'}</span></h3>
-      <div class="desc">Prix médian par nuit constaté les années précédentes pour la même semaine, ajusté de l'occupation et du contexte (vacances/fériés/ponts). Recommandation à recopier dans Superhote.</div>
-      <div class="scroll" style="max-height:340px"><table class="tbl calptbl"><thead><tr><th>Bien</th><th>Semaine</th><th>Occ. hist.</th><th>ADR médian</th><th>Prix conseillé /nuit</th><th>Contexte</th></tr></thead><tbody>${rowsH||'<tr><td colspan="6" class="muted" style="padding:12px">Historique insuffisant pour cette période.</td></tr>'}</tbody></table></div></div>`;
+    for(let w=wMin;w<=wMax;w++){ const g=LU[b+'|'+w]; if(!g)continue;
+      const tags=[]; if(g.ctx&&g.ctx.vacMetro)tags.push('<span class="ptag met">Vac. métro</span>'); if(g.ctx&&g.ctx.vacReunion)tags.push('<span class="ptag reu">Vac. Réú</span>'); if(g.ctx&&g.ctx.ferie)tags.push('<span class="ptag fer">Férié</span>'); if(g.ctx&&g.ctx.pont)tags.push('<span class="ptag pont">Pont</span>');
+      const occ=g.occ!=null?Math.round(g.occ*100)+'%':'—'; const prix=g.mid!=null?`<b>${g.mid} €</b> <span class="prange">(${g.low}–${g.high})</span>`:'<span class="muted">hist. insuffisant</span>';
+      rowsH+=`<tr><td>S${w}<br><span class="muted">${fd(g.dateRef)}</span></td><td>${occ}</td><td>${g.base?g.base+' €':'—'}</td><td>${prix}</td><td>${tags.join(' ')||'<span class="muted">—</span>'}</td></tr>`; }
+    return `<div class="card calpcard"><h3>Prix conseillés à programmer — <span class="pill ${b==='Ambassador'?'amb':'lodge'}">${b}</span> <span class="hint">base historique ${(AL_CAL._priceYears||[]).join(', ')||'—'}</span></h3>
+      <div class="desc">Prix médian/nuit constaté les mêmes semaines les années précédentes, ajusté de l'occupation et du contexte (vacances/fériés/ponts).</div>
+      <div class="scroll" style="max-height:320px"><table class="tbl calptbl"><thead><tr><th>Semaine</th><th>Occ. hist.</th><th>ADR médian</th><th>Prix conseillé /nuit</th><th>Contexte</th></tr></thead><tbody>${rowsH||'<tr><td colspan="5" class="muted" style="padding:12px">Historique insuffisant.</td></tr>'}</tbody></table></div></div>`;
   }
 
-  // ---------- rendu principal ----------
+  // ---------- rendu ----------
   function render(){
     if(st.year==null){ const t=new Date(); st.year=t.getUTCFullYear(); st.month=t.getUTCMonth(); }
+    if(!st.bien) st.bien=biens()[0];
+    buildPrice();
     const ctrl=document.getElementById('calControls'); if(ctrl)ctrl.innerHTML=controls();
     const lg=document.getElementById('calLegend'); if(lg)lg.innerHTML=legend();
     const body=document.getElementById('calBody');
-    if(body){ if(st.view==='month'){ const start=ymd(new Date(Date.UTC(st.year,st.month,1))); const end=ymd(new Date(Date.UTC(st.year,st.month+1,1))); body.innerHTML=timeline(start,end,34); }
-      else if(st.view==='quarter'){ const q=Math.floor(st.month/3); const start=ymd(new Date(Date.UTC(st.year,q*3,1))); const end=ymd(new Date(Date.UTC(st.year,q*3+3,1))); body.innerHTML=timeline(start,end,13); }
-      else { body.innerHTML=yearView(); } }
+    if(body){ const b=st.bien;
+      if(st.view==='month'){ body.innerHTML=`<div class="mggrid one">${monthGrid(st.year,st.month,b,'lg')}</div>`; }
+      else if(st.view==='quarter'){ const q=Math.floor(st.month/3); let g=''; for(let i=0;i<3;i++)g+=monthGrid(st.year,q*3+i,b,'sm'); body.innerHTML=`<div class="mggrid three">${g}</div>`; }
+      else { let g=''; for(let m=0;m<12;m++)g+=monthGrid(st.year,m,b,'sm'); body.innerHTML=`<div class="mggrid three">${g}</div>`; }
+    }
     const pp=document.getElementById('calPricing'); if(pp)pp.innerHTML=pricingPanel();
     wire();
   }
 
-  // ---------- navigation + interactions ----------
   function step(dir){ if(st.view==='month'){ st.month+=dir; if(st.month>11){st.month=0;st.year++;} if(st.month<0){st.month=11;st.year--;} }
     else if(st.view==='quarter'){ st.month+=dir*3; while(st.month>11){st.month-=12;st.year++;} while(st.month<0){st.month+=12;st.year--;} }
-    else { st.year+=dir; } render(); }
-  function tip(html,x,y){ let t=document.getElementById('calTip'); if(!t)return; t.innerHTML=html; t.style.display='block';
+    else st.year+=dir; render(); }
+  function tip(html,x,y){ const t=document.getElementById('calTip'); if(!t)return; t.innerHTML=html; t.style.display='block';
     const w=t.offsetWidth,h=t.offsetHeight; let nx=x+14,ny=y+14; if(nx+w>window.innerWidth)nx=x-w-14; if(ny+h>window.innerHeight)ny=y-h-14; t.style.left=nx+'px'; t.style.top=ny+'px'; }
   function hideTip(){ const t=document.getElementById('calTip'); if(t)t.style.display='none'; }
   function resaTip(r){ const a=adr(r), lt=leadTime(r);
     return `<div class="ttl"><span class="pill ${r.logement==='Ambassador'?'amb':'lodge'}">${r.logement}</span> ${(r.prenom||'')+' '+(r.nom||'')}</div>
       <table class="cttab">
       <tr><td>Séjour</td><td>${fd(r.entree)} → ${fd(r.sortie)} (${r.nuitees||diffDays(r.entree,r.sortie)} nuits)</td></tr>
-      <tr><td>Montant versé</td><td>${_eur(r.montant)}</td></tr>
-      <tr><td>ADR /nuit</td><td>${a?_eur(a):'—'}</td></tr>
-      <tr><td>Canal / apporteur</td><td>${r.origine||'—'}</td></tr>
-      <tr><td>Taxe séjour</td><td>${_eur(r.taxe)}</td></tr>
-      <tr><td>Ménage</td><td>${_eur(r.frais_menage)}</td></tr>
-      <tr><td>Voyageurs</td><td>${r.nb_pers||'—'}</td></tr>
-      <tr><td>Réservé le</td><td>${fd(r.date_resa)} ${lt!=null?'('+lt+' j avant)':''}</td></tr>
-      <tr><td>Reste à payer</td><td>${_eur(reste(r))}</td></tr></table>`; }
+      <tr><td>Montant versé</td><td>${_eur(r.montant)}</td></tr><tr><td>ADR /nuit</td><td>${a?_eur(a):'—'}</td></tr>
+      <tr><td>Canal / apporteur</td><td>${r.origine||'—'}</td></tr><tr><td>Taxe séjour</td><td>${_eur(r.taxe)}</td></tr>
+      <tr><td>Ménage</td><td>${_eur(r.frais_menage)}</td></tr><tr><td>Voyageurs</td><td>${r.nb_pers||'—'}</td></tr>
+      <tr><td>Réservé le</td><td>${fd(r.date_resa)} ${lt!=null?'('+lt+' j avant)':''}</td></tr><tr><td>Reste à payer</td><td>${_eur(reste(r))}</td></tr></table>`; }
   function wire(){
     const vs=document.getElementById('calViewSeg'); if(vs)vs.querySelectorAll('button').forEach(b=>b.onclick=()=>{st.view=b.dataset.v;render();});
     const bn=document.getElementById('calBienSeg'); if(bn)bn.querySelectorAll('button').forEach(b=>b.onclick=()=>{st.bien=b.dataset.v;render();});
@@ -1847,19 +1816,15 @@ const AL_CAL = (function(){
     const n=document.getElementById('calNext'); if(n)n.onclick=()=>step(1);
     const td=document.getElementById('calToday'); if(td)td.onclick=()=>{const t=new Date();st.year=t.getUTCFullYear();st.month=t.getUTCMonth();render();};
     document.querySelectorAll('#calControls input[data-z]').forEach(c=>c.onchange=()=>{st.zones[c.dataset.z]=c.checked;render();});
-    document.querySelectorAll('#calBody .calresa').forEach(el=>{ const k=el.dataset.k; const r=rows().find(x=>((x.logement||'')+'|'+x.entree+'|'+(x.nom||''))===k);
+    document.querySelectorAll('#calBody .mgresa').forEach(el=>{ const k=el.dataset.k; const r=rows().find(x=>((x.logement||'')+'|'+x.entree+'|'+(x.nom||''))===k);
       if(r){ el.onmousemove=e=>tip(resaTip(r),e.clientX,e.clientY); el.onmouseleave=hideTip; } });
-    document.querySelectorAll('#calBody .calhcell').forEach(el=>{ el.onmousemove=e=>{ const parts=(el.dataset.tip||'').split('|'); tip('<div class="ttl">'+parts[0]+'</div>'+parts.slice(1).map(p=>'<div>'+p+'</div>').join(''),e.clientX,e.clientY); }; el.onmouseleave=hideTip; });
   }
-
-  // ---------- init (charge fériés/vacances) ----------
   async function init(){ if(st.holReady){render();return;}
-    render(); // rendu immédiat (sans superpositions)
-    if(typeof AL_HOL!=='undefined'){ const t=new Date().getUTCFullYear(); const years=[t-2,t-1,t,t+1];
-      try{ await AL_HOL.load(years,{fallback:(typeof AL_HOL_FALLBACK!=='undefined'?AL_HOL_FALLBACK:null)}); }catch(e){} }
+    render();
+    if(typeof AL_HOL!=='undefined'){ const t=new Date().getUTCFullYear(); try{ await AL_HOL.load([t-2,t-1,t,t+1],{fallback:(typeof AL_HOL_FALLBACK!=='undefined'?AL_HOL_FALLBACK:null)}); }catch(e){} }
     st.holReady=true; render();
   }
-  return {init,render,_gaps:gaps,_holCtx:holCtx,_monthAgg:monthAgg,_state:()=>st};
+  return {init,render,_state:()=>st,_priceYears:[]};
 })();
 function renderCalendar(){ AL_CAL.init(); }
 if(typeof module!=='undefined') module.exports=AL_CAL;
