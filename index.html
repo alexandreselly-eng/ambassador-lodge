@@ -288,6 +288,9 @@ td.actions{white-space:nowrap}
   .kpi .kbar{margin-top:10px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
   .kpi .kbar>span{display:block;height:100%;border-radius:3px;background:var(--gold);transition:width .3s}
   .kpi.b2 .kbar>span{background:var(--lodge)}.kpi.b3 .kbar>span{background:var(--green)}.kpi.b4 .kbar>span{background:var(--blue)}.kpi.b5 .kbar>span{background:var(--violet)}.kpi.b6 .kbar>span{background:var(--orange)}
+  .bienpick{display:flex;gap:4px;flex-wrap:wrap}
+  .bienchip{background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:6px;padding:2px 9px;font-size:11px;font-weight:600;cursor:pointer}
+  .bienchip.on{font-weight:700}
   #commAnalysis .cactrl{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
   #commAnalysis .caperiod{display:flex;align-items:center;gap:6px}
   #commAnalysis .caperiod button{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:12px}
@@ -667,7 +670,20 @@ td.actions{white-space:nowrap}
       <span class="formmsg" id="adminMsg"></span>
     </div>
     <div class="scroll">
-      <table class="tbl"><thead><tr><th>E-mail autorisé</th><th>Statut</th><th>Ajouté le</th><th>Action</th></tr></thead><tbody id="adminBody"></tbody></table>
+      <table class="tbl"><thead><tr><th>E-mail autorisé</th><th>Biens visibles</th><th>Statut</th><th>Ajouté le</th><th>Action</th></tr></thead><tbody id="adminBody"></tbody></table>
+    </div>
+    <div class="desc" style="margin-top:8px">« Biens visibles » limite ce que chaque personne voit (réservations, objectifs, imports). Vide = tous les biens. La restriction est appliquée côté serveur (RLS Supabase), pas seulement à l'écran.</div>
+  </div>
+  <div class="card" id="propCard">
+    <h3>Biens &amp; correspondances Superhote <span class="hint">référentiel des logements</span></h3>
+    <div class="desc">Chaque bien et les <b>libellés d'annonce Superhote</b> qui lui correspondent (séparés par des virgules). À l'import d'un CSV, le bien est reconnu via ces libellés ; un libellé inconnu est bloqué et vous est proposé.</div>
+    <div class="scroll">
+      <table class="tbl"><thead><tr><th>Bien</th><th>Libellés Superhote (séparés par des virgules)</th><th>Couleur</th><th>Objectif €/mois</th><th>Actif</th><th></th></tr></thead><tbody id="propBody"></tbody></table>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px">
+      <input id="newPropName" type="text" placeholder="Nom du nouveau bien (ex. Villa Métis)" style="flex:1;min-width:220px;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:9px 11px;font-size:13.5px;outline:none">
+      <button class="btn" id="btnAddProp">Ajouter un bien</button>
+      <span class="formmsg" id="propMsg"></span>
     </div>
   </div>
   <div class="card">
@@ -718,6 +734,7 @@ td.actions{white-space:nowrap}
 <div id="toast"></div>
 
 <script>
+
 
 
 
@@ -774,6 +791,7 @@ const AL_HOL_FALLBACK = {
 
 
 
+
 </script>
 <script>
 
@@ -790,7 +808,22 @@ const SUPABASE_ANON_KEY = 'sb_publishable_2hvzAvSDxckuY80zHHVdYg_he3n2E9f';
 // --------------------------------------------------------------------
 const OBJ_DEFAULTS = { Ambassador:{obj:9125,comm:1825,pm:6416}, Lodge:{obj:4000,comm:1825,pm:2000} };
 let OBJECTIVES = {}; // `${annee}|${logement}` -> {obj,comm,pm}
-function objFor(year,bien){ return OBJECTIVES[year+'|'+bien] || OBJ_DEFAULTS[bien]; }
+function objFor(year,bien){ return OBJECTIVES[year+'|'+bien] || OBJ_DEFAULTS[bien] || {obj:(propOf(bien).obj_mois_defaut||0),comm:0,pm:0}; }
+
+// ---- Référentiel des biens (multi-biens) ----
+let PROPERTIES = [ {nom:'Ambassador',superhote_labels:['Ambassador'],couleur:'#d4af37',ordre:1,actif:true},
+                   {nom:'Lodge',superhote_labels:['Lodge'],couleur:'#3fb6c9',ordre:2,actif:true} ];
+let MY_BIENS = null;   // null = tous ; sinon liste des biens visibles par l'utilisateur
+function allBiens(){ return PROPERTIES.filter(p=>p.actif!==false).sort((a,b)=>(a.ordre||99)-(b.ordre||99)).map(p=>p.nom); }
+function visBiens(){ const all=allBiens(); return MY_BIENS? all.filter(b=>MY_BIENS.includes(b)) : all; }
+function propOf(b){ return PROPERTIES.find(p=>p.nom===b) || {nom:b,couleur:'#888',obj_mois_defaut:0,superhote_labels:[b]}; }
+function bienColor(b){ return propOf(b).couleur || '#888'; }
+async function loadProperties(){
+  if(SUPA){
+    try{ const {data}=await SUPA.from('properties').select('*'); if(data&&data.length){ PROPERTIES=data.map(p=>({nom:p.nom,superhote_labels:Array.isArray(p.superhote_labels)?p.superhote_labels:(p.superhote_labels||[]),couleur:p.couleur||'#888',commission_pct:p.commission_pct,obj_mois_defaut:p.obj_mois_defaut||0,actif:p.actif!==false,ordre:p.ordre||99})); } }catch(e){}
+    try{ if(IS_ADMIN){ MY_BIENS=null; } else { const {data}=await SUPA.from('authorized_emails').select('biens_autorises').eq('email',(CURRENT_USER&&CURRENT_USER.email)||'').maybeSingle(); MY_BIENS=(data&&Array.isArray(data.biens_autorises))?data.biens_autorises:null; } }catch(e){ MY_BIENS=null; }
+  } else { MY_BIENS=null; }
+}
 async function loadObjectives(){
   OBJECTIVES={};
   if(SUPA){ try{ const {data}=await SUPA.from('objectives').select('*'); (data||[]).forEach(r=>OBJECTIVES[r.annee+'|'+r.logement]={obj:+r.obj_mois,comm:+r.obj_comm,pm:+r.point_mort}); }catch(e){} }
@@ -1007,7 +1040,7 @@ function wireSetPassword(){
     }catch(e){ m.textContent='Erreur : '+e.message; m.className='authmsg err'; }
   };
 }
-async function reload(){ await loadObjectives(); const raw=await Store.list(); ROWS=raw.map(compute); }
+async function reload(){ await loadProperties(); await loadObjectives(); const raw=await Store.list(); ROWS=raw.map(compute); }
 
 function wireAuth(){
   const msg=document.getElementById('authMsg');
@@ -1032,7 +1065,7 @@ function val(id){ return document.getElementById(id).value.trim(); }
 const FORM_IDS=['inLogement','inOrigine','inDateResa','inEntree','inSortie','inNom','inPrenom','inNbPers','inNbAdultes','inMontant','inTaxe','inAc1','inAc1d','inAc2','inAc2d','inAc3','inAc3d','inMenage','inObs'];
 function wireForm(){
   const sel=(id,opts,ph)=>{ const s=document.getElementById(id); s.innerHTML=(ph?`<option value="">${ph}</option>`:'')+opts.map(o=>`<option>${o}</option>`).join(''); };
-  sel('inLogement',['Ambassador','Lodge'],'— choisir —');
+  sel('inLogement',visBiens(),'— choisir —');
   sel('inOrigine',CHANNELS,'— choisir —');
   document.getElementById('btnSave').onclick=saveForm;
   document.getElementById('btnReset').onclick=()=>{ exitEditMode(); clearFields(); formMsg(''); };
@@ -1174,6 +1207,15 @@ function initUI(){
   injectCardTools();
 }
 function buildFilters(){
+  // boutons de biens dynamiques (limités aux biens autorisés)
+  const vb=visBiens(); const fL=document.getElementById('fLog');
+  if(fL){ if(!vb.includes(state.log) && state.log!=='all') state.log= vb.length===1? vb[0] : 'all';
+    if(vb.length<=1 && vb.length) state.log=vb[0];
+    let h = vb.length>1 ? `<button data-v="all" class="${state.log==='all'?'on':''}">Tous</button>` : '';
+    h += vb.map(b=>`<button data-v="${b}" class="${state.log===b?'on':''}">${b}</button>`).join('');
+    fL.innerHTML=h;
+    fL.querySelectorAll('button').forEach(b=>b.onclick=()=>{ fL.querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); state.log=b.dataset.v; render(); });
+  }
   const years=[...new Set(ROWS.filter(d=>d.annee).map(d=>d.annee))].sort();
   const fY=document.getElementById('fYear'); fY.innerHTML=years.map(y=>`<option value="${y}">${y}</option>`).join('');
   if(!years.includes(state.year)) state.year=years.includes(2026)?2026:years[years.length-1];
@@ -1207,7 +1249,7 @@ const DIMS={
 function currentRows(){ return ROWS.filter(d=>d.annee===state.year && (state.log==='all'||d.logement===state.log) && (state.chan==='all'||d.origine===state.chan) && (state.month==='all'||d.mois===+state.month)); }
 function monthly(rows,f){ const a=Array(12).fill(0); rows.forEach(d=>{ if(d.mois&&d[f]) a[d.mois-1]+=d[f]; }); return a; }
 function cumul(a){ let s=0; return a.map(v=>s+=v); }
-function activeObj(){ let o=0,c=0,pm=0; (state.log==='all'?['Ambassador','Lodge']:[state.log]).forEach(b=>{const x=objFor(state.year,b); o+=x.obj;c+=x.comm;pm+=x.pm;}); return {obj:o,comm:c,pm}; }
+function activeObj(){ let o=0,c=0,pm=0; (state.log==='all'?visBiens():[state.log]).forEach(b=>{const x=objFor(state.year,b)||{obj:0,comm:0,pm:0}; o+=x.obj;c+=x.comm;pm+=x.pm;}); return {obj:o,comm:c,pm}; }
 function destroy(id){ if(charts[id]){charts[id].destroy(); delete charts[id];} }
 function mk(id,cfg){ destroy(id); const el=document.getElementById(id); if(el) charts[id]=new Chart(el,cfg); }
 function DL(fmt,color){ return state.labels?{display:true,anchor:'end',align:'end',clamp:true,color:color||css('--txt'),font:{size:10,weight:'600'},formatter:v=>{ if(v==null||v===0)return ''; return fmt?fmt(v):v; }}:{display:false}; }
@@ -1247,7 +1289,7 @@ function render(){
   const byLog={}; rows.forEach(d=>{byLog[d.logement]=(byLog[d.logement]||0)+(d.montant||0);});
   let lgP=applySort(Object.entries(byLog),state.sortLog);
   const lgTot=lgP.reduce((s,p)=>s+p[1],0);
-  mk('cLog',{type:'doughnut',data:{labels:lgP.map(p=>p[0]),datasets:[{data:lgP.map(p=>p[1]),backgroundColor:lgP.map(p=>p[0]==='Ambassador'?css('--gold'):css('--lodge')),borderColor:css('--panel'),borderWidth:2,datalabels:state.labels?{display:true,color:'#0d1117',font:{size:11,weight:'700'},formatter:v=>PCT?(lgTot?(v/lgTot*100).toFixed(1)+' %':''):eur(v)}:{display:false}}]},
+  mk('cLog',{type:'doughnut',data:{labels:lgP.map(p=>p[0]),datasets:[{data:lgP.map(p=>p[1]),backgroundColor:lgP.map(p=>bienColor(p[0])),borderColor:css('--panel'),borderWidth:2,datalabels:state.labels?{display:true,color:'#0d1117',font:{size:11,weight:'700'},formatter:v=>PCT?(lgTot?(v/lgTot*100).toFixed(1)+' %':''):eur(v)}:{display:false}}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'bottom',labels:{boxWidth:11,padding:10}},datalabels:state.labels?{display:true}:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${eur(c.parsed)} (${lgTot?(c.parsed/lgTot*100).toFixed(1):0} %)`}}}}});
   const occM=Array(12).fill(0);
   for(let m=1;m<=12;m++){const r=rows.filter(d=>d.mois===m&&d.tx_rempl!=null); if(r.length) occM[m-1]=r.reduce((s,d)=>s+d.tx_rempl,0)/r.length*100;}
@@ -1270,12 +1312,54 @@ async function renderAdmin(){
   try{ const {data,error}=await SUPA.from('authorized_emails').select('*').order('added_at',{ascending:false}); if(error)throw error; rows=data||[]; }
   catch(e){ document.getElementById('adminBody').innerHTML=`<tr><td colspan="4">Erreur : ${e.message}</td></tr>`; }
   document.getElementById('adminCount').textContent=`${rows.length} accès`;
-  document.getElementById('adminBody').innerHTML = rows.length? rows.map(r=>`<tr>
-      <td>${r.email}</td><td>${r.status||''}</td><td>${fmtDateTime(r.added_at)}</td>
-      <td><button class="mini-act del" data-em="${r.email}">Révoquer</button></td></tr>`).join('')
-    : '<tr><td colspan="4" style="color:var(--muted)">Aucun accès autorisé pour l\'instant.</td></tr>';
+  const ab=allBiens();
+  document.getElementById('adminBody').innerHTML = rows.length? rows.map(r=>{
+      const list=Array.isArray(r.biens_autorises)?r.biens_autorises:null;
+      const chips=ab.map(b=>{ const on=list?list.includes(b):true; return `<button class="bienchip ${on?'on':''}" data-em="${r.email}" data-b="${b}" style="${on?'background:'+bienColor(b)+';color:#000;border-color:'+bienColor(b):''}">${b}</button>`; }).join('');
+      return `<tr><td>${r.email}</td><td><div class="bienpick">${chips}</div><div class="muted" style="font-size:10px;margin-top:3px">${list?(list.length+' bien'+(list.length>1?'s':'')):'tous les biens'}</div></td><td>${r.status||''}</td><td>${fmtDateTime(r.added_at)}</td><td><button class="mini-act del" data-em="${r.email}">Révoquer</button></td></tr>`; }).join('')
+    : '<tr><td colspan="5" style="color:var(--muted)">Aucun accès autorisé pour l\'instant.</td></tr>';
   document.querySelectorAll('#adminBody .mini-act').forEach(b=>b.onclick=()=>removeAuthorized(b.dataset.em));
+  document.querySelectorAll('#adminBody .bienchip').forEach(b=>b.onclick=()=>toggleUserBien(b.dataset.em,b.dataset.b,rows));
+  renderProps();
   renderConnections();
+}
+async function toggleUserBien(email,bien,rows){
+  const r=rows.find(x=>x.email===email); if(!r)return;
+  let list=Array.isArray(r.biens_autorises)?r.biens_autorises.slice():allBiens().slice();
+  if(list.includes(bien)) list=list.filter(x=>x!==bien); else list.push(bien);
+  const all=allBiens(); const val=(list.length===all.length && all.every(b=>list.includes(b)))? null : list;
+  try{ const {error}=await SUPA.from('authorized_emails').update({biens_autorises:val}).eq('email',email); if(error)throw error; toast('Accès biens mis à jour pour '+email+'.'); renderAdmin(); }
+  catch(e){ alert('Erreur : '+e.message); }
+}
+function renderProps(){
+  const tb=document.getElementById('propBody'); if(!tb)return;
+  tb.innerHTML=PROPERTIES.slice().sort((a,b)=>(a.ordre||99)-(b.ordre||99)).map(p=>`<tr>
+    <td><span class="pill" style="background:${(p.couleur||'#888')}22;color:${p.couleur||'#888'}">${p.nom}</span></td>
+    <td><input class="pinp" data-nom="${p.nom}" data-f="labels" value="${(p.superhote_labels||[]).join(', ').replace(/"/g,'&quot;')}" style="width:100%;min-width:220px;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:5px 8px;font-size:12px"></td>
+    <td><input class="pinp" type="color" data-nom="${p.nom}" data-f="couleur" value="${p.couleur||'#888888'}" style="width:42px;height:26px;border:none;background:none;cursor:pointer"></td>
+    <td><input class="pinp" type="number" data-nom="${p.nom}" data-f="obj" value="${p.obj_mois_defaut||0}" style="width:84px;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:5px 8px;font-size:12px"></td>
+    <td style="text-align:center"><input type="checkbox" class="pact" data-nom="${p.nom}" ${p.actif!==false?'checked':''}></td>
+    <td><button class="mini-act psave" data-nom="${p.nom}">Enregistrer</button></td></tr>`).join('');
+  tb.querySelectorAll('.psave').forEach(b=>b.onclick=()=>saveProp(b.dataset.nom));
+  const ap=document.getElementById('btnAddProp'); if(ap) ap.onclick=addProp;
+}
+async function saveProp(nom){
+  const q=f=>document.querySelector('.pinp[data-nom="'+CSS.escape(nom)+'"][data-f="'+f+'"]');
+  const labels=(q('labels').value||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const couleur=q('couleur').value, obj=+q('obj').value||0;
+  const actif=document.querySelector('.pact[data-nom="'+CSS.escape(nom)+'"]').checked;
+  const m=document.getElementById('propMsg');
+  try{ const {error}=await SUPA.from('properties').update({superhote_labels:labels,couleur,obj_mois_defaut:obj,actif}).eq('nom',nom); if(error)throw error;
+    m.textContent='✓ '+nom+' enregistré.'; m.className='formmsg ok'; await loadProperties(); renderProps();
+  }catch(e){ m.textContent='Erreur : '+e.message; m.className='formmsg err'; }
+}
+async function addProp(){
+  const inp=document.getElementById('newPropName'), m=document.getElementById('propMsg'); const nom=(inp.value||'').trim();
+  if(!nom){ m.textContent='Indiquez un nom de bien.'; m.className='formmsg err'; return; }
+  try{ const ordre=Math.max(0,...PROPERTIES.map(p=>p.ordre||0))+1;
+    const {error}=await SUPA.from('properties').insert({nom,superhote_labels:[nom],couleur:'#888888',ordre,actif:true}); if(error)throw error;
+    inp.value=''; m.textContent='✓ Bien « '+nom+' » ajouté.'; m.className='formmsg ok'; await loadProperties(); renderProps();
+  }catch(e){ m.textContent='Erreur : '+e.message; m.className='formmsg err'; }
 }
 async function renderConnections(){
   if(!IS_ADMIN||!SUPA) return;
