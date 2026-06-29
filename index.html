@@ -185,7 +185,7 @@ td.actions{white-space:nowrap}
       <div class="fglabel" style="color:var(--gold)"><i class="ti ti-filter" aria-hidden="true"></i> Périmètre</div>
       <div class="fgrow">
         <div class="fg"><label>Exercice</label><select id="fYear"></select></div>
-        <div class="fg"><label>Bien</label><div class="seg" id="fLog"><button data-v="all" class="on">Les deux</button><button data-v="Ambassador">Ambassador</button><button data-v="Lodge">Lodge</button></div></div>
+        <div class="fg"><label>Bien <span class="xi" data-explain="Filtre par bien|Restreint tous les chiffres, graphiques et tableaux au logement choisi|« Les deux / Tous » = somme des biens visibles|Toutes les vues (tableau de bord, objectifs, écarts, qualité) suivent ce filtre" tabindex="0" role="button" aria-label="Explication du filtre bien">ⓘ</span></label><div class="seg" id="fLog"><button data-v="all" class="on">Les deux</button><button data-v="Ambassador">Ambassador</button><button data-v="Lodge">Lodge</button></div></div>
         <div class="fg"><label>Mois</label><select id="fMonth"></select></div>
         <div class="fg"><label>Canal</label><select id="fChan"></select></div>
       </div>
@@ -202,9 +202,9 @@ td.actions{white-space:nowrap}
     <div class="fgroup">
       <div class="fglabel" style="color:var(--muted)"><i class="ti ti-adjustments" aria-hidden="true"></i> Affichage</div>
       <div class="fgrow">
-        <div class="fg"><label>Unité</label><div class="seg" id="fUnit"><button data-v="eur" class="on">€</button><button data-v="pct">%</button></div></div>
-        <div class="fg"><label>Cumul</label><button id="tCumul" class="toggle on">Cumul affiché</button></div>
-        <div class="fg"><label>Valeurs</label><button id="tLabels" class="toggle on">Valeurs affichées</button></div>
+        <div class="fg"><label>Unité</label><div class="seg" id="fUnit"><button data-v="eur" class="on" data-explain="Unité : euros (€)|Affiche les montants en valeur absolue">€</button><button data-v="pct" data-explain="Unité : pourcentage (%)|Affiche les parts relatives (% du total) sur les graphiques compatibles : CA par canal, par bien, explorateur">%</button></div></div>
+        <div class="fg"><label>Cumul</label><button id="tCumul" class="toggle on" data-explain="Cumul|Ajoute une courbe cumulée (somme progressive mois après mois) sur les graphiques|Suit la montée vers le total annuel · cliquer pour afficher/masquer">Cumul affiché</button></div>
+        <div class="fg"><label>Valeurs</label><button id="tLabels" class="toggle on" data-explain="Valeurs affichées|Affiche les étiquettes chiffrées directement sur les graphiques|Cliquer pour masquer et obtenir une lecture épurée">Valeurs affichées</button></div>
       </div>
     </div>
   </div>
@@ -2648,7 +2648,7 @@ const AL_TARIF = (function(){
     return `<div class="calctrls">
       <div class="tflabel"><span class="pill ${st.bien==='Ambassador'?'amb':'lodge'}">${st.bien||'—'}</span> · Exercice <b>${st.year}</b> <span class="hint">(choix via les filtres du haut)</span></div>
       <div class="tfaggr">Agressivité <span class="xi" data-explain="Politique de prix|Prix conseillé = ADR médian + (cible − ADR médian) × agressivité|Cible = ADR × occupation historique × contexte (vacances, fériés, ponts)|Curseur : Prudent ×0,5 · Équilibré ×1 · Agressif ×1,5" tabindex="0" role="button" aria-label="Explication de la politique de prix">ⓘ</span> ${seg('tfAggr',[['prudent','Prudent',"Prudent (×0,5)|N'applique que la MOITIÉ de l'ajustement calculé|Prix proches du tarif actuel : hausses modérées en forte demande, baisses douces en creux|Objectif : sécuriser le remplissage / l'occupation"],['equilibre','Équilibré',"Équilibré (×1)|Applique l'INTÉGRALITÉ de l'ajustement demande (occupation × contexte saisonnier)|Compromis remplissage / recette|Réglage recommandé par défaut"],['agressif','Agressif',"Agressif (×1,5)|AMPLIFIE l'ajustement de 50 %|Prix poussés plus haut en forte demande (vacances, ponts), plus bas dans les creux|Objectif : maximiser la recette/nuit, au risque de baisser l'occupation"]],st.aggr)}</div>
-      <div class="tfmen">Tarifs ${seg('tfMen',[['horsmenage','Hors ménage'],['avecmenage','Ménage inclus']],st.menage)} <span class="hint">${avecM()?'= montant versé Superhote':'= prix/nuit à programmer'}</span></div>
+      <div class="tfmen">Tarifs ${seg('tfMen',[['horsmenage','Hors ménage',"Hors ménage|Prix = hébergement seul, sans frais de ménage|= prix/nuit à programmer dans le calendrier de la plateforme"],['avecmenage','Ménage inclus',"Ménage inclus|Prix = hébergement + frais de ménage|= montant versé observé côté Superhote"]],st.menage)} <span class="hint">${avecM()?'= montant versé Superhote':'= prix/nuit à programmer'}</span></div>
       <div class="tfwe">Premium week-end <b>×${wp.toFixed(2)}</b> <span class="hint">(observé)</span></div>
     </div>`;
   }
