@@ -23,7 +23,11 @@ header.top{display:flex;justify-content:space-between;align-items:flex-end;flex-
 .modebadge{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px}
 .modebadge.on{background:rgba(63,185,80,.16);color:var(--green)}.modebadge.off{background:rgba(227,137,59,.16);color:var(--orange)}
 #userBadge{font-size:12px;color:var(--muted)}
-.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.filters{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
+.fgroup{display:flex;flex-direction:column;gap:7px}
+.fglabel{font-size:10px;letter-spacing:.8px;font-weight:700;text-transform:uppercase;display:flex;align-items:center;gap:6px;opacity:.95}
+.fgrow{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.fdiv{align-self:stretch;width:0;border-left:1px solid var(--line)}
 .fg{display:flex;flex-direction:column;gap:4px}
 .fg label{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);padding-left:2px}
 select,.seg{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;cursor:pointer}
@@ -65,10 +69,11 @@ canvas{cursor:pointer}
 .scroll{max-height:460px;overflow-y:auto}
 .badge{font-size:10px;padding:2px 8px;border-radius:6px;font-weight:700}
 .badge.maj{background:rgba(248,81,73,.16);color:var(--red)}.badge.min{background:rgba(227,137,59,.16);color:var(--orange)}
-.tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
-.tabs button{background:none;border:none;color:var(--muted);padding:10px 16px;font-size:13.5px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
-.tabs button.on{color:var(--gold);border-bottom-color:var(--gold)}
-.tabs button.accent{color:var(--green)}.tabs button.accent.on{color:var(--green);border-bottom-color:var(--green)}
+.tabs{display:flex;gap:6px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.tabs button{background:var(--panel2);border:1px solid var(--line);color:var(--muted);padding:8px 15px;font-size:13.5px;font-weight:600;cursor:pointer;border-radius:9px;transition:background .12s,border-color .12s,color .12s}
+.tabs button:hover{background:var(--panel);border-color:var(--muted);color:var(--txt)}
+.tabs button.on{color:var(--gold);border-color:var(--gold);background:rgba(212,175,55,.14)}
+.tabs button.accent{color:var(--green);border-color:rgba(63,185,80,.45)}.tabs button.accent.on{color:var(--green);border-color:var(--green);background:rgba(63,185,80,.14)}
 .view{display:none}.view.on{display:block}
 .note{font-size:11.5px;color:var(--muted);font-style:italic;margin-top:10px}
 .exprow{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--line)}
@@ -176,18 +181,35 @@ td.actions{white-space:nowrap}
     <div class="usr"><button id="btnExpert" title="Affiche les analyses avancées (calendrier, prix conseillés)" style="display:none">☆ Mode Expert</button><button id="btnTheme" class="btn sec" title="Basculer clair / sombre" style="padding:4px 10px;font-size:11px">☾ Sombre</button><span class="modebadge" id="modeBadge">—</span><span id="userBadge"></span><button class="btn sec" id="btnLogout" style="display:none;padding:4px 10px;font-size:11px">Déconnexion</button></div>
   </div>
   <div class="filters">
-    <div class="fg"><label>Exercice</label><select id="fYear"></select></div>
-    <div class="fg"><label>Bien</label><div class="seg" id="fLog"><button data-v="all" class="on">Les deux</button><button data-v="Ambassador">Ambassador</button><button data-v="Lodge">Lodge</button></div></div>
-    <div class="fg"><label>Source des chiffres</label><div class="seg" id="fSource"><button data-v="saisies" class="on">Saisies</button><button data-v="superhote">Superhote</button></div></div>
-    <div class="fg" id="shConvWrap" style="display:none"><label>Montant Superhote</label><div class="seg" id="fShConv"><button data-v="paye_taxe" class="on">Payé − taxe</button><button data-v="net_plateforme">Net plateforme</button><button data-v="brut_menage">Brut − ménage</button><button data-v="verse">Versé</button></div></div>
-    <div class="fg"><label>Mois</label><select id="fMonth"></select></div>
-    <div class="fg"><label>Canal</label><select id="fChan"></select></div>
-    <div class="fg"><label>Affichage</label><button id="tLabels" class="toggle on">Valeurs affichées</button></div>
-    <div class="fg"><label>Cumul</label><button id="tCumul" class="toggle on">Cumul affiché</button></div>
-    <div class="fg"><label>Unité</label><div class="seg" id="fUnit"><button data-v="eur" class="on">€</button><button data-v="pct">%</button></div></div>
+    <div class="fgroup">
+      <div class="fglabel" style="color:var(--gold)"><i class="ti ti-filter" aria-hidden="true"></i> Périmètre</div>
+      <div class="fgrow">
+        <div class="fg"><label>Exercice</label><select id="fYear"></select></div>
+        <div class="fg"><label>Bien</label><div class="seg" id="fLog"><button data-v="all" class="on">Les deux</button><button data-v="Ambassador">Ambassador</button><button data-v="Lodge">Lodge</button></div></div>
+        <div class="fg"><label>Mois</label><select id="fMonth"></select></div>
+        <div class="fg"><label>Canal</label><select id="fChan"></select></div>
+      </div>
+    </div>
+    <div class="fdiv"></div>
+    <div class="fgroup">
+      <div class="fglabel" style="color:var(--lodge)"><i class="ti ti-database" aria-hidden="true"></i> Source <span id="shInfo" class="xi" data-explain="Source Superhote active|Chiffres issus du CSV validé (mémoire par bien)|Plateformes uniquement (Airbnb, Booking…) — réservations directes non incluses|« Commission » = frais de plateforme (≠ commission apporteur des saisies)" tabindex="0" role="button" aria-label="Détails de la source Superhote" style="display:none">ⓘ</span></div>
+      <div class="fgrow">
+        <div class="fg"><label>Source des chiffres</label><div class="seg" id="fSource"><button data-v="saisies" class="on">Saisies</button><button data-v="superhote">Superhote</button></div></div>
+        <div class="fg" id="shConvWrap" style="display:none"><label>Montant Superhote</label><div class="seg" id="fShConv"><button data-v="paye_taxe" class="on">Payé − taxe</button><button data-v="net_plateforme">Net plateforme</button><button data-v="brut_menage">Brut − ménage</button><button data-v="verse">Versé</button></div></div>
+      </div>
+    </div>
+    <div class="fdiv"></div>
+    <div class="fgroup">
+      <div class="fglabel" style="color:var(--muted)"><i class="ti ti-adjustments" aria-hidden="true"></i> Affichage</div>
+      <div class="fgrow">
+        <div class="fg"><label>Unité</label><div class="seg" id="fUnit"><button data-v="eur" class="on">€</button><button data-v="pct">%</button></div></div>
+        <div class="fg"><label>Cumul</label><button id="tCumul" class="toggle on">Cumul affiché</button></div>
+        <div class="fg"><label>Valeurs</label><button id="tLabels" class="toggle on">Valeurs affichées</button></div>
+      </div>
+    </div>
   </div>
 </header>
-<div id="srcBanner" style="display:none">⚠️ <b>Source Superhote active</b> — chiffres issus du CSV validé (mémoire par bien). Canaux <b>plateforme uniquement</b> (Airbnb, Booking…) : les réservations directes ne sont pas incluses. « Commission » = frais de plateforme (≠ commission apporteur des saisies).</div>
+
 
 <div class="tabs">
   <button class="accent" data-t="saisie">+ Nouvelle saisie</button>
@@ -295,7 +317,7 @@ td.actions{white-space:nowrap}
   .bienpick{display:flex;gap:4px;flex-wrap:wrap}
   .bienchip{background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:6px;padding:2px 9px;font-size:11px;font-weight:600;cursor:pointer}
   .bienchip.on{font-weight:700}
-  #srcBanner{align-items:center;gap:8px;background:rgba(63,182,201,.14);border:1px solid var(--lodge);color:var(--txt);border-radius:10px;padding:9px 14px;font-size:12px;margin:-8px 0 18px}
+  #shInfo{cursor:help;opacity:.85}
   #fSource button.on{background:var(--lodge);color:#04222a;border-color:var(--lodge)}
   #reconCard .reconrow{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:6px}
   #reconCard .rck{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:13px 15px;position:relative;overflow:hidden}
@@ -748,6 +770,7 @@ td.actions{white-space:nowrap}
 <!-- ERREURS -->
 <div class="view" id="v-err">
   <div class="kpis" id="kpisErr"></div>
+  <div class="card" id="healthCard"><h3>🛡️ Intégrité des données <span class="hint">contrôle automatique à chaque ouverture · sources, doublons, écarts</span></h3><div id="healthBody"></div></div>
   <div class="card">
     <h3>Anomalies du fichier Excel d'origine <span class="hint">référence — la saisie via formulaire les empêche désormais</span></h3>
     <div class="desc">Listées dans le PDF fourni. La saisie par formulaire (listes fermées + validations + calcul automatique) empêche leur réapparition.</div>
@@ -883,6 +906,22 @@ async function loadObjectives(){
 const MONTHS = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'];
 const CHANNELS = ['Immosphera','Airbnb','Site web','Booking','Bibizfamily','Abritel','Direct FM','Facebook','Google Adwords'];
 const CHAN_COLORS = {Immosphera:'#d4af37',Airbnb:'#f85149','Site web':'#58a6ff',Booking:'#3fb6c9',Bibizfamily:'#bc8cff',Abritel:'#e3893b','Direct FM':'#3fb950','Google Adwords':'#8b97a8',Facebook:'#4267B2',Inconnu:'#555'};
+// Couleur de canal tolérante : gère les noms bruts Superhote (Airbnb.com, Website, Booking.com, Direct…) et les variantes de casse → plus de repli gris intempestif.
+function chanColor(name, fb){
+  if(name==null||name==='') return fb||'#888';
+  if(CHAN_COLORS[name]) return CHAN_COLORS[name];
+  const n=(''+name).toLowerCase();
+  if(n.includes('airbnb')) return '#f85149';
+  if(n.includes('booking')) return '#3fb6c9';
+  if(n.includes('website')||n.includes('site')||n==='web') return '#58a6ff';
+  if(n.includes('immosphera')) return '#d4af37';
+  if(n.includes('bibiz')) return '#bc8cff';
+  if(n.includes('abritel')||n.includes('vrbo')) return '#e3893b';
+  if(n.includes('direct')) return '#3fb950';
+  if(n.includes('google')) return '#8b97a8';
+  if(n.includes('facebook')||n.includes('meta')) return '#4267B2';
+  return fb||'#888';
+}
 const css=(v)=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const eur=(n)=>(n==null?'—':Math.round(n).toLocaleString('fr-FR')+' €');
 const pct=(n)=>(n==null?'—':(n*100).toFixed(0)+' %');
@@ -895,7 +934,7 @@ const state={ year:null, log:'all', chan:'all', month:'all', labels:true, commCh
   rsort:{key:'entree',dir:-1}, editId:null, unit:'eur', cumul:true,
   commAnaPeriod:'annee', commAnaMonth:null, commAnaSort:{key:'comm',dir:-1},
   dataSource:'saisies', shMontantConv:'paye_taxe' };
-let SAISIES_ROWS=[], SH_ROWS=[], SH_RAW=[];   // caches : saisies vs données Superhote (CSV validé)
+let SAISIES_ROWS=[], SH_ROWS=[], SH_RAW=[], SH_DIAG={};   // caches : saisies vs données Superhote (CSV validé) + diagnostic d'intégrité
 function cumulDS(label,arr,color,fmt){ fmt=fmt||eur; return {label, type:'line', data:cumul(arr), borderColor:color, borderWidth:2, pointRadius:2, pointBackgroundColor:color, tension:.25, yAxisID:'y1', order:0, datalabels: state.labels?{display:true,align:'top',color, font:{size:9,weight:'600'}, formatter:v=>fmt(v)}:{display:false}}; }
 function addY1(opts,color,fmt){ fmt=fmt||eur; opts.scales=opts.scales||{}; opts.scales.y1={position:'right',beginAtZero:true,grid:{display:false},ticks:{callback:v=>fmt(v),font:{size:9},color}}; return opts; }
 const charts={};
@@ -929,9 +968,14 @@ function compute(r){
   let H=null;
   if(c&&d){ const F=new Date(c.getFullYear(),c.getMonth(),1); const G=new Date(d.getFullYear(),d.getMonth()+1,1); H=Math.round((G-F)/86400000); }
   const comm=commissionRule(r.logement,r.origine,r.montant,c);
+  let _alloc=null;
+  if(c&&d&&nuit>0){ _alloc=[]; const _cur=new Date(c.getTime()); const _ix={};
+    for(let _i=0;_i<nuit;_i++){ const _y=_cur.getFullYear(),_m=_cur.getMonth()+1,_k=_y+'-'+_m;
+      if(_ix[_k]==null){ _ix[_k]=_alloc.length; _alloc.push({y:_y,m:_m,nights:0}); }
+      _alloc[_ix[_k]].nights++; _cur.setDate(_cur.getDate()+1); } }
   return Object.assign({},r,{
     annee:c?c.getFullYear():null, mois:c?c.getMonth()+1:null,
-    nuitees:nuit, jours_mois:H, tx_rempl:(nuit!=null&&H)?nuit/H:null,
+    nuitees:nuit, jours_mois:H, tx_rempl:(nuit!=null&&H)?nuit/H:null, monthsAlloc:_alloc,
     commission:(comm!=null)?Math.round(comm*100)/100:null,
     benefice:(r.montant!=null&&comm!=null)?Math.round((r.montant-comm)*100)/100:null,
     cout_nuit:(r.montant!=null&&nuit)?r.montant/nuit:null,
@@ -1093,7 +1137,7 @@ async function enterApp(user){
   // refléter la source active dans l'UI
   document.querySelectorAll('#fSource button').forEach(x=>x.classList.toggle('on',x.dataset.v===state.dataSource));
   document.querySelectorAll('#fShConv button').forEach(x=>x.classList.toggle('on',x.dataset.v===state.shMontantConv));
-  const _sb=document.getElementById('srcBanner'); if(_sb)_sb.style.display=(state.dataSource==='superhote')?'flex':'none';
+  const _sb=document.getElementById('shInfo'); if(_sb)_sb.style.display=(state.dataSource==='superhote')?'inline-flex':'none';
   const _cw=document.getElementById('shConvWrap'); if(_cw)_cw.style.display=(state.dataSource==='superhote')?'flex':'none';
 }
 function showDenied(email){
@@ -1148,17 +1192,26 @@ function renderRecon(){ const card=document.getElementById('reconCard'); if(!car
         ${cell('CA Superhote net',eur(shNet),`${sh.length} résa · net de commission plateforme`,`CA Superhote net plateforme|Σ (montant payé − taxe − commission Airbnb)|Brut = ${eur(shBrut)} ; commission déduite = ${eur(shBrut-shNet)}|${sh.length} résa`,'b4')}
         ${cell('Écart résiduel',(gap>=0?'+':'')+eur(gap),gp!=null?`${(gp>=0?'+':'')+gp.toFixed(1)} % · ${Math.abs(gp)<=5?'rapprochés ✓':'à investiguer'}`:'',`Écart résiduel|Superhote net − Excel = ${eur(shNet)} − ${eur(xlCA)}|Résidu attendu (périmètre : résa directes/annulations + arrondis)|Δ réservations : Superhote ${sh.length} vs Excel ${xl.length}`,Math.abs(gp||0)<=5?'b3':'b6')}
        </div>
-       <div class="desc" style="margin-top:8px">Le CA Superhote <b>net de commission plateforme</b> se rapproche du CA Excel : votre Excel saisit le net après commission Airbnb. L'écart résiduel ≈ différences de périmètre (réservations directes hors Superhote, annulations) et arrondis.</div>`
+       <div class="desc" style="margin-top:8px">Le CA Superhote <b>net de commission plateforme</b> se rapproche du CA Excel : votre Excel saisit le net après commission Airbnb. L'écart résiduel ≈ différences de périmètre (réservations directes hors Superhote, annulations) et arrondis.</div>
+       ${(typeof SH_DIAG!=='undefined'&&SH_DIAG.dupCount)?`<div class="desc" style="margin-top:6px;color:var(--red);font-weight:600">⚠ Intégrité : ${SH_DIAG.dupCount} réservation(s) Superhote en double détectée(s) et neutralisée(s) automatiquement (snapshots redondants en base). Onglet « Qualité des données » → bouton de nettoyage.</div>`:''}
+       ${(gp!=null&&Math.abs(gp)>15)?`<div class="desc" style="margin-top:6px;color:var(--orange);font-weight:600">⚠ Écart de rapprochement anormal (${(gp>=0?'+':'')+gp.toFixed(1)} %, seuil ±15 %). Causes probables : doublons en base, périmètre (résa directes) ou import incomplet — à investiguer.</div>`:''}`
     : `<div class="desc">Rapprochement indisponible pour ce périmètre : ${xl.length?'pas de données Superhote validées pour '+(state.log==='all'?'ces biens':state.log)+' (importez le CSV dans Validation des données).':'pas de saisies Excel pour ce périmètre.'} (Excel : ${xl.length} résa · Superhote : ${sh.length} résa)</div>`;
 }
 async function loadSuperhoteRows(){ SH_RAW=[]; if(!SUPA){ SH_ROWS=[]; return; }
   try{ const {data}=await SUPA.from('data_snapshots').select('bien,rows').eq('source','superhote_csv');
-    (data||[]).forEach(s=>{ if(s.bien==='(historique)')return; (s.rows||[]).forEach(r=>SH_RAW.push(r)); });
+    // Dédup anti-doublon + diagnostic d'intégrité : un même snapshot peut exister sous 2 clés `bien` (mapping renommé entre 2 imports) → ne compter chaque réservation qu'une fois, et tracer ce qui a été dédupliqué.
+    const _seen=new Map(); SH_DIAG={raw:0,dupCount:0,dupPairs:{},biensSeen:{},at:new Date().toISOString()};
+    const _keyOf=r=>(r.id!=null&&r.id!=='')?('id:'+r.id):[r.logement,r.entree,r.sortie,(r.nom||'').toString().toLowerCase(),r.montant_paye].join('|');
+    (data||[]).forEach(s=>{ if(s.bien==='(historique)')return; SH_DIAG.biensSeen[s.bien]=(SH_DIAG.biensSeen[s.bien]||0)+((s.rows||[]).length);
+      (s.rows||[]).forEach(r=>{ SH_DIAG.raw++; const k=_keyOf(r); const prev=_seen.get(k);
+        if(prev!==undefined){ SH_DIAG.dupCount++; const pair=prev+' ↔ '+s.bien; SH_DIAG.dupPairs[pair]=(SH_DIAG.dupPairs[pair]||0)+1; return; }
+        _seen.set(k,s.bien); SH_RAW.push(r); }); });
+    if(SH_DIAG.dupCount) console.warn('[Intégrité] '+SH_DIAG.dupCount+' réservation(s) Superhote en double ignorée(s) :',SH_DIAG.dupPairs);
   }catch(e){ SH_RAW=[]; } rebuildSH(); }
 function applyDataSource(){ ROWS = (state.dataSource==='superhote')? SH_ROWS : SAISIES_ROWS; }
 function setDataSource(src){ state.dataSource=src; try{localStorage.setItem('al_src',src);}catch(e){} applyDataSource();
   document.querySelectorAll('#fSource button').forEach(x=>x.classList.toggle('on',x.dataset.v===src));
-  const sb=document.getElementById('srcBanner'); if(sb) sb.style.display=(src==='superhote')?'flex':'none';
+  const sb=document.getElementById('shInfo'); if(sb) sb.style.display=(src==='superhote')?'inline-flex':'none';
   const cs=document.getElementById('shConvWrap'); if(cs) cs.style.display=(src==='superhote')?'flex':'none';
   const st=document.getElementById('subtitle'); // mis à jour par render()
   buildFilters(); reRenderActive(); }
@@ -1372,7 +1425,27 @@ const DIMS={
   client:{label:'Client',get:d=>((d.nom||'')+' '+(d.prenom||'')).trim()||'—',fmtKey:k=>k},
   annee:{label:'Exercice',get:d=>d.annee,fmtKey:k=>k,order:'num'},
 };
-function currentRows(){ return ROWS.filter(d=>d.annee===state.year && (state.log==='all'||d.logement===state.log) && (state.chan==='all'||d.origine===state.chan) && (state.month==='all'||d.mois===+state.month)); }
+// ---- Répartition des séjours à cheval : tranches mensuelles au prorata des nuits ----
+function daysInMonth(y,m){ return new Date(y,m,0).getDate(); }
+function _pr(v,f){ return v==null?null:Math.round(v*f*100)/100; }
+// Renvoie, pour l'année demandée, une tranche par mois couvert (montants/nuits proratisés). Tout est scindé.
+function monthSlices(d, year){
+  const al=d.monthsAlloc;
+  if(!al||!al.length||!d.nuitees){ return (d.annee===year)? [Object.assign({},d,{_frac:1,_split:false})] : []; }
+  const inY=al.filter(a=>a.y===year); if(!inY.length) return [];
+  const N=d.nuitees;
+  return inY.map(a=>{ const f=N? a.nights/N : 0; const jm=daysInMonth(a.y,a.m);
+    return Object.assign({},d,{ annee:a.y, mois:a.m, _frac:f, _split:al.length>1, _partN:a.nights, _totN:N,
+      nuitees:a.nights,
+      montant:_pr(d.montant,f), taxe:_pr(d.taxe,f), commission:_pr(d.commission,f), benefice:_pr(d.benefice,f),
+      frais_menage:_pr(d.frais_menage,f), ac1:_pr(d.ac1,f), ac2:_pr(d.ac2,f), ac3:_pr(d.ac3,f),
+      reste_a_payer:_pr(d.reste_a_payer,f), jours_mois:jm, tx_rempl:jm? a.nights/jm : null });
+  });
+}
+function currentRows(){ const out=[];
+  ROWS.forEach(d=>{ if(!(state.log==='all'||d.logement===state.log))return; if(!(state.chan==='all'||d.origine===state.chan))return;
+    monthSlices(d,state.year).forEach(sl=>{ if(state.month==='all'||sl.mois===+state.month) out.push(sl); }); });
+  return out; }
 function monthly(rows,f){ const a=Array(12).fill(0); rows.forEach(d=>{ if(d.mois&&d[f]) a[d.mois-1]+=d[f]; }); return a; }
 function cumul(a){ let s=0; return a.map(v=>s+=v); }
 function activeObj(){ let o=0,c=0,pm=0; (state.log==='all'?visBiens():[state.log]).forEach(b=>{const x=objFor(state.year,b)||{obj:0,comm:0,pm:0}; o+=x.obj;c+=x.comm;pm+=x.pm;}); return {obj:o,comm:c,pm}; }
@@ -1384,7 +1457,8 @@ function applySort(pairs,mode){ const [by,dir]=mode.split('-'); const s=dir==='a
 // ---------- rendu principal ----------
 function render(){
   const rows=currentRows();
-  document.getElementById('subtitle').textContent=`Source ${state.dataSource==='superhote'?'Superhote (CSV)':'Saisies'} · Exercice ${state.year} · ${state.log==='all'?(visBiens().join(' + ')||'tous biens'):state.log} · ${state.chan==='all'?'tous canaux':state.chan}${state.month!=='all'?' · '+MONTHS[state.month-1]:''} · ${rows.length} réservations`;
+  const nResa=new Set(rows.map(d=>d.id!=null?('#'+d.id):((d.nom||'')+'|'+d.entree))).size;
+  document.getElementById('subtitle').textContent=`Source ${state.dataSource==='superhote'?'Superhote (CSV)':'Saisies'} · Exercice ${state.year} · ${state.log==='all'?(visBiens().join(' + ')||'tous biens'):state.log} · ${state.chan==='all'?'tous canaux':state.chan}${state.month!=='all'?' · '+MONTHS[state.month-1]:''} · ${nResa} réservations`;
   const ca=rows.reduce((s,d)=>s+(d.montant||0),0), benef=rows.reduce((s,d)=>s+(d.benefice||0),0), comm=rows.reduce((s,d)=>s+(d.commission||0),0);
   const nuit=rows.reduce((s,d)=>s+(d.nuitees||0),0), taxe=rows.reduce((s,d)=>s+(d.taxe||0),0), reste=rows.reduce((s,d)=>s+(d.reste_a_payer||0),0);
   const prix=nuit?ca/nuit:null; const occR=rows.filter(d=>d.tx_rempl!=null); const occ=occR.length?occR.reduce((s,d)=>s+d.tx_rempl,0)/occR.length:null;
@@ -1394,7 +1468,7 @@ function render(){
   const convLbl=state.shMontantConv==='brut_menage'?'revenu brut − ménage':state.shMontantConv==='verse'?'montant versé':_net?'payé − taxe − commission (net plateforme ≈ Excel)':'montant payé − taxe';
   const srcTag=isSH?'Source Superhote (CSV validé)':'Source Saisies';
   document.getElementById('kpis').innerHTML=[
-    kpiCard('Chiffre d\'affaires',eur(ca),`${rows.length} réservations · ${nuit} nuitées`,'',
+    kpiCard('Chiffre d\'affaires',eur(ca),`${nResa} réservations · ${nuit} nuitées`,'',
       isSH?`Chiffre d'affaires|Σ des montants — convention « ${convLbl} »|${srcTag} : canaux plateforme uniquement (directs non inclus)|Périmètre : ${rows.length} résa`
           :`Chiffre d'affaires|Formule : Σ des montants hébergement|Hors taxe de séjour et hors ménage|${srcTag}|Périmètre : ${rows.length} résa de la sélection`),
     kpiCard('Bénéfice net',eur(benef),`marge ${ca?Math.round(benef/ca*100):0} % du CA${isSH?' · estimé':''}`,'b3',
@@ -1422,7 +1496,7 @@ function render(){
   const chTot=chP.reduce((s,p)=>s+p[1],0);
   const chData=PCT?chP.map(p=>chTot?p[1]/chTot*100:0):chP.map(p=>p[1]);
   const chFmt=v=>v? (PCT? v.toFixed(1)+' %' : eur(v)) : '';
-  mk('cChan',{type:'bar',data:{labels:chP.map(p=>p[0]),datasets:[{label:PCT?'% du CA':'CA',data:chData,backgroundColor:chP.map(p=>CHAN_COLORS[p[0]]||'#888'),borderRadius:5,datalabels:DL(chFmt)}]},
+  mk('cChan',{type:'bar',data:{labels:chP.map(p=>p[0]),datasets:[{label:PCT?'% du CA':'CA',data:chData,backgroundColor:chP.map(p=>chanColor(p[0])),borderRadius:5,datalabels:DL(chFmt)}]},
     options:Object.assign(baseOpt({legend:false}),{indexAxis:'y',scales:{x:{grid:{color:'rgba(40,48,64,.5)'},ticks:{callback:v=>PCT?v+' %':eur(v)}},y:{grid:{display:false}}},plugins:{legend:{display:false},datalabels:DL(chFmt),tooltip:{callbacks:{label:c=>' '+chFmt(c.parsed.x)}}}})});
   const byLog={}; rows.forEach(d=>{byLog[d.logement]=(byLog[d.logement]||0)+(d.montant||0);});
   let lgP=applySort(Object.entries(byLog),state.sortLog);
@@ -1564,8 +1638,8 @@ function renderCommission(rows){
   const stacked=state.commChan==='all'; let datasets;
   if(stacked){
     const chans=[...new Set(rows.map(d=>d.origine))].map(c=>[c,rows.filter(d=>d.origine===c).reduce((s,d)=>s+(d.commission||0),0)]).sort((a,b)=>b[1]-a[1]).map(p=>p[0]);
-    datasets=chans.map(c=>{ const arr=Array(12).fill(0); rows.filter(d=>d.origine===c).forEach(d=>{if(d.mois&&d.commission)arr[d.mois-1]+=d.commission;}); return {label:c,data:arr,backgroundColor:CHAN_COLORS[c]||'#888',borderRadius:3,stack:'c',datalabels:state.labels?{display:ctx=>ctx.dataset.data[ctx.dataIndex]>120,color:'#0d1117',font:{size:9,weight:'700'},formatter:v=>v?Math.round(v):''}:{display:false}}; });
-  } else { const arr=Array(12).fill(0); rows.filter(d=>d.origine===state.commChan).forEach(d=>{if(d.mois&&d.commission)arr[d.mois-1]+=d.commission;}); datasets=[{label:'Commission '+state.commChan,data:arr,backgroundColor:CHAN_COLORS[state.commChan]||css('--orange'),borderRadius:5,datalabels:DL(eur)}]; }
+    datasets=chans.map(c=>{ const arr=Array(12).fill(0); rows.filter(d=>d.origine===c).forEach(d=>{if(d.mois&&d.commission)arr[d.mois-1]+=d.commission;}); return {label:c,data:arr,backgroundColor:chanColor(c),borderRadius:3,stack:'c',datalabels:state.labels?{display:ctx=>ctx.dataset.data[ctx.dataIndex]>120,color:'#0d1117',font:{size:9,weight:'700'},formatter:v=>v?Math.round(v):''}:{display:false}}; });
+  } else { const arr=Array(12).fill(0); rows.filter(d=>d.origine===state.commChan).forEach(d=>{if(d.mois&&d.commission)arr[d.mois-1]+=d.commission;}); datasets=[{label:'Commission '+state.commChan,data:arr,backgroundColor:chanColor(state.commChan,css('--orange')),borderRadius:5,datalabels:DL(eur)}]; }
   const commTotM=monthly(rows.filter(d=>state.commChan==='all'||d.origine===state.commChan),'commission');
   const opt=Object.assign(baseOpt({money:true,legend:stacked}),{scales:{x:{stacked,grid:{display:false}},y:{stacked,beginAtZero:true,grid:{color:'rgba(40,48,64,.5)'},ticks:{callback:v=>eur(v)}}},plugins:{legend:{display:stacked||state.cumul,position:'bottom',labels:{boxWidth:10,padding:7,font:{size:9.5}}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${eur(c.parsed.y)}`}}}});
   if(state.cumul){ datasets=datasets.concat([cumulDS('Commission cumulée',commTotM,css('--green'))]); addY1(opt,css('--green')); }
@@ -1574,9 +1648,11 @@ function renderCommission(rows){
 
 // ---------- Analyse des commissions par apporteur (tri + évolution période/période) ----------
 function commAgg(year, month){ const m={};
-  ROWS.forEach(d=>{ if(d.annee!==year)return; if(month!=null && d.mois!==month)return; if(!(state.log==='all'||d.logement===state.log))return;
-    const k=d.origine||'Inconnu'; const o=m[k]||(m[k]={comm:0,nb:0,ca:0}); o.comm+=(d.commission||0); o.nb+=1; o.ca+=(d.montant||0); });
-  return m; }
+  ROWS.forEach(d=>{ if(!(state.log==='all'||d.logement===state.log))return;
+    monthSlices(d,year).forEach(sl=>{ if(month!=null && sl.mois!==month)return;
+      const k=sl.origine||'Inconnu'; const o=m[k]||(m[k]={comm:0,nb:0,ca:0,_ids:new Set()});
+      o.comm+=(sl.commission||0); o.ca+=(sl.montant||0); o._ids.add(sl.id!=null?('#'+sl.id):((sl.nom||'')+'|'+sl.entree)); }); });
+  Object.values(m).forEach(o=>{ o.nb=o._ids.size; }); return m; }
 function renderCommByApporteur(){ const host=document.getElementById('commAnalysis'); if(!host)return;
   const per=state.commAnaPeriod||'annee';
   let curY,curM,prevY,prevM,curLbl,prevLbl;
@@ -1597,7 +1673,7 @@ function renderCommByApporteur(){ const host=document.getElementById('commAnalys
   const arrow=k=>srt.key===k?(srt.dir<0?' ▾':' ▴'):'';
   const th=(k,l)=>`<th data-k="${k}" class="${srt.key===k?'sorted':''}">${l}${arrow(k)}</th>`;
   const dcell=(d,dp)=>{ if(d===0&&dp==null)return '<span class="dnan">— (nouv.)</span>'; const cls=d>0?'dpos':d<0?'dneg':'dnan'; return `<span class="${cls}">${(d>0?'+':'')+eur(d)}${dp!=null?` (${d>0?'+':''}${Math.round(dp*100)} %)`:''}</span>`; };
-  const body=rws.map(r=>`<tr><td><span class="achip" style="background:${CHAN_COLORS[r.app]||'#888'}"></span>${r.app}</td><td>${eur(r.comm)}</td><td>${dcell(r.delta,r.deltaPct)}</td><td>${r.nb}</td><td>${eur(r.ca)}</td><td>${r.taux!=null?(r.taux*100).toFixed(1)+' %':'—'}</td><td>${Math.round(r.part*100)} %</td></tr>`).join('');
+  const body=rws.map(r=>`<tr><td><span class="achip" style="background:${chanColor(r.app)}"></span>${r.app}</td><td>${eur(r.comm)}</td><td>${dcell(r.delta,r.deltaPct)}</td><td>${r.nb}</td><td>${eur(r.ca)}</td><td>${r.taux!=null?(r.taux*100).toFixed(1)+' %':'—'}</td><td>${Math.round(r.part*100)} %</td></tr>`).join('');
   const tC=rws.reduce((s,r)=>s+r.comm,0),tN=rws.reduce((s,r)=>s+r.nb,0),tCA=rws.reduce((s,r)=>s+r.ca,0),tP=rws.reduce((s,r)=>s+r.prev,0),tD=tC-tP;
   host.innerHTML=`<div class="cactrl"><div class="caperiod">${seg('mois','Mois')}${seg('annee','Année')}</div>${nav}<span class="hint">Tri : clic en-tête · Δ vs ${per==='mois'?'mois préc.':'année préc.'}</span></div>
    <div class="scroll" style="max-height:360px"><table><thead><tr>${th('app','Apporteur')}${th('comm','Commission')}${th('delta','Δ vs préc.')}${th('nb','Nb résa')}${th('ca','CA')}${th('taux','Taux comm.')}${th('part','Part %')}</tr></thead>
@@ -1649,7 +1725,7 @@ function resetObjectives(){
 function renderObjectives(rows,benefM,ob,benef,objAnnual){
   renderObjEditor();
   // --- Atteinte de l'objectif (base CA : réalisé + réservé) ---
-  const _yr=ROWS.filter(d=>d.annee===state.year && (state.log==='all'||d.logement===state.log));
+  const _yr=[]; ROWS.forEach(d=>{ if(!(state.log==='all'||d.logement===state.log))return; monthSlices(d,state.year).forEach(sl=>_yr.push(sl)); });
   const _t=new Date(), _ty=_t.getUTCFullYear(), _tm=_t.getUTCMonth()+1;
   const curMonth = state.year<_ty?13:(state.year>_ty?1:_tm);   // 1er mois "à venir"
   const monthsRem = Math.max(0,12-curMonth+1);
@@ -1709,7 +1785,7 @@ function renderExplorer(){
   const [by,dir]=state.expSort.split('-'); const s=dir==='asc'?1:-1;
   pairs.sort((a,b)=> by==='val'?(a[1]-b[1])*s:(dim.order==='num'?(a[0]-b[0]):(''+a[0]).localeCompare(''+b[0]))*s);
   if(state.expDim==='client') pairs=pairs.slice(0, by==='val'&&dir==='desc'?20:pairs.length);
-  const labels=pairs.map(p=>dim.fmtKey(p[0])); const color=state.expDim==='origine'?pairs.map(p=>CHAN_COLORS[p[0]]||'#888'):css('--gold');
+  const labels=pairs.map(p=>dim.fmtKey(p[0])); const color=state.expDim==='origine'?pairs.map(p=>chanColor(p[0])):css('--gold');
   document.getElementById('expTitle').textContent=`${mes.label} par ${dim.label.toLowerCase()}`;
   const total=pairs.reduce((a,b)=>a+b[1],0);
   const showPct = state.unit==='pct' && (mes.agg==='sum'||mes.agg==='count');
@@ -1732,10 +1808,10 @@ function renderReservs(rows){
   document.querySelectorAll('#rthead th[data-k]').forEach(th=>{ th.classList.toggle('sorted',th.dataset.k===key); const base=th.getAttribute('data-base')||th.textContent.replace(/[ ▲▼]+$/,''); th.setAttribute('data-base',base); th.textContent=base+(th.dataset.k===key?(dir>0?' ▲':' ▼'):''); });
   document.getElementById('rtbody').innerHTML=sorted.map(d=>{
     const canAct = d.id!=null;
-    const acts = canAct ? `<button class="mini-act" title="Modifier" data-act="edit" data-id="${d.id}">✏️</button><button class="mini-act" title="Historique" data-act="hist" data-id="${d.id}">🕑</button><button class="mini-act del" title="Supprimer" data-act="del" data-id="${d.id}">🗑️</button>` : '<span style="color:var(--muted);font-size:11px">—</span>';
+    const acts = canAct ? `<button class="mini-act" title="Modifier la réservation entière" data-act="edit" data-id="${d.id}">✏️</button><button class="mini-act" title="Historique" data-act="hist" data-id="${d.id}">🕑</button><button class="mini-act del" title="Supprimer" data-act="del" data-id="${d.id}">🗑️</button>` : '<span style="color:var(--muted);font-size:11px">—</span>';
     return `<tr>
     <td><span class="pill ${d.logement==='Ambassador'?'amb':'lodge'}">${d.logement}</span>${(d.version>1)?` <span class="vbadge">v${d.version}</span>`:''}</td>
-    <td>${fmtDate(d.entree)}</td><td>${fmtDate(d.sortie)}</td><td class="num${HILITE==='nuitees'?' hl':''}">${d.nuitees??'—'}</td>
+    <td>${fmtDate(d.entree)}${d._split?` <span class="vbadge" title="Quote-part du mois : ${d._partN}/${d._totN} nuits">${(MONTHS[d.mois-1]||'').slice(0,3)} ${d._partN}/${d._totN}n</span>`:''}</td><td>${fmtDate(d.sortie)}</td><td class="num${HILITE==='nuitees'?' hl':''}">${d.nuitees??'—'}</td>
     <td>${(d.nom||'')+' '+(d.prenom||'')}</td><td>${d.origine}</td>
     <td class="num${HILITE==='montant'?' hl':''}">${eur(d.montant)}</td><td class="num${HILITE==='commission'?' hl':''}">${eur(d.commission)}</td>
     <td class="num${HILITE==='benefice'?' hl':''}" style="color:${css('--green')}">${eur(d.benefice)}</td>
@@ -1760,6 +1836,61 @@ function renderErrors(){
   ].join('');
   const order={'Majeur':0,'Mineur':1}; const sorted=[...ERRORS].sort((a,b)=>order[a.severite]-order[b.severite]||(''+a.ligne).localeCompare(''+b.ligne,undefined,{numeric:true}));
   document.getElementById('etbody').innerHTML=sorted.map(e=>`<tr><td><span class="badge ${e.severite==='Majeur'?'maj':'min'}">${e.severite}</span></td><td>${e.categorie}</td><td>${e.ligne}</td><td>${e.detail}</td></tr>`).join('');
+  try{ renderHealth(); }catch(e){ console.error('renderHealth',e); }
+}
+
+// ===== Contrôle d'intégrité permanent (anti-récidive) =====
+// Détecte automatiquement : doublons Superhote neutralisés, snapshots orphelins (clé bien inconnue),
+// écarts de rapprochement anormaux par bien/année, et doublons de saisies Excel. Rien de bloquant : on alerte.
+function dataHealthCheck(){
+  const issues=[]; const ok=[];
+  const props=(typeof PROPERTIES!=='undefined'&&PROPERTIES)?PROPERTIES.map(p=>p.nom):[];
+  // 1) Doublons Superhote neutralisés au chargement
+  if(typeof SH_DIAG!=='undefined'&&SH_DIAG.dupCount){
+    issues.push({sev:'Majeur',cat:'Doublon Superhote',detail:`${SH_DIAG.dupCount} réservation(s) en double détectée(s) et ignorée(s) automatiquement (${Object.keys(SH_DIAG.dupPairs||{}).map(k=>k+' ×'+SH_DIAG.dupPairs[k]).join(' · ')}). La base contient des snapshots redondants → nettoyer.`});
+  } else if(typeof SH_DIAG!=='undefined'&&SH_DIAG.raw){ ok.push(`Superhote : ${SH_DIAG.raw} lignes, aucun doublon.`); }
+  // 2) Snapshots orphelins : clé bien d'un snapshot qui ne correspond à aucun bien du référentiel
+  if(typeof SH_DIAG!=='undefined'&&SH_DIAG.biensSeen&&props.length){
+    Object.keys(SH_DIAG.biensSeen).forEach(b=>{ if(b&&b!=='(historique)'&&!props.includes(b)){
+      issues.push({sev:'Majeur',cat:'Snapshot orphelin',detail:`Snapshot Superhote stocké sous « ${b} » (${SH_DIAG.biensSeen[b]} lignes) — ce bien n'existe pas dans le référentiel. Vestige d'un libellé renommé → supprimer ce snapshot.`}); } });
+  }
+  // 3) Écart de rapprochement anormal par bien × année (|gap| > 15 %)
+  try{
+    const SEUIL=15; const years=[...new Set([].concat(SAISIES_ROWS.map(r=>r.annee),SH_RAW.map(r=>r.annee)).filter(Boolean))];
+    const biens=props.length?props:[...new Set(SAISIES_ROWS.map(r=>r.logement).filter(Boolean))];
+    years.forEach(y=>biens.forEach(b=>{
+      const xl=SAISIES_ROWS.filter(r=>r.annee===y&&r.logement===b);
+      const sh=SH_RAW.filter(r=>r.annee===y&&r.logement===b);
+      if(!xl.length||!sh.length)return;
+      const xlCA=xl.reduce((a,r)=>a+(+r.montant||0),0);
+      const shNet=sh.reduce((a,r)=>a+((+r.montant_paye||0)-(+r.taxe||0)-(+r.commission||0)),0);
+      const gp=xlCA?(shNet-xlCA)/xlCA*100:null;
+      if(gp!=null&&Math.abs(gp)>SEUIL){ issues.push({sev:Math.abs(gp)>40?'Majeur':'Mineur',cat:'Écart de rapprochement',detail:`${b} ${y} : Excel ${Math.round(xlCA).toLocaleString('fr-FR')} € (${xl.length} résa) vs Superhote net ${Math.round(shNet).toLocaleString('fr-FR')} € (${sh.length} résa) → ${(gp>=0?'+':'')+gp.toFixed(1)} % (seuil ±${SEUIL} %).`}); }
+      else if(gp!=null){ ok.push(`${b} ${y} : rapprochement ${(gp>=0?'+':'')+gp.toFixed(1)} % ✓`); }
+    }));
+  }catch(e){ console.error('health/recon',e); }
+  // 4) Doublons de saisies Excel (même bien + entrée + nom + montant)
+  try{ const seen=new Map(); let dup=0; SAISIES_ROWS.forEach(r=>{ const k=[r.logement,r.entree,(r.nom||'').toLowerCase(),r.montant].join('|'); seen.set(k,(seen.get(k)||0)+1); });
+    seen.forEach(v=>{ if(v>1)dup+=v-1; });
+    if(dup) issues.push({sev:'Mineur',cat:'Doublon de saisie',detail:`${dup} saisie(s) Excel potentiellement en double (même bien, date d'entrée, nom et montant) — à vérifier dans Réservations.`});
+    else if(SAISIES_ROWS.length) ok.push(`Saisies : ${SAISIES_ROWS.length} lignes, aucun doublon évident.`);
+  }catch(e){ console.error('health/saisies',e); }
+  return {issues,ok};
+}
+function renderHealth(){ const el=document.getElementById('healthBody'); if(!el)return;
+  const {issues,ok}=dataHealthCheck();
+  const maj=issues.filter(i=>i.sev==='Majeur').length, min=issues.length-maj;
+  const head = issues.length
+    ? `<div class="desc" style="font-weight:600;color:${maj?'var(--red)':'var(--orange)'}">${maj?'⛔':'⚠'} ${issues.length} anomalie(s) d'intégrité détectée(s)${maj?` · dont ${maj} majeure(s)`:''}.</div>`
+    : `<div class="desc" style="font-weight:600;color:var(--green)">✓ Aucune anomalie d'intégrité — sources cohérentes.</div>`;
+  const rows = issues.length
+    ? `<div class="scroll" style="margin-top:8px"><table class="tbl"><thead><tr><th>Sévérité</th><th>Type</th><th>Détail</th></tr></thead><tbody>`
+      + issues.sort((a,b)=>(a.sev==='Majeur'?0:1)-(b.sev==='Majeur'?0:1)).map(i=>`<tr><td><span class="badge ${i.sev==='Majeur'?'maj':'min'}">${i.sev}</span></td><td>${i.cat}</td><td>${i.detail}</td></tr>`).join('')
+      + `</tbody></table></div>` : '';
+  const okline = ok.length ? `<div class="note" style="margin-top:8px">Contrôles OK : ${ok.slice(0,12).join(' · ')}${ok.length>12?' …':''}</div>` : '';
+  const dupBtn = (typeof SH_DIAG!=='undefined'&&(SH_DIAG.dupCount||Object.keys(SH_DIAG.biensSeen||{}).some(b=>b&&b!=='(historique)'&&!(PROPERTIES||[]).some(p=>p.nom===b))))
+    ? `<div style="margin-top:10px"><button class="btnv sec" onclick="alert('Nettoyage base :\n\n1. Ouvrez le script SQL fourni (nettoyage-snapshots-superhote.sql) dans Supabase → SQL Editor.\n2. Lancez d\'abord la requête d\'inspection, vérifiez les snapshots à supprimer.\n3. Lancez la requête DELETE.\n\nLe correctif anti-doublon de l\'app neutralise déjà l\'affichage en attendant.')">🧹 Comment nettoyer la base</button></div>` : '';
+  el.innerHTML = head + rows + okline + dupBtn;
 }
 
 function kpiCard(lab,v,sub,cls,explain,bar){
