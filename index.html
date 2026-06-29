@@ -2497,7 +2497,7 @@ const AL_CAL = (function(){
   // ---------- contrôles ----------
   function controls(){
     const lab = st.view==='year'? String(st.year) : st.view==='quarter'? ('T'+(Math.floor(st.month/3)+1)+' '+st.year) : (MOISL[st.month]+' '+st.year);
-    const seg=(id,opts,cur)=>`<div class="seg" id="${id}">`+opts.map(o=>`<button data-v="${o[0]}" class="${o[0]===cur?'on':''}">${o[1]}</button>`).join('')+'</div>';
+    const seg=(id,opts,cur)=>`<div class="seg" id="${id}">`+opts.map(o=>`<button data-v="${o[0]}"${o[2]?` data-explain="${String(o[2]).replace(/"/g,'&quot;')}"`:''} class="${o[0]===cur?'on':''}">${o[1]}</button>`).join('')+'</div>';
     const zchk=z=>`<label class="calz"><input type="checkbox" data-z="${z}" ${st.zones[z]?'checked':''}> ${z==='Réunion'?'Réunion':'Métro '+z}</label>`;
     return `<div class="calctrls">
       ${seg('calViewSeg',[['month','Mois'],['quarter','Trimestre'],['year','Année']],st.view)}
@@ -2643,11 +2643,11 @@ const AL_TARIF = (function(){
 
   // ---------- contrôles ----------
   function controls(){
-    const seg=(id,opts,cur)=>`<div class="seg" id="${id}">`+opts.map(o=>`<button data-v="${o[0]}" class="${o[0]===cur?'on':''}">${o[1]}</button>`).join('')+'</div>';
+    const seg=(id,opts,cur)=>`<div class="seg" id="${id}">`+opts.map(o=>`<button data-v="${o[0]}"${o[2]?` data-explain="${String(o[2]).replace(/"/g,'&quot;')}"`:''} class="${o[0]===cur?'on':''}">${o[1]}</button>`).join('')+'</div>';
     const wp=(st.G&&st.G.wePremium&&st.G.wePremium[st.bien])||1.12;
     return `<div class="calctrls">
       <div class="tflabel"><span class="pill ${st.bien==='Ambassador'?'amb':'lodge'}">${st.bien||'—'}</span> · Exercice <b>${st.year}</b> <span class="hint">(choix via les filtres du haut)</span></div>
-      <div class="tfaggr">Agressivité ${seg('tfAggr',[['prudent','Prudent'],['equilibre','Équilibré'],['agressif','Agressif']],st.aggr)}</div>
+      <div class="tfaggr">Agressivité <span class="xi" data-explain="Politique de prix|Prix conseillé = ADR médian + (cible − ADR médian) × agressivité|Cible = ADR × occupation historique × contexte (vacances, fériés, ponts)|Curseur : Prudent ×0,5 · Équilibré ×1 · Agressif ×1,5" tabindex="0" role="button" aria-label="Explication de la politique de prix">ⓘ</span> ${seg('tfAggr',[['prudent','Prudent',"Prudent (×0,5)|N'applique que la MOITIÉ de l'ajustement calculé|Prix proches du tarif actuel : hausses modérées en forte demande, baisses douces en creux|Objectif : sécuriser le remplissage / l'occupation"],['equilibre','Équilibré',"Équilibré (×1)|Applique l'INTÉGRALITÉ de l'ajustement demande (occupation × contexte saisonnier)|Compromis remplissage / recette|Réglage recommandé par défaut"],['agressif','Agressif',"Agressif (×1,5)|AMPLIFIE l'ajustement de 50 %|Prix poussés plus haut en forte demande (vacances, ponts), plus bas dans les creux|Objectif : maximiser la recette/nuit, au risque de baisser l'occupation"]],st.aggr)}</div>
       <div class="tfmen">Tarifs ${seg('tfMen',[['horsmenage','Hors ménage'],['avecmenage','Ménage inclus']],st.menage)} <span class="hint">${avecM()?'= montant versé Superhote':'= prix/nuit à programmer'}</span></div>
       <div class="tfwe">Premium week-end <b>×${wp.toFixed(2)}</b> <span class="hint">(observé)</span></div>
     </div>`;
