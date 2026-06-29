@@ -655,7 +655,7 @@ td.actions{white-space:nowrap}
       <div class="scroll" style="max-height:600px">
         <table class="tbl"><thead><tr>
           <th>Statut</th><th>Bien</th><th>Entrée</th><th>Client</th>
-          <th class="num">Excel</th><th class="num">Superhote</th><th class="num">Δ</th>
+          <th class="num">Excel</th><th class="num">Superhote (versé)</th><th class="num">Taxe séj.</th><th class="num">Δ</th>
           <th>Apporteur réel</th><th>Explication de l'écart</th>
         </tr></thead><tbody id="shEcartBody"></tbody></table>
       </div>
@@ -665,6 +665,7 @@ td.actions{white-space:nowrap}
   <!-- SYNTHÈSE -->
   <div class="sh-sub" id="sh-synth">
     <div class="kpis" id="shKpis"></div>
+    <div id="shTaxCtrl"></div>
     <div class="g2">
       <div class="card"><h3>Distribution des écarts de montant</h3><div class="desc">Superhote − Excel, par réservation rapprochée.</div><div class="chartbox"><canvas id="shGap"></canvas></div></div>
       <div class="card"><h3>Couverture des sources</h3><div class="desc">Communes vs présentes dans une seule source.</div><div class="chartbox"><canvas id="shCov"></canvas></div></div>
@@ -2058,8 +2059,8 @@ const SHmatch=(function(){
         if((x.origine||'')!==(s.origine||''))expl.push(`Canal : Excel « ${x.origine} » → Superhote « ${s.plateforme||s.origine} »`);
         const dt=(s.taxe||0)-(x.taxe||0); if(Math.abs(dt)>1)expl.push(`Taxe séjour : Superhote ${Math.round(s.taxe||0)} € vs Excel ${Math.round(x.taxe||0)} €`);
         if(m.fuzzy)expl.unshift(`⚠ Rapprochement approché (noms différents : Excel « ${x.nom} » / Superhote « ${s.nom} ») — à vérifier`);
-        comp.push({nom:s.nom,prenom:s.prenom,xl_nom:x.nom,entree:s.entree,logement:s.logement,sh_montant:s.montant,xl_montant:x.montant,delta:Math.round(dm*100)/100,sh_origine:s.plateforme||s.origine,xl_origine:x.origine,sh_taxe:s.taxe,xl_taxe:x.taxe,statut:'match',fuzzy:m.fuzzy,apporteur_reel:x.origine,explication:expl.join(' · ')});
-      } else comp.push({nom:s.nom,prenom:s.prenom,entree:s.entree,logement:s.logement,sh_montant:s.montant,xl_montant:null,delta:null,sh_origine:s.plateforme||s.origine,xl_origine:null,sh_taxe:s.taxe,xl_taxe:null,statut:'sh_only',apporteur_reel:null,explication:"Présente uniquement dans Superhote (absente de l'Excel)"});
+        comp.push({nom:s.nom,prenom:s.prenom,xl_nom:x.nom,entree:s.entree,logement:s.logement,sh_montant:s.montant,xl_montant:x.montant,delta:Math.round(dm*100)/100,sh_origine:s.plateforme||s.origine,xl_origine:x.origine,sh_taxe:s.taxe,xl_taxe:x.taxe,sh_paye:s.montant_paye,sh_comm:s.commission,statut:'match',fuzzy:m.fuzzy,apporteur_reel:x.origine,explication:expl.join(' · ')});
+      } else comp.push({nom:s.nom,prenom:s.prenom,entree:s.entree,logement:s.logement,sh_montant:s.montant,xl_montant:null,delta:null,sh_origine:s.plateforme||s.origine,xl_origine:null,sh_taxe:s.taxe,xl_taxe:null,sh_paye:s.montant_paye,sh_comm:s.commission,statut:'sh_only',apporteur_reel:null,explication:"Présente uniquement dans Superhote (absente de l'Excel)"});
     });
     const yrs=new Set(sh.map(s=>s.annee)), biens=new Set(sh.map(s=>s.logement));
     xl.forEach(x=>{ if(yrs.has(x.annee)&&biens.has(x.logement)&&!used.has(x._i!==undefined?x._i:-1)){
@@ -2123,8 +2124,8 @@ function _shRenderEcarts(){
     const st=c.statut==='sh_only'?'<span class="badge sh">Superhote seul</span>':c.statut==='xl_only'?'<span class="badge xl">Excel seul</span>':(c.fuzzy?'<span class="badge fuzzy">Approché</span>':(Math.abs(c.delta||0)<1?'<span class="badge match">Identique</span>':'<span class="badge gap">Écart</span>'));
     const dcell=c.delta==null?'<td class="num">—</td>':`<td class="num ${Math.abs(c.delta)<1?'dzero':'dpos'}">${(c.delta>=0?'+':'')+_shEur(c.delta)}</td>`;
     const ap=c.apporteur_reel?`<span class="appr">${c.apporteur_reel}</span>`:'—';
-    return `<tr><td>${st}</td><td><span class="pill ${c.logement==='Ambassador'?'amb':'lodge'}">${c.logement}</span></td><td>${_shFd(c.entree)}</td><td>${(c.prenom||'')+' '+(c.nom||'')}</td><td class="num">${_shEur(c.xl_montant)}</td><td class="num">${_shEur(c.sh_montant)}</td>${dcell}<td>${ap}</td><td class="expl">${c.explication||''}</td></tr>`;
-  }).join('') || '<tr><td colspan="9" style="color:var(--muted);padding:14px">Aucune ligne pour ce filtre.</td></tr>';
+    return `<tr><td>${st}</td><td><span class="pill ${c.logement==='Ambassador'?'amb':'lodge'}">${c.logement}</span></td><td>${_shFd(c.entree)}</td><td>${(c.prenom||'')+' '+(c.nom||'')}</td><td class="num">${_shEur(c.xl_montant)}</td><td class="num">${_shEur(c.sh_montant)}</td><td class="num" style="color:var(--lodge)">${c.sh_taxe!=null?_shEur(c.sh_taxe):'—'}</td>${dcell}<td>${ap}</td><td class="expl">${c.explication||''}</td></tr>`;
+  }).join('') || '<tr><td colspan="10" style="color:var(--muted);padding:14px">Aucune ligne pour ce filtre.</td></tr>';
 }
 
 // ---------- SYNTHÈSE ----------
@@ -2141,6 +2142,27 @@ function _shRenderSynth(){
     _shKpi('Total Excel',_shEur(totXl),'montant nuitées','b3'),
     _shKpi('1 seule source',`${so.length+xo.length}`,`${so.length} Superhote · ${xo.length} Excel`,'b2'),
   ].join('');
+  // --- Contrôle taxe de séjour : Net plateforme + Taxe = Versé ---
+  const sumVerse=SC.reduce((a,c)=>a+(c.sh_montant||0),0);
+  const sumTaxe=SC.reduce((a,c)=>a+(c.sh_taxe||0),0);
+  const sumNet=SC.reduce((a,c)=>{ const pe=(c.sh_paye!=null?c.sh_paye:null); return pe==null?a:a+(pe-(c.sh_taxe||0)-(c.sh_comm||0)); },0);
+  const theo=Math.round((sumNet+sumTaxe)*100)/100, resid=Math.round((sumVerse-(sumNet+sumTaxe))*100)/100;
+  const ctl=document.getElementById('shTaxCtrl');
+  if(ctl) ctl.innerHTML=`<div class="card" style="border-left:3px solid var(--lodge);border-radius:0 11px 11px 0">`
+    +`<h3>Contrôle taxe de séjour ${state.log!=='all'?'· '+state.log:''}</h3>`
+    +`<div class="desc">La taxe de séjour transite par le compte (versée par la plateforme, à reverser à la commune) : elle gonfle la recette bancaire mais n'est pas un revenu. Le CA de l'app (« Net plateforme ») l'exclut.</div>`
+    +`<div style="display:flex;flex-wrap:wrap;gap:14px;align-items:baseline;margin-top:10px;font-size:14px">`
+    +`<span><b style="color:var(--gold)">${_shEur(sumNet)}</b> <span style="color:var(--muted);font-size:11.5px">Net plateforme (CA app)</span></span>`
+    +`<span style="color:var(--muted)">+</span>`
+    +`<span><b style="color:var(--lodge)">${_shEur(sumTaxe)}</b> <span style="color:var(--muted);font-size:11.5px">Taxe de séjour</span></span>`
+    +`<span style="color:var(--muted)">=</span>`
+    +`<span><b>${_shEur(theo)}</b></span>`
+    +`<span style="color:var(--muted)">≟ Versé (banque)</span>`
+    +`<span><b style="color:var(--green)">${_shEur(sumVerse)}</b></span>`
+    +`<span class="badge ${Math.abs(resid)<=2?'match':'gap'}" style="margin-left:4px">${Math.abs(resid)<=2?'✓ rapproché':((resid>=0?'+':'')+_shEur(resid)+' résiduel')}</span>`
+    +`</div>`
+    +(Math.abs(resid)>2?`<div class="note" style="margin-top:7px">Résiduel = frais de ménage/linge et acomptes des réservations directes (Website/Direct), déduits du montant versé mais hors taxe.</div>`:'')
+    +`</div>`;
   const bk={'Identique':0,'+200 € (Lodge)':0,'+300 € (Ambass.)':0,'Autre écart':0};
   ident.forEach(()=>bk['Identique']++);
   gaps.forEach(c=>{const d=c.delta;if(Math.abs(d-300)<1)bk['+300 € (Ambass.)']++;else if(Math.abs(d-200)<1)bk['+200 € (Lodge)']++;else bk['Autre écart']++;});
