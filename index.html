@@ -355,7 +355,7 @@ td.actions{white-space:nowrap}
     </div>
     </details>
   </div>
-  <div class="objsection">Atteinte de l'objectif <span class="hint">base chiffre d'affaires · réalisé + réservé</span></div>
+  <div class="objsection">Atteinte de l'objectif <span class="hint">base CA brut (hors ménage &amp; taxe de séjour) · réalisé + réservé</span></div>
   <div class="kpis k4" id="kpisAtteinte"></div>
   <div class="objsection">Suivi du bénéfice <span class="hint">vs objectif &amp; point mort</span></div>
   <div class="kpis" id="kpisObj"></div>
@@ -1747,7 +1747,7 @@ function renderObjectives(rows,benefM,ob,benef,objAnnual){
   const _bl=state.log==='all'?'Ambassador + Lodge':state.log;
   const aEl=document.getElementById('kpisAtteinte');
   if(aEl) aEl.innerHTML=[
-    kpiCard('Objectif annuel',eur(objAn),`${eur(ob.obj)} / mois`,'',`Objectif annuel (CA)|Objectif mensuel × 12 = ${eur(ob.obj)} × 12|Base : chiffre d'affaires (montants)|Exercice ${state.year} · ${_bl}`),
+    kpiCard('Objectif annuel brut',eur(objAn),`${eur(ob.obj)} / mois · base CA brut`,'',`Objectif annuel brut (CA)|Objectif mensuel × 12 = ${eur(ob.obj)} × 12|Base : CA brut — hors ménage & taxe de séjour|Exercice ${state.year} · ${_bl}`),
     kpiCard('Déjà acquis',eur(acquis),`${Math.round((objAn?acquis/objAn:0)*100)} % de l'objectif`,'b3',`Déjà acquis (CA)|Réalisé (mois échus) ${eur(caReal)} + Réservé (mois à venir) ${eur(caResv)}|= ${eur(acquis)}|Toutes les réservations ${state.year} · ${_bl}`,objAn?acquis/objAn:0),
     kpiCard('Reste à réaliser',eur(resteAR),`${eur(resteMois)} / mois · ${monthsRem} mois`,'b6',`Reste à réaliser (CA)|Objectif des ${monthsRem} mois restants − réservé sur ces mois|= ${eur(ob.obj)} × ${monthsRem} − ${eur(caResv)} = ${eur(resteAR)}|À vendre en plus des réservations déjà prises|Barre = part déjà réservée des mois restants`,objRest?caResv/objRest:0),
     kpiCard('Taux d\'atteinte',_pa,`${(ecart>=0?'+':'')+eur(ecart)} vs objectif`,ecart>=0?'b3':'b6',`Taux d'atteinte|Déjà acquis ÷ objectif annuel = ${eur(acquis)} ÷ ${eur(objAn)} = ${_pa}|Écart = acquis − objectif = ${(ecart>=0?'+':'')+eur(ecart)}`,taux||0),
