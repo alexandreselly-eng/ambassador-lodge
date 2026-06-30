@@ -106,7 +106,7 @@ td.actions{white-space:nowrap}
 .mini-act.del:hover{border-color:var(--red)}
 .mini-act.restore{color:var(--green);font-size:11.5px;font-weight:600}
 .vbadge{font-size:9.5px;background:rgba(88,166,255,.16);color:var(--blue);padding:1px 5px;border-radius:5px;font-weight:700}
-.objgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:14px}
+.objgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-bottom:14px}
 .objcol{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px}
 .objhead{font-weight:700;font-size:13px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--line)}
 .objhead.amb{color:var(--gold2)}.objhead.lodge{color:var(--lodge)}
@@ -344,19 +344,8 @@ td.actions{white-space:nowrap}
   <div class="card" id="objEditor" style="display:none">
     <details id="objDetails" class="fold">
     <summary class="foldsum">⚙️ Paramétrage des objectifs &amp; point mort — exercice <span id="objYear"></span> <span class="hint" id="objSource"></span><span class="foldhint">cliquer pour déplier</span></summary>
-    <div class="desc" style="margin-top:10px">Modifiez les objectifs mensuels et points morts pour cette année. Sans modification, les valeurs par défaut s'appliquent (Ambassador 9 125 / 1 825 / 6 416 · Lodge 4 000 / 1 825 / 2 000).</div>
-    <div class="objgrid">
-      <div class="objcol"><div class="objhead amb">Ambassador</div>
-        <label>Objectif mensuel (€)</label><input id="objAObj" type="number" step="1">
-        <label>Objectif commission (€)</label><input id="objAComm" type="number" step="1">
-        <label>Point mort mensuel (€)</label><input id="objAPm" type="number" step="1">
-      </div>
-      <div class="objcol"><div class="objhead lodge">Lodge</div>
-        <label>Objectif mensuel (€)</label><input id="objLObj" type="number" step="1">
-        <label>Objectif commission (€)</label><input id="objLComm" type="number" step="1">
-        <label>Point mort mensuel (€)</label><input id="objLPm" type="number" step="1">
-      </div>
-    </div>
+    <div class="desc" style="margin-top:10px">Modifiez les objectifs mensuels et points morts pour cette année (filtrés sur le bien sélectionné en haut). Sans modification, les valeurs par défaut s'appliquent <span id="objDefaults"></span>.</div>
+    <div class="objgrid" id="objGrid"></div>
     <div class="formactions">
       <button class="btn" id="btnSaveObj">Enregistrer les objectifs</button>
       <button class="btn sec" id="btnResetObj">Valeurs par défaut</button>
@@ -1687,39 +1676,50 @@ function renderCommByApporteur(){ const host=document.getElementById('commAnalys
   host.querySelectorAll('th[data-k]').forEach(t=>t.onclick=()=>{ const k=t.dataset.k, c=state.commAnaSort||{key:'comm',dir:-1}; state.commAnaSort=c.key===k?{key:k,dir:-c.dir}:{key:k,dir:k==='app'?1:-1}; renderCommByApporteur(); });
 }
 
+let _objBiens=[];
+function _objDef(b){ return OBJ_DEFAULTS[b]||{obj:(propOf(b).obj_mois_defaut||0),comm:0,pm:0}; }
 function renderObjEditor(){
   const box=document.getElementById('objEditor'); if(!box) return;
   if(!IS_ADMIN){ box.style.display='none'; return; }
   box.style.display='block';
   document.getElementById('objYear').textContent=state.year;
-  const a=objFor(state.year,'Ambassador'), l=objFor(state.year,'Lodge');
-  const def=(OBJECTIVES[state.year+'|Ambassador']||OBJECTIVES[state.year+'|Lodge'])?'valeurs personnalisées':'valeurs par défaut';
-  document.getElementById('objSource').textContent=def;
-  setVal('objAObj',a.obj); setVal('objAComm',a.comm); setVal('objAPm',a.pm);
-  setVal('objLObj',l.obj); setVal('objLComm',l.comm); setVal('objLPm',l.pm);
+  const biens = (state.log==='all') ? (typeof visBiens==='function'?visBiens():['Ambassador','Lodge']) : [state.log];
+  _objBiens = biens.map((bn,i)=>({bien:bn,i}));
+  const custom = biens.some(bn=>OBJECTIVES[state.year+'|'+bn]);
+  const srcEl=document.getElementById('objSource'); if(srcEl) srcEl.textContent = custom?'valeurs personnalisées':'valeurs par défaut';
+  const grid=document.getElementById('objGrid');
+  if(grid) grid.innerHTML = _objBiens.map(({bien,i})=>{ const o=objFor(state.year,bien);
+    const cls = bien==='Ambassador'?'amb':bien==='Lodge'?'lodge':'';
+    return `<div class="objcol"><div class="objhead ${cls}" style="color:${(typeof bienColor==='function'?bienColor(bien):'var(--txt)')}">${bien}</div>`
+      +`<label>Objectif mensuel (€)</label><input id="obj_${i}_obj" type="number" step="1" value="${o.obj}">`
+      +`<label>Objectif commission (€)</label><input id="obj_${i}_comm" type="number" step="1" value="${o.comm}">`
+      +`<label>Point mort mensuel (€)</label><input id="obj_${i}_pm" type="number" step="1" value="${o.pm}">`
+      +`</div>`; }).join('');
+  const dEl=document.getElementById('objDefaults');
+  if(dEl) dEl.textContent='('+biens.map(bn=>{const d=_objDef(bn); return `${bn} ${d.obj} / ${d.comm} / ${d.pm}`;}).join(' · ')+')';
 }
 async function saveObjectives(){
-  const m=document.getElementById('objMsg');
-  const y=state.year;
-  const A={obj:numOrNull('objAObj'),comm:numOrNull('objAComm'),pm:numOrNull('objAPm')};
-  const L={obj:numOrNull('objLObj'),comm:numOrNull('objLComm'),pm:numOrNull('objLPm')};
-  if([A.obj,A.comm,A.pm,L.obj,L.comm,L.pm].some(v=>v==null||v<0)) { m.textContent='Toutes les valeurs doivent être des nombres ≥ 0.'; m.className='formmsg err'; return; }
+  const m=document.getElementById('objMsg'); const y=state.year;
+  const recs=[]; let bad=false;
+  _objBiens.forEach(({bien,i})=>{ const obj=numOrNull('obj_'+i+'_obj'), comm=numOrNull('obj_'+i+'_comm'), pm=numOrNull('obj_'+i+'_pm');
+    if([obj,comm,pm].some(v=>v==null||v<0)) bad=true;
+    recs.push({annee:y,logement:bien,obj_mois:obj,obj_comm:comm,point_mort:pm,updated_by:(CURRENT_USER&&CURRENT_USER.email)}); });
+  if(bad||!recs.length){ m.textContent='Toutes les valeurs doivent être des nombres ≥ 0.'; m.className='formmsg err'; return; }
   m.textContent='Enregistrement…'; m.className='formmsg';
-  const recs=[{annee:y,logement:'Ambassador',obj_mois:A.obj,obj_comm:A.comm,point_mort:A.pm,updated_by:(CURRENT_USER&&CURRENT_USER.email)},
-              {annee:y,logement:'Lodge',obj_mois:L.obj,obj_comm:L.comm,point_mort:L.pm,updated_by:(CURRENT_USER&&CURRENT_USER.email)}];
   try{
     if(SUPA){ const {error}=await SUPA.from('objectives').upsert(recs); if(error)throw error; }
-    else { OBJECTIVES[y+'|Ambassador']={obj:A.obj,comm:A.comm,pm:A.pm}; OBJECTIVES[y+'|Lodge']={obj:L.obj,comm:L.comm,pm:L.pm}; localStorage.setItem('al_obj',JSON.stringify(OBJECTIVES)); }
-    await reload(); render(); m.textContent='✓ Objectifs enregistrés pour '+y+'.'; m.className='formmsg ok';
+    else { recs.forEach(r=>OBJECTIVES[y+'|'+r.logement]={obj:r.obj_mois,comm:r.obj_comm,pm:r.point_mort}); localStorage.setItem('al_obj',JSON.stringify(OBJECTIVES)); }
+    await reload(); render(); m.textContent='✓ Objectifs enregistrés pour '+y+' ('+_objBiens.map(x=>x.bien).join(', ')+').'; m.className='formmsg ok';
   }catch(e){ m.textContent='Erreur : '+e.message; m.className='formmsg err'; }
 }
 function resetObjectives(){
-  if(!confirm(`Réinitialiser les objectifs ${state.year} aux valeurs par défaut ?`)) return;
+  const biens=_objBiens.map(x=>x.bien); if(!biens.length)return;
+  if(!confirm(`Réinitialiser les objectifs ${state.year} (${biens.join(', ')}) aux valeurs par défaut ?`)) return;
   const y=state.year;
   (async()=>{ try{
-    if(SUPA){ await SUPA.from('objectives').delete().eq('annee',y); }
-    else { delete OBJECTIVES[y+'|Ambassador']; delete OBJECTIVES[y+'|Lodge']; localStorage.setItem('al_obj',JSON.stringify(OBJECTIVES)); }
-    await reload(); render(); document.getElementById('objMsg').textContent='✓ Valeurs par défaut rétablies pour '+y+'.'; document.getElementById('objMsg').className='formmsg ok';
+    if(SUPA){ const {error}=await SUPA.from('objectives').delete().eq('annee',y).in('logement',biens); if(error)throw error; }
+    else { biens.forEach(b=>delete OBJECTIVES[y+'|'+b]); localStorage.setItem('al_obj',JSON.stringify(OBJECTIVES)); }
+    await reload(); render(); document.getElementById('objMsg').textContent='✓ Valeurs par défaut rétablies pour '+y+' ('+biens.join(', ')+').'; document.getElementById('objMsg').className='formmsg ok';
   }catch(e){ document.getElementById('objMsg').textContent='Erreur : '+e.message; } })();
 }
 
