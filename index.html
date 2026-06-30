@@ -288,10 +288,14 @@ td.actions{white-space:nowrap}
     <div class="card"><h3>Taux d'occupation <span class="hint">nuitées / jours du mois</span></h3><div class="desc">Moyenne des taux de remplissage.</div><div class="chartbox sm"><canvas id="cOcc"></canvas></div></div>
     <div class="card"><h3>Prix moyen / nuit <span class="hint">€</span></h3><div class="desc">CA du mois / nuitées du mois.</div><div class="chartbox sm"><canvas id="cPrix"></canvas></div></div>
   </div>
+  <div class="card" id="brkOccCard"><h3>Taux d'occupation — tableau mensuel <span class="hint">nuitées & taux par mois · cliquez un mois pour le détail</span></h3><div id="brkOcc"></div></div>
+  <div class="card" id="brkPrixCard"><h3>Prix moyen / nuit — tableau mensuel <span class="hint">CA ÷ nuitées par mois · cliquez un mois pour le détail</span></h3><div id="brkPrix"></div></div>
   <div class="grid g2">
     <div class="card"><h3>Commission par mois <span class="hint">Apporteur : <select id="commChan" class="mini"></select></span></h3><div class="desc">Empilé par apporteur ou isolé sur un seul.</div><div class="chartbox sm"><canvas id="cComm"></canvas></div></div>
     <div class="card"><h3>Taxes de séjour <span class="hint">€ collectées</span> <button id="taxExtractBtn2" class="kbtn" title="Justificatif détaillé de la période sélectionnée">⤓ Justificatif</button></h3><div class="desc">Par mois d'entrée.</div><div class="chartbox sm"><canvas id="cTaxe"></canvas></div></div>
   </div>
+  <div class="card" id="brkCommCard"><h3>Commission par mois — tableau mensuel <span class="hint">part apporteur + cumul · cliquez un mois pour le détail</span></h3><div id="brkComm"></div></div>
+  <div class="card" id="brkTaxeCard"><h3>Taxes de séjour — tableau mensuel <span class="hint">collectées + cumul · cliquez un mois pour le détail</span></h3><div id="brkTaxe"></div></div>
   <div class="card"><h3>Commission par apporteur <span class="hint">total sur le périmètre · montant et part</span></h3><div class="desc">Qui apporte le plus de commission. Barres triées ; chaque barre indique le <b>montant €</b> et la <b>part %</b> du total. Le sélecteur €/% du haut change l'axe.</div><div class="chartbox sm"><canvas id="cCommApp"></canvas></div></div>
   <div class="card" id="brkCommAppCard"><h3>Commission par apporteur — tableau mensuel <span class="hint">part Immosphéra / Bibizfamily · cliquez un mois pour le détail</span></h3><div id="brkCommApp"></div></div>
 </div>
@@ -911,7 +915,7 @@ const eur=(n)=>(n==null?'—':Math.round(n).toLocaleString('fr-FR')+' €');
 const pct=(n)=>(n==null?'—':(n*100).toFixed(0)+' %');
 const n0=(v)=>(typeof v==='number'?v:0);
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260630-122312';
+const APP_BUILD='20260630-123401';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
     const d=document.createElement('div'); d.id='newVerBar';
@@ -1625,6 +1629,26 @@ function render(){
     {key:'bibiz', label:'Bibizfamily', fields:['comm_bibiz_new','comm_bibiz_runoff'], fmt:eur, color:'--violet', tip:()=>'Part Bibizfamily (aff. nouvelles + run off)'},
     {key:'totc', label:'Total commission', kind:'calc', calc:(S,m)=>(S.immo[m]||0)+(S.bibiz[m]||0), total:(T)=>(T.immo||0)+(T.bibiz||0), fmt:eur, tip:()=>'Immosphéra + Bibizfamily'}
   ]});
+  const _intf=v=>v==null?'—':Math.round(v).toLocaleString('fr-FR');
+  renderBreakdownTable({ id:'brkOcc', host:'brkOcc', rows:rows, title:'Taux_occupation', detail:true, columns:[
+    {key:'nuit', label:'Nuitées', field:'nuitees', fmt:_intf, tip:()=>'Σ nuitées du mois'},
+    {key:'occ', label:"Taux d'occupation", series:occM, totalVal:(occ!=null?occ*100:null), fmt:v=>v==null?'—':v.toFixed(0)+' %', color:'--lodge', tip:()=>'Moyenne des taux de remplissage (nuitées ÷ jours du mois)'}
+  ]});
+  renderBreakdownTable({ id:'brkPrix', host:'brkPrix', rows:rows, title:'Prix_moyen_nuit', detail:true, columns:[
+    {key:'caP', label:'CA', field:'montant', fmt:eur, tip:()=>'Σ CA du mois'},
+    {key:'nuitP', label:'Nuitées', field:'nuitees', fmt:_intf, tip:()=>'Σ nuitées du mois'},
+    {key:'prix', label:'Prix / nuit', kind:'calc', calc:(S,m)=>S.montant[m]&&S.nuitees[m]?S.montant[m]/S.nuitees[m]:null, total:(T)=>T.nuitees?T.montant/T.nuitees:null, fmt:eur, color:'--blue', tip:()=>'CA ÷ nuitées'}
+  ]});
+  renderBreakdownTable({ id:'brkComm', host:'brkComm', rows:rows, title:'Commission_par_mois', detail:true, columns:[
+    {key:'cimmo', label:'Immosphéra', field:'comm_immo', fmt:eur, color:'--gold', tip:()=>'Part Immosphéra'},
+    {key:'cbibiz', label:'Bibizfamily', fields:['comm_bibiz_new','comm_bibiz_runoff'], fmt:eur, color:'--violet', tip:()=>'Part Bibizfamily'},
+    {key:'ctot', label:'Total', kind:'calc', calc:(S,m)=>(S.cimmo[m]||0)+(S.cbibiz[m]||0), total:(T)=>(T.cimmo||0)+(T.cbibiz||0), fmt:eur, tip:()=>'Immosphéra + Bibizfamily'},
+    {key:'ccum', label:'Cumul', kind:'calc', calc:(S,m)=>{let x=0;for(let i=0;i<=m;i++)x+=(S.cimmo[i]||0)+(S.cbibiz[i]||0);return x;}, total:(T)=>(T.cimmo||0)+(T.cbibiz||0), fmt:eur, color:'--green', tip:()=>'Commission cumulée à fin de mois'}
+  ]});
+  renderBreakdownTable({ id:'brkTaxe', host:'brkTaxe', rows:rows, title:'Taxes_sejour', detail:true, columns:[
+    {key:'tax', label:'Taxe collectée', field:'taxe', fmt:eur, color:'--violet', tip:()=>'Σ taxe de séjour du mois'},
+    {key:'taxcum', label:'Cumul', kind:'calc', calc:(S,m)=>{let x=0;for(let i=0;i<=m;i++)x+=(S.taxe[i]||0);return x;}, total:(T)=>T.taxe, fmt:eur, color:'--green', tip:()=>'Taxe cumulée à fin de mois'}
+  ]});
 }
 
 // ---------- Section admin : liste blanche + invitations ----------
@@ -1990,6 +2014,7 @@ function _brkSeries(cfg){
   const rows=cfg.rows||currentRows(); const cols=cfg.columns;
   const ser=cols.map(c=>{
     if(c.kind==='calc') return null;
+    if(c.series) return c.series;
     if(c.fields){ const a=Array(12).fill(0); c.fields.forEach(fl=>{ const mm=monthly(rows,fl); for(let i=0;i<12;i++) a[i]+=mm[i]; }); return a; }
     if(c.dim){ return monthly(rows.filter(d=>d[c.dim]===c.val), c.measure||'montant'); }
     return monthly(rows,c.field);
@@ -2002,7 +2027,7 @@ function renderBreakdownTable(cfg){
   const host=document.getElementById(cfg.host); if(!host) return;
   const {rows,cols,ser,S,T}=_brkSeries(cfg); const tid=cfg.id||cfg.host;
   const cellVal=(c,i,m)=> c.kind==='calc'? c.calc(S,m) : ser[i][m];
-  const totVal=(c,i)=> c.kind==='calc'? c.total(T) : ser[i].reduce((a,b)=>a+b,0);
+  const totVal=(c,i)=> c.kind==='calc'? c.total(T) : (c.totalVal!=null? c.totalVal : ser[i].reduce((a,b)=>a+b,0));
   const fmtc=(c,v)=> v==null?'—':(c.fmt?c.fmt(v):eur(v));
   const cstyle=c=>c.color?` style="color:${css(c.color)}"`:'';
   if(!BRK[tid]) BRK[tid]=new Set();
@@ -2029,7 +2054,7 @@ function renderBreakdownTable(cfg){
 function exportBrkCSV(cfg){
   const {cols,ser,S,T}=_brkSeries(cfg);
   const cv=(c,i,m)=>c.kind==='calc'?c.calc(S,m):ser[i][m];
-  const tv=(c,i)=>c.kind==='calc'?c.total(T):ser[i].reduce((a,b)=>a+b,0);
+  const tv=(c,i)=>c.kind==='calc'?c.total(T):(c.totalVal!=null?c.totalVal:ser[i].reduce((a,b)=>a+b,0));
   const num=v=>v==null?'':String(Math.round(v*100)/100).replace('.',',');
   const L=[['Mois',...cols.map(c=>c.label)].join(';')];
   for(let m=0;m<12;m++) L.push([MONTHS[m],...cols.map((c,i)=>num(cv(c,i,m)))].join(';'));
