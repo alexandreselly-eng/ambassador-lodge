@@ -908,7 +908,7 @@ const eur=(n)=>(n==null?'—':Math.round(n).toLocaleString('fr-FR')+' €');
 const pct=(n)=>(n==null?'—':(n*100).toFixed(0)+' %');
 const n0=(v)=>(typeof v==='number'?v:0);
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260630-103638';
+const APP_BUILD='20260630-104545';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
     const d=document.createElement('div'); d.id='newVerBar';
@@ -1074,6 +1074,7 @@ function drillFromChart(id,i,chart){
   if(id in MONTHLY_METRIC){ state.month=String(i+1); HILITE=MONTHLY_METRIC[id]; }
   else if(id==='cChan'){ state.chan=lab; HILITE='montant'; }
   else if(id==='cLog'){ state.log=lab; HILITE='montant'; }
+  else if(id==='cCommApp'){ state.chan=lab; HILITE='commission'; }
   else if(id==='cExp'){ const dim=state.expDim; if(dim==='mois'){ state.month=String(MONTHS.indexOf(lab)+1); } else if(dim==='origine'){ state.chan=lab; } else if(dim==='logement'){ state.log=lab; } else if(dim==='annee'){ state.year=+lab; } HILITE=(MEASURES[state.expMes]&&MEASURES[state.expMes].field)||null; }
   else { return; }
   syncFilters(); gotoReservs(); render();
