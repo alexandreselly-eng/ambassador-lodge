@@ -9,6 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1c2330;--line:#283040;--txt:#e6edf3;--muted:#8b97a8;--gold:#d4af37;--gold2:#f1d27a;--amb:#d4af37;--lodge:#3fb6c9;--green:#3fb950;--red:#f85149;--blue:#58a6ff;--violet:#bc8cff;--orange:#e3893b;--tip-bg:#0b0f16;--input-bg:#0d1117;--grid:rgba(40,48,64,.5);--shadow:rgba(0,0,0,.55);--pill-bg:#3a4150;}
@@ -69,7 +70,7 @@ canvas{cursor:pointer}
 .tbl th.num{text-align:right}
 .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10.5px;font-weight:600}
 .pill.amb{background:rgba(212,175,55,.16);color:var(--gold2)}.pill.lodge{background:rgba(63,182,201,.16);color:var(--lodge)}
-.scroll{max-height:460px;overflow-y:auto}
+.scroll{max-height:460px;overflow-y:auto;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .badge{font-size:10px;padding:2px 8px;border-radius:6px;font-weight:700}
 .badge.maj{background:rgba(248,81,73,.16);color:var(--red)}.badge.min{background:rgba(227,137,59,.16);color:var(--orange)}
 .tabs{display:flex;gap:6px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line);flex-wrap:wrap}
@@ -309,6 +310,7 @@ td.actions{white-space:nowrap}
   tr.brk-detail>td{padding:0!important;background:rgba(0,0,0,.15)}
   .brk-detail-in{padding:6px 6px 10px 24px;overflow-x:auto}
   .brk-bar{display:flex;justify-content:flex-end;margin-bottom:6px}
+  @media (max-width:640px){ table.tbl.brk td, table.tbl.brk th{font-size:11px;padding:5px 6px} .brk-detail-in{padding:4px 4px 8px 10px} }
   details.fold>summary.foldsum{cursor:pointer;list-style:none;font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;color:var(--ink,var(--txt));user-select:none}
   details.fold>summary.foldsum::-webkit-details-marker{display:none}
   details.fold>summary.foldsum::before{content:'▸';font-size:12px;color:var(--gold,#d4af37);transition:transform .15s}
@@ -915,7 +917,7 @@ const eur=(n)=>(n==null?'—':Math.round(n).toLocaleString('fr-FR')+' €');
 const pct=(n)=>(n==null?'—':(n*100).toFixed(0)+' %');
 const n0=(v)=>(typeof v==='number'?v:0);
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260630-123401';
+const APP_BUILD='20260630-124216';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
     const d=document.createElement('div'); d.id='newVerBar';
@@ -2009,7 +2011,9 @@ function reservRowHTML(d){
     <td style="color:var(--muted);font-size:11px">${d.created_by_email||'—'}</td>
     <td class="actions">${acts}</td></tr>`;
 }
-const BRK={};
+const BRK={}; let _brkLoaded=false;
+function _brkLoad(){ try{ const o=JSON.parse(localStorage.getItem('al_brk')||'{}'); Object.keys(o).forEach(k=>{ BRK[k]=new Set(o[k]); }); }catch(e){} }
+function _brkSave(){ try{ localStorage.setItem('al_brk', JSON.stringify(Object.fromEntries(Object.entries(BRK).map(([k,v])=>[k,[...v]])))); }catch(e){} }
 function _brkSeries(cfg){
   const rows=cfg.rows||currentRows(); const cols=cfg.columns;
   const ser=cols.map(c=>{
@@ -2025,13 +2029,14 @@ function _brkSeries(cfg){
 }
 function renderBreakdownTable(cfg){
   const host=document.getElementById(cfg.host); if(!host) return;
+  if(!_brkLoaded){ _brkLoaded=true; _brkLoad(); }
   const {rows,cols,ser,S,T}=_brkSeries(cfg); const tid=cfg.id||cfg.host;
   const cellVal=(c,i,m)=> c.kind==='calc'? c.calc(S,m) : ser[i][m];
   const totVal=(c,i)=> c.kind==='calc'? c.total(T) : (c.totalVal!=null? c.totalVal : ser[i].reduce((a,b)=>a+b,0));
   const fmtc=(c,v)=> v==null?'—':(c.fmt?c.fmt(v):eur(v));
   const cstyle=c=>c.color?` style="color:${css(c.color)}"`:'';
   if(!BRK[tid]) BRK[tid]=new Set();
-  let h=`<div class="brk-bar"><button class="ctool" data-brk-csv title="Exporter le tableau en CSV">⤓ CSV</button></div>`;
+  let h=`<div class="brk-bar"><button class="ctool" data-brk-pdf title="Exporter le tableau en PDF">PDF</button><button class="ctool" data-brk-csv title="Exporter le tableau en CSV">⤓ CSV</button></div>`;
   h+=`<div class="scroll"><table class="tbl brk"><thead><tr><th>Mois</th>${cols.map(c=>`<th class="num">${c.label}</th>`).join('')}</tr></thead><tbody>`;
   for(let m=0;m<12;m++){
     const det=cfg.detail!==false; const open=BRK[tid].has(m);
@@ -2048,7 +2053,8 @@ function renderBreakdownTable(cfg){
   h+=`</tbody></table></div>`;
   host.innerHTML=h;
   const cb=host.querySelector('[data-brk-csv]'); if(cb) cb.onclick=()=>exportBrkCSV(cfg);
-  host.querySelectorAll('.brk-mrow').forEach(tr=>{ if(tr.querySelector('.brk-tog')) tr.onclick=()=>{ const m=+tr.dataset.m; if(BRK[tid].has(m))BRK[tid].delete(m); else BRK[tid].add(m); renderBreakdownTable(cfg); }; });
+  const pb=host.querySelector('[data-brk-pdf]'); if(pb) pb.onclick=()=>exportBrkPDF(cfg);
+  host.querySelectorAll('.brk-mrow').forEach(tr=>{ if(tr.querySelector('.brk-tog')) tr.onclick=()=>{ const m=+tr.dataset.m; if(BRK[tid].has(m))BRK[tid].delete(m); else BRK[tid].add(m); _brkSave(); renderBreakdownTable(cfg); }; });
   host.querySelectorAll('.brk-detail .mini-act').forEach(b=>b.onclick=(e)=>{ e.stopPropagation(); const id=b.dataset.id,a=b.dataset.act; if(a==='edit')actEdit(id); else if(a==='del')actDelete(id); else if(a==='hist')actHistory(id); });
 }
 function exportBrkCSV(cfg){
@@ -2060,6 +2066,28 @@ function exportBrkCSV(cfg){
   for(let m=0;m<12;m++) L.push([MONTHS[m],...cols.map((c,i)=>num(cv(c,i,m)))].join(';'));
   L.push([`TOTAL ${state.year}`,...cols.map((c,i)=>num(tv(c,i)))].join(';'));
   download((cfg.title||cfg.id||'tableau')+'.csv','text/csv;charset=utf-8','﻿'+L.join('\n'));
+}
+function exportBrkPDF(cfg){
+  if(!window.jspdf||!window.jspdf.jsPDF){ alert('PDF indisponible'); return; }
+  const {cols,ser,S,T}=_brkSeries(cfg);
+  const cv=(c,i,m)=>c.kind==='calc'?c.calc(S,m):ser[i][m];
+  const tv=(c,i)=>c.kind==='calc'?c.total(T):(c.totalVal!=null?c.totalVal:ser[i].reduce((a,b)=>a+b,0));
+  const fmtc=(c,v)=> v==null?'—':(c.fmt?c.fmt(v):eur(v));
+  const head=[['Mois',...cols.map(c=>c.label)]];
+  const body=[]; for(let m=0;m<12;m++) body.push([MONTHS[m],...cols.map((c,i)=>fmtc(c,cv(c,i,m)))]);
+  const foot=[['TOTAL '+state.year,...cols.map((c,i)=>fmtc(c,tv(c,i)))]];
+  const {jsPDF}=window.jspdf; const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const title=(cfg.title||cfg.id||'tableau').replace(/_/g,' ');
+  doc.setFontSize(14); doc.setTextColor(30); doc.text('Ambassador & Lodge — '+title,14,15);
+  doc.setFontSize(9); doc.setTextColor(120); doc.text('Exercice '+state.year+' · '+(state.log==='all'?'tous biens':state.log)+(state.month!=='all'?' · '+MONTHS[state.month-1]:'')+' · '+new Date().toLocaleDateString('fr-FR'),14,21);
+  if(typeof doc.autoTable!=='function'){ alert('Module PDF (autoTable) non chargé'); return; }
+  doc.autoTable({head:head,body:body,foot:foot,startY:25,
+    styles:{fontSize:8,halign:'right',cellPadding:1.6},
+    headStyles:{fillColor:[34,40,52],textColor:230,halign:'right'},
+    footStyles:{fillColor:[212,175,55],textColor:20,fontStyle:'bold',halign:'right'},
+    columnStyles:{0:{halign:'left',fontStyle:'bold'}},
+    margin:{left:14,right:14}});
+  doc.save((cfg.title||cfg.id||'tableau')+'.pdf');
 }
 
 function renderReservs(rows){
