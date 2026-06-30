@@ -29,6 +29,7 @@ header.top{display:flex;justify-content:space-between;align-items:flex-end;flex-
 .fgrow{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
 .fdiv{align-self:stretch;width:0;border-left:1px solid var(--line)}
 .kbtn{display:inline-block;margin-top:5px;background:var(--panel2);border:1px solid var(--line);color:var(--lodge);border-radius:7px;padding:3px 9px;font-size:11px;font-weight:600;cursor:pointer}.kbtn:hover{border-color:var(--lodge)}
+.commb{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:16px}.commb-h{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px}.commb-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.commb-c{background:var(--panel2);border-radius:9px;padding:9px 12px}.commb-l{font-size:11px;color:var(--muted);margin-bottom:3px}.commb-v{font-size:18px;font-weight:700}@media(max-width:760px){.commb-row{grid-template-columns:repeat(2,1fr)}}
 .fg{display:flex;flex-direction:column;gap:4px}
 .fg label{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);padding-left:2px}
 select,.seg{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;cursor:pointer}
@@ -274,6 +275,7 @@ td.actions{white-space:nowrap}
 <!-- DASHBOARD -->
 <div class="view on" id="v-dash">
   <div class="kpis" id="kpis"></div>
+  <div id="commBanner"></div>
   <div class="card" id="reconCard" style="display:none"><h3>🔗 Rapprochement Excel ↔ Superhote <span class="hint" id="reconScope"></span></h3><div id="reconBody"></div></div>
   <div class="grid g3">
     <div class="card"><h3>Bénéfice net mensuel <span class="hint">€ par mois</span></h3><div class="desc">Montant − commission. Barres = réalisé, ligne = objectif.</div><div class="chartbox"><canvas id="cBenef"></canvas></div></div>
@@ -712,19 +714,9 @@ td.actions{white-space:nowrap}
     </div>
   </div>
   <div class="card" id="commCard">
-    <h3>Taux de commission <span class="hint">par bien × apporteur × date d'effet</span></h3>
-    <div class="desc">Commission appliquée au montant de chaque réservation. Résolution : un <b>apporteur</b> précis prime sur un <b>bien</b> précis, qui prime sur « Tous ». La <b>date d'effet</b> gère les changements de taux (le taux le plus récent applicable à la date de la réservation s'applique). « Tous » = <code>*</code>.</div>
-    <div class="scroll">
-      <table class="tbl"><thead><tr><th>Bien</th><th>Apporteur</th><th>Taux %</th><th>À partir du</th><th></th></tr></thead><tbody id="commBody"></tbody></table>
-    </div>
-    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:12px">
-      <div class="fg"><label>Bien</label><select id="ncrLog" class="mini"></select></div>
-      <div class="fg"><label>Apporteur</label><select id="ncrApp" class="mini"></select></div>
-      <div class="fg"><label>Taux %</label><input id="ncrTaux" type="number" step="0.1" style="width:80px;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:5px 8px;font-size:12px"></div>
-      <div class="fg"><label>À partir du</label><input id="ncrDate" type="date" style="background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:4px 8px;font-size:12px"></div>
-      <button class="btn" id="btnAddComm">Ajouter une règle</button>
-      <span class="formmsg" id="commMsg"></span>
-    </div>
+    <h3>Barème commissions prestataires <span class="hint">Immosphera / Bibizfamily · Lodge &amp; Ambassador</span></h3>
+    <div class="desc">Commission calculée sur le <b>CA net</b> (montant). Le régime dépend de la <b>date de réservation</b> par rapport à la date pivot. Les <b>mois exclus</b> ne portent aucune commission. Villa Métis &amp; autres biens : aucune commission prestataire.</div>
+    <div id="commEditor"></div>
   </div>
   <div class="card">
     <h3>Connexions &amp; temps passé <span class="hint" id="connCount"></span></h3>
@@ -908,7 +900,7 @@ const eur=(n)=>(n==null?'—':Math.round(n).toLocaleString('fr-FR')+' €');
 const pct=(n)=>(n==null?'—':(n*100).toFixed(0)+' %');
 const n0=(v)=>(typeof v==='number'?v:0);
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260630-104545';
+const APP_BUILD='20260630-110418';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
     const d=document.createElement('div'); d.id='newVerBar';
@@ -963,13 +955,32 @@ function commissionRule(log,ori,R,c){
   if(c>=cut){ if(ori==='Immosphera')return R*0.13; if(log==='Lodge')return R*0.13; if(log==='Ambassador')return R*0.25; return R*0.20; }
   return log==='Lodge'? R*0.13 : R*0.20;
 }
+// ===== Barème commissions prestataires (Immosphera / Bibizfamily) — configurable =====
+const DEFAULT_COMM_CONFIG={ pivot:'2026-02-25', excludeMonths:[{y:2026,m:1}],
+  biens:{ Lodge:{ancien:{immo:10,bibiz:3}, runoff:{immo:10,bibiz:3}, affnouv:{bibiz:13}},
+          Ambassador:{ancien:{immo:10,bibiz:10}, runoff:{immo:10,bibiz:10}, affnouv:{bibiz:25}} } };
+let COMM_CONFIG=JSON.parse(JSON.stringify(DEFAULT_COMM_CONFIG));
+async function loadCommConfig(){ if(!SUPA)return; try{ const {data}=await SUPA.from('commission_config').select('config').eq('id',1).maybeSingle(); if(data&&data.config){ COMM_CONFIG=Object.assign(JSON.parse(JSON.stringify(DEFAULT_COMM_CONFIG)),data.config); } }catch(e){} }
+// Calcule les parts de commission (montants) pour une réservation : {immo, bibizNew(aff. nouvelles), bibizRunoff, total}
+function commCalc(r){ const z={immo:0,bibizNew:0,bibizRunoff:0,total:0};
+  const M=n0(r.montant); if(!M) return z;
+  const b=COMM_CONFIG.biens[r.logement]; if(!b) return z;            // Villa Métis & autres → pas de commission prestataire
+  const dr=r.date_resa?new Date(r.date_resa+'T00:00:00'):null;
+  const pivot=new Date((COMM_CONFIG.pivot||'2026-02-25')+'T00:00:00');
+  const nouveau = dr? (dr>=pivot) : false;                           // sans date → ancien régime
+  const isImmo = (r.origine==='Immosphera');
+  let immoR=0,bnR=0,brR=0;
+  if(!nouveau){ immoR=b.ancien.immo; brR=b.ancien.bibiz; }           // Ancien : Immo + Bibiz (run off)
+  else if(isImmo){ immoR=b.runoff.immo; brR=b.runoff.bibiz; }        // Nouveau · source Immosphera : run off
+  else { bnR=b.affnouv.bibiz; }                                      // Nouveau · autre source : Bibiz affaires nouvelles
+  return { immo:M*immoR/100, bibizNew:M*bnR/100, bibizRunoff:M*brR/100, total:M*(immoR+bnR+brR)/100 };
+}
 function compute(r){
   const c=r.entree?new Date(r.entree+'T00:00:00'):null, d=r.sortie?new Date(r.sortie+'T00:00:00'):null;
   const nuit=(c&&d)?Math.round((d-c)/86400000):null;
   let H=null;
   if(c&&d){ const F=new Date(c.getFullYear(),c.getMonth(),1); const G=new Date(d.getFullYear(),d.getMonth()+1,1); H=Math.round((G-F)/86400000); }
-  const comm=commissionRule(r.logement,r.origine,r.montant,c);
-  // Apporteur d'affaires = lu directement dans « origine » (Immosphera / Bibizfamily). Les autres origines sont des canaux (pas d'apporteur).
+  const _cp=commCalc(r);
   const apporteur = (r.origine==='Immosphera'||r.origine==='Bibizfamily') ? r.origine : null;
   let _alloc=null;
   if(c&&d&&nuit>0){ _alloc=[]; const _cur=new Date(c.getTime()); const _ix={};
@@ -979,8 +990,9 @@ function compute(r){
   return Object.assign({},r,{
     annee:c?c.getFullYear():null, mois:c?c.getMonth()+1:null,
     nuitees:nuit, jours_mois:H, tx_rempl:(nuit!=null&&H)?nuit/H:null, monthsAlloc:_alloc, apporteur:apporteur,
-    commission:(comm!=null)?Math.round(comm*100)/100:null,
-    benefice:(r.montant!=null&&comm!=null)?Math.round((r.montant-comm)*100)/100:null,
+    commission:(r.montant!=null)?Math.round(_cp.total*100)/100:null,
+    comm_immo:Math.round(_cp.immo*100)/100, comm_bibiz_new:Math.round(_cp.bibizNew*100)/100, comm_bibiz_runoff:Math.round(_cp.bibizRunoff*100)/100,
+    benefice:(r.montant!=null)?Math.round((r.montant-_cp.total)*100)/100:null,
     cout_nuit:(r.montant!=null&&nuit)?r.montant/nuit:null,
     reste_a_payer:(r.montant!=null)?Math.round((n0(r.montant)+n0(r.taxe)-n0(r.ac1)-n0(r.ac2)-n0(r.ac3)-n0(r.frais_menage))*100)/100:null
   });
@@ -1163,7 +1175,7 @@ function wireSetPassword(){
     }catch(e){ m.textContent='Erreur : '+e.message; m.className='authmsg err'; }
   };
 }
-async function reload(){ await loadProperties(); await loadCommRules(); await loadObjectives();
+async function reload(){ await loadProperties(); await loadCommRules(); await loadCommConfig(); await loadObjectives();
   const raw=await Store.list(); SAISIES_ROWS=raw.map(compute);
   await loadSuperhoteRows(); applyDataSource(); }
 // ----- Source de données : Saisies (réservations) OU Superhote (CSV validé, mémoire par bien) -----
@@ -1415,7 +1427,7 @@ function buildFilters(){
   const chans=[...new Set(ROWS.map(d=>d.origine))].sort();
   const fC=document.getElementById('fChan'); fC.innerHTML='<option value="all">Tous</option>'+chans.map(c=>`<option>${c}</option>`).join(''); fC.value=state.chan; fC.onchange=e=>{state.chan=e.target.value; render();};
   const fM=document.getElementById('fMonth'); fM.innerHTML='<option value="all">Toute l\'année</option>'+MONTHS.map((m,i)=>`<option value="${i+1}">${m}</option>`).join(''); fM.value=state.month; fM.onchange=e=>{state.month=e.target.value; render();};
-  const apps=[...new Set(ROWS.map(d=>d.apporteur).filter(Boolean))].sort();
+  const apps=['Immosphera','Bibizfamily'];
   const cc=document.getElementById('commChan'); cc.innerHTML='<option value="all">Tous (empilé)</option>'+apps.map(c=>`<option>${c}</option>`).join(''); if(state.commChan!=='all'&&!apps.includes(state.commChan))state.commChan='all'; cc.value=state.commChan;
 }
 function fillSel(id,map,v){ const s=document.getElementById(id); s.innerHTML=''; for(const k in map){const o=document.createElement('option');o.value=k;o.textContent=map[k];s.appendChild(o);} s.value=v; }
@@ -1448,10 +1460,16 @@ function monthSlices(d, year){
   if(!al||!al.length||!d.nuitees){ return (d.annee===year)? [Object.assign({},d,{_frac:1,_split:false})] : []; }
   const inY=al.filter(a=>a.y===year); if(!inY.length) return [];
   const N=d.nuitees;
+  const _excl=(COMM_CONFIG.excludeMonths||[]);
   return inY.map(a=>{ const f=N? a.nights/N : 0; const jm=daysInMonth(a.y,a.m);
+    const off=_excl.some(e=>e.y===a.y&&e.m===a.m);   // mois exclu (ex. janvier 2026) → aucune commission
+    const mont=_pr(d.montant,f);
+    const ci=off?0:_pr(d.comm_immo,f), cbn=off?0:_pr(d.comm_bibiz_new,f), cbr=off?0:_pr(d.comm_bibiz_runoff,f);
+    const com=off?0:_pr(d.commission,f);
     return Object.assign({},d,{ annee:a.y, mois:a.m, _frac:f, _split:al.length>1, _partN:a.nights, _totN:N,
       nuitees:a.nights,
-      montant:_pr(d.montant,f), taxe:_pr(d.taxe,f), commission:_pr(d.commission,f), benefice:_pr(d.benefice,f),
+      montant:mont, taxe:_pr(d.taxe,f), commission:com, comm_immo:ci, comm_bibiz_new:cbn, comm_bibiz_runoff:cbr,
+      benefice:(mont==null?null:Math.round((mont-(com||0))*100)/100),
       frais_menage:_pr(d.frais_menage,f), ac1:_pr(d.ac1,f), ac2:_pr(d.ac2,f), ac3:_pr(d.ac3,f),
       reste_a_payer:_pr(d.reste_a_payer,f), jours_mois:jm, tx_rempl:jm? a.nights/jm : null });
   });
@@ -1514,6 +1532,7 @@ function render(){
   const nResa=new Set(rows.map(d=>d.id!=null?('#'+d.id):((d.nom||'')+'|'+d.entree))).size;
   document.getElementById('subtitle').textContent=`Source ${state.dataSource==='superhote'?'Superhote (CSV)':'Saisies'} · Exercice ${state.year} · ${state.log==='all'?(visBiens().join(' + ')||'tous biens'):state.log} · ${state.chan==='all'?'tous canaux':state.chan}${state.month!=='all'?' · '+MONTHS[state.month-1]:''} · ${nResa} réservations`;
   const ca=rows.reduce((s,d)=>s+(d.montant||0),0), benef=rows.reduce((s,d)=>s+(d.benefice||0),0), comm=rows.reduce((s,d)=>s+(d.commission||0),0);
+  const cImmo=rows.reduce((s,d)=>s+(d.comm_immo||0),0), cBibN=rows.reduce((s,d)=>s+(d.comm_bibiz_new||0),0), cBibR=rows.reduce((s,d)=>s+(d.comm_bibiz_runoff||0),0); const cBibT=cBibN+cBibR;
   const nuit=rows.reduce((s,d)=>s+(d.nuitees||0),0), taxe=rows.reduce((s,d)=>s+(d.taxe||0),0), reste=rows.reduce((s,d)=>s+(d.reste_a_payer||0),0);
   const prix=nuit?ca/nuit:null; const occR=rows.filter(d=>d.tx_rempl!=null); const occ=occR.length?occR.reduce((s,d)=>s+d.tx_rempl,0)/occR.length:null;
   const ob=activeObj(), objAnnual=ob.obj*12;
@@ -1538,6 +1557,8 @@ function render(){
           :`Reste à encaisser|Par résa : montant + taxe − acomptes (1+2+3) − ménage|Somme des soldes clients encore ouverts|Source : saisies`),
   ].join('');
   const _teb=document.getElementById('taxExtractBtn'); if(_teb)_teb.onclick=genTaxeJustificatif;
+  const _cb=document.getElementById('commBanner');
+  if(_cb){ _cb.innerHTML = ((cImmo+cBibT)>0.005)? `<div class="commb"><div class="commb-h">Détail commissions prestataires${state.month!=='all'?' · '+MONTHS[state.month-1]:''} <span style="font-weight:400;text-transform:none">· base CA net · janvier 2026 exclu</span></div><div class="commb-row"><div class="commb-c"><div class="commb-l">Comm. Immosphera</div><div class="commb-v" style="color:var(--gold)">${eur(cImmo)}</div></div><div class="commb-c"><div class="commb-l">Bibiz · Aff. nouvelles</div><div class="commb-v" style="color:var(--violet)">${eur(cBibN)}</div></div><div class="commb-c"><div class="commb-l">Bibiz · Run Off</div><div class="commb-v" style="color:var(--violet)">${eur(cBibR)}</div></div><div class="commb-c" style="border:1px solid var(--violet)"><div class="commb-l">Total Bibizfamily</div><div class="commb-v" style="color:var(--violet)">${eur(cBibT)}</div></div></div></div>` : ''; }
   const _teb2=document.getElementById('taxExtractBtn2'); if(_teb2)_teb2.onclick=genTaxeJustificatif;
   const benefM=monthly(rows,'benefice');
   const benefDS=[
@@ -1589,7 +1610,7 @@ async function renderAdmin(){
   document.querySelectorAll('#adminBody .mini-act').forEach(b=>b.onclick=()=>removeAuthorized(b.dataset.em));
   document.querySelectorAll('#adminBody .bienchip').forEach(b=>b.onclick=()=>toggleUserBien(b.dataset.em,b.dataset.b,rows));
   renderProps();
-  renderCommRules();
+  renderCommEditor();
   renderConnections();
 }
 async function toggleUserBien(email,bien,rows){
@@ -1691,18 +1712,19 @@ async function removeAuthorized(email){
 }
 
 function renderCommission(rows){
-  const stacked=state.commChan==='all'; let datasets;
-  if(stacked){
-    const chans=[...new Set(rows.map(d=>d.apporteur))].filter(Boolean).map(c=>[c,rows.filter(d=>d.apporteur===c).reduce((s,d)=>s+(d.commission||0),0)]).sort((a,b)=>b[1]-a[1]).map(p=>p[0]);
-    datasets=chans.map(c=>{ const arr=Array(12).fill(0); rows.filter(d=>d.apporteur===c).forEach(d=>{if(d.mois&&d.commission)arr[d.mois-1]+=d.commission;}); return {label:c,data:arr,backgroundColor:chanColor(c),borderRadius:3,stack:'c',datalabels:state.labels?{display:ctx=>ctx.dataset.data[ctx.dataIndex]>120,color:'#0d1117',font:{size:9,weight:'700'},formatter:v=>v?Math.round(v):''}:{display:false}}; });
-  } else { const arr=Array(12).fill(0); rows.filter(d=>d.apporteur===state.commChan).forEach(d=>{if(d.mois&&d.commission)arr[d.mois-1]+=d.commission;}); datasets=[{label:'Commission '+state.commChan,data:arr,backgroundColor:chanColor(state.commChan,css('--orange')),borderRadius:5,datalabels:DL(eur)}]; }
-  const commTotM=monthly(rows.filter(d=>state.commChan==='all'||d.apporteur===state.commChan),'commission');
+  const immoM=Array(12).fill(0), bibM=Array(12).fill(0);
+  rows.forEach(d=>{ if(d.mois){ immoM[d.mois-1]+=(d.comm_immo||0); bibM[d.mois-1]+=((d.comm_bibiz_new||0)+(d.comm_bibiz_runoff||0)); } });
+  const SER={Immosphera:{data:immoM,color:chanColor('Immosphera')}, Bibizfamily:{data:bibM,color:chanColor('Bibizfamily')}};
+  const stacked = !(state.commChan in SER); let datasets;
+  if(stacked){ datasets=Object.entries(SER).map(([k,v])=>({label:k,data:v.data,backgroundColor:v.color,borderRadius:3,stack:'c',datalabels:state.labels?{display:ctx=>ctx.dataset.data[ctx.dataIndex]>120,color:'#0d1117',font:{size:9,weight:'700'},formatter:x=>x?Math.round(x):''}:{display:false}})); }
+  else { const v=SER[state.commChan]; datasets=[{label:state.commChan,data:v.data,backgroundColor:v.color,borderRadius:5,datalabels:DL(eur)}]; }
+  const commTotM=immoM.map((x,i)=>x+bibM[i]); const cumM=stacked?commTotM:SER[state.commChan].data;
   const opt=Object.assign(baseOpt({money:true,legend:stacked}),{scales:{x:{stacked,grid:{display:false}},y:{stacked,beginAtZero:true,grid:{color:'rgba(40,48,64,.5)'},ticks:{callback:v=>eur(v)}}},plugins:{legend:{display:stacked||state.cumul,position:'bottom',labels:{boxWidth:10,padding:7,font:{size:9.5}}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${eur(c.parsed.y)}`}}}});
-  if(state.cumul){ datasets=datasets.concat([cumulDS('Commission cumulée',commTotM,css('--green'))]); addY1(opt,css('--green')); }
+  if(state.cumul){ datasets=datasets.concat([cumulDS('Commission cumulée',cumM,css('--green'))]); addY1(opt,css('--green')); }
   mk('cComm',{type:'bar',data:{labels:MONTHS,datasets},options:opt});
-  // --- Commission par apporteur : montant € + part % ---
-  const byApp={}; rows.forEach(d=>{ if(d.commission && d.apporteur) byApp[d.apporteur]=(byApp[d.apporteur]||0)+d.commission; });
-  const appP=Object.entries(byApp).sort((a,b)=>b[1]-a[1]);
+  // --- Commission par prestataire (Immosphera / Bibizfamily) : montant € + part % ---
+  const byApp={Immosphera:0,Bibizfamily:0}; rows.forEach(d=>{ byApp.Immosphera+=(d.comm_immo||0); byApp.Bibizfamily+=((d.comm_bibiz_new||0)+(d.comm_bibiz_runoff||0)); });
+  const appP=Object.entries(byApp).filter(x=>x[1]>0.005).sort((a,b)=>b[1]-a[1]);
   const appTot=appP.reduce((s,x)=>s+x[1],0);
   const PCTa=state.unit==='pct';
   const appData=PCTa?appP.map(x=>appTot?x[1]/appTot*100:0):appP.map(x=>x[1]);
@@ -1712,12 +1734,47 @@ function renderCommission(rows){
 }
 
 // ---------- Analyse des commissions par apporteur (tri + évolution période/période) ----------
-function commAgg(year, month){ const m={};
+function commAgg(year, month){ const m={Immosphera:{comm:0,nb:0,ca:0,_ids:new Set()}, Bibizfamily:{comm:0,nb:0,ca:0,_ids:new Set()}};
   ROWS.forEach(d=>{ if(!(state.log==='all'||d.logement===state.log))return;
     monthSlices(d,year).forEach(sl=>{ if(month!=null && sl.mois!==month)return;
-      if(!sl.apporteur)return; const k=sl.apporteur; const o=m[k]||(m[k]={comm:0,nb:0,ca:0,_ids:new Set()});
-      o.comm+=(sl.commission||0); o.ca+=(sl.montant||0); o._ids.add(sl.id!=null?('#'+sl.id):((sl.nom||'')+'|'+sl.entree)); }); });
-  Object.values(m).forEach(o=>{ o.nb=o._ids.size; }); return m; }
+      const id=sl.id!=null?('#'+sl.id):((sl.nom||'')+'|'+sl.entree);
+      const im=(sl.comm_immo||0), bi=((sl.comm_bibiz_new||0)+(sl.comm_bibiz_runoff||0));
+      if(im>0.005){ m.Immosphera.comm+=im; m.Immosphera.ca+=(sl.montant||0); m.Immosphera._ids.add(id); }
+      if(bi>0.005){ m.Bibizfamily.comm+=bi; m.Bibizfamily.ca+=(sl.montant||0); m.Bibizfamily._ids.add(id); }
+    }); });
+  Object.keys(m).forEach(k=>{ m[k].nb=m[k]._ids.size; if(m[k].comm<=0.005) delete m[k]; }); return m; }
+function renderCommEditor(){ const host=document.getElementById('commEditor'); if(!host)return;
+  const C=COMM_CONFIG; const excl=(C.excludeMonths||[]).map(e=>e.y+'-'+String(e.m).padStart(2,'0')).join(', ');
+  const ni=(id,v)=>`<input id="${id}" type="number" step="0.1" value="${v}" style="width:72px;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:5px 7px;font-size:12px">`;
+  const blk=(bn)=>{ const b=(C.biens&&C.biens[bn])||{ancien:{immo:0,bibiz:0},runoff:{immo:0,bibiz:0},affnouv:{bibiz:0}};
+    return `<div style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:10px"><div style="font-weight:700;color:${(typeof bienColor==='function'?bienColor(bn):'var(--txt)')};margin-bottom:8px">${bn}</div>`
+     +`<table class="tbl"><thead><tr><th>Régime / source</th><th class="num">Immosphera %</th><th class="num">Bibizfamily %</th></tr></thead><tbody>`
+     +`<tr><td>Ancien régime (toutes sources)</td><td class="num">${ni('ce_'+bn+'_anc_immo',b.ancien.immo)}</td><td class="num">${ni('ce_'+bn+'_anc_bib',b.ancien.bibiz)}</td></tr>`
+     +`<tr><td>Nouveau · source Immosphera (run off)</td><td class="num">${ni('ce_'+bn+'_ro_immo',b.runoff.immo)}</td><td class="num">${ni('ce_'+bn+'_ro_bib',b.runoff.bibiz)}</td></tr>`
+     +`<tr><td>Nouveau · autre source (affaires nouvelles)</td><td class="num" style="color:var(--muted)">—</td><td class="num">${ni('ce_'+bn+'_an_bib',b.affnouv.bibiz)}</td></tr>`
+     +`</tbody></table></div>`; };
+  host.innerHTML = `<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">`
+    +`<div class="fg"><label>Date pivot (≥ = nouveau régime)</label><input id="ce_pivot" type="date" value="${C.pivot}" style="background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:6px 8px;font-size:12px"></div>`
+    +`<div class="fg"><label>Mois exclus (AAAA-MM, séparés par ,)</label><input id="ce_excl" type="text" value="${excl}" style="width:200px;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:6px 8px;font-size:12px"></div></div>`
+    +blk('Lodge')+blk('Ambassador')
+    +`<div style="display:flex;gap:10px;align-items:center;margin-top:14px"><button class="btn" id="ce_save">Enregistrer le barème</button><button class="btn sec" id="ce_reset">Valeurs par défaut</button><span class="formmsg" id="ce_msg"></span></div>`;
+  const sv=document.getElementById('ce_save'); if(sv) sv.onclick=()=>saveCommConfig(false);
+  const rs=document.getElementById('ce_reset'); if(rs) rs.onclick=()=>{ if(confirm('Réinitialiser le barème aux valeurs par défaut ?')) saveCommConfig(true); };
+}
+async function saveCommConfig(reset){ const m=document.getElementById('ce_msg'); let cfg;
+  if(reset){ cfg=JSON.parse(JSON.stringify(DEFAULT_COMM_CONFIG)); }
+  else{ const num=id=>{ const v=parseFloat(val(id)); return isNaN(v)?0:v; };
+    const excl=(val('ce_excl')||'').split(',').map(x=>x.trim()).filter(Boolean).map(x=>{const q=x.split('-'); return {y:+q[0],m:+q[1]};}).filter(e=>e.y&&e.m);
+    cfg={ pivot:val('ce_pivot')||DEFAULT_COMM_CONFIG.pivot, excludeMonths:excl, biens:{
+      Lodge:{ancien:{immo:num('ce_Lodge_anc_immo'),bibiz:num('ce_Lodge_anc_bib')},runoff:{immo:num('ce_Lodge_ro_immo'),bibiz:num('ce_Lodge_ro_bib')},affnouv:{bibiz:num('ce_Lodge_an_bib')}},
+      Ambassador:{ancien:{immo:num('ce_Ambassador_anc_immo'),bibiz:num('ce_Ambassador_anc_bib')},runoff:{immo:num('ce_Ambassador_ro_immo'),bibiz:num('ce_Ambassador_ro_bib')},affnouv:{bibiz:num('ce_Ambassador_an_bib')}}
+    }}; }
+  if(m){ m.textContent='Enregistrement…'; m.className='formmsg'; }
+  try{ if(SUPA){ const {error}=await SUPA.from('commission_config').upsert({id:1,config:cfg,updated_by:(CURRENT_USER&&CURRENT_USER.email),updated_at:new Date().toISOString()},{onConflict:'id'}); if(error)throw error; }
+    COMM_CONFIG=cfg; await reload(); applyDataSource(); render(); renderAdmin();
+    if(m){ m.textContent='✓ Barème enregistré · chiffres recalculés.'; m.className='formmsg ok'; }
+  }catch(e){ if(m){ m.textContent='Erreur : '+(e.message||e); m.className='formmsg err'; } }
+}
 function renderCommByApporteur(){ const host=document.getElementById('commAnalysis'); if(!host)return;
   const per=state.commAnaPeriod||'annee';
   let curY,curM,prevY,prevM,curLbl,prevLbl;
