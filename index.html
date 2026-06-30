@@ -282,6 +282,7 @@ td.actions{white-space:nowrap}
     <div class="card"><h3>CA par canal <span class="hint"><select id="sortChan" class="mini"><option value="val-desc">Montant ↓</option><option value="val-asc">Montant ↑</option><option value="key-asc">Nom A→Z</option><option value="key-desc">Nom Z→A</option></select></span></h3><div class="desc">Origine de la réservation.</div><div class="chartbox"><canvas id="cChan"></canvas></div></div>
     <div class="card"><h3>Répartition par bien <span class="hint"><select id="sortLog" class="mini"><option value="val-desc">Montant ↓</option><option value="val-asc">Montant ↑</option><option value="key-asc">Nom A→Z</option><option value="key-desc">Nom Z→A</option></select></span></h3><div class="desc">Chiffre d'affaires.</div><div class="chartbox"><canvas id="cLog"></canvas></div></div>
   </div>
+  <div class="card" id="brkBenefCard"><h3>Bénéfice net mensuel — tableau mensuel <span class="hint">cliquez un mois pour le détail des réservations · survolez un chiffre pour le calcul</span></h3><div id="brkBenef"></div></div>
   <div class="grid g2">
     <div class="card"><h3>Taux d'occupation <span class="hint">nuitées / jours du mois</span></h3><div class="desc">Moyenne des taux de remplissage.</div><div class="chartbox sm"><canvas id="cOcc"></canvas></div></div>
     <div class="card"><h3>Prix moyen / nuit <span class="hint">€</span></h3><div class="desc">CA du mois / nuitées du mois.</div><div class="chartbox sm"><canvas id="cPrix"></canvas></div></div>
@@ -294,6 +295,14 @@ td.actions{white-space:nowrap}
 </div>
 
 <style>
+  table.tbl.brk td, table.tbl.brk th{white-space:nowrap}
+  tr.brk-mrow{cursor:pointer}
+  tr.brk-mrow:hover{background:rgba(255,255,255,.03)}
+  .brk-tog{display:inline-block;width:12px;color:var(--gold,#d4af37);font-size:11px}
+  tr.brk-total td{font-weight:700;border-top:2px solid var(--gold,#d4af37);background:rgba(212,175,55,.05)}
+  tr.brk-detail>td{padding:0!important;background:rgba(0,0,0,.15)}
+  .brk-detail-in{padding:6px 6px 10px 24px;overflow-x:auto}
+  .brk-bar{display:flex;justify-content:flex-end;margin-bottom:6px}
   details.fold>summary.foldsum{cursor:pointer;list-style:none;font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;color:var(--ink,var(--txt));user-select:none}
   details.fold>summary.foldsum::-webkit-details-marker{display:none}
   details.fold>summary.foldsum::before{content:'▸';font-size:12px;color:var(--gold,#d4af37);transition:transform .15s}
@@ -900,7 +909,7 @@ const eur=(n)=>(n==null?'—':Math.round(n).toLocaleString('fr-FR')+' €');
 const pct=(n)=>(n==null?'—':(n*100).toFixed(0)+' %');
 const n0=(v)=>(typeof v==='number'?v:0);
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260630-113437';
+const APP_BUILD='20260630-120310';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
     const d=document.createElement('div'); d.id='newVerBar';
@@ -1593,6 +1602,12 @@ function render(){
   if(state.cumul){ taxeDS.push(cumulDS('Taxes cumulées',taxeM,css('--green'))); addY1(taxeOpt,css('--green')); }
   mk('cTaxe',{type:'bar',data:{labels:MONTHS,datasets:taxeDS},options:taxeOpt});
   renderObjectives(rows,benefM,ob,benef,objAnnual); renderReservs(rows); renderExplorer(); renderRecon();
+  renderBreakdownTable({ id:'brkBenef', host:'brkBenef', rows:rows, title:'Benefice_net_mensuel', detail:true, columns:[
+    {label:'CA', kind:'sum', field:'montant', fmt:eur, tip:()=>'Σ des montants du mois (hors taxe & ménage)'},
+    {label:'Commission', kind:'sum', field:'commission', fmt:eur, tip:()=>'Σ commissions apporteur du mois'},
+    {label:'Bénéfice net', kind:'sum', field:'benefice', fmt:eur, color:'--green', tip:()=>'CA − commission'},
+    {label:'Marge %', kind:'calc', calc:(S,m)=>S.montant[m]?S.benefice[m]/S.montant[m]*100:null, total:(T)=>T.montant?T.benefice/T.montant*100:null, fmt:pctv, tip:()=>'Bénéfice ÷ CA'}
+  ]});
 }
 
 // ---------- Section admin : liste blanche + invitations ----------
@@ -1934,6 +1949,69 @@ function renderExplorer(){
   mk('cExp',{type:'bar',data:{labels,datasets:expDS},options:expOpt});
 }
 
+// ===== Moteur générique : tableau mensuel (mois × mesures) — source UNIQUE = currentRows(), agrégation via monthly() =====
+const pctv=(n)=>(n==null?'—':n.toFixed(1).replace('.',',')+' %');
+function reservHeadHTML(){
+  return `<tr><th>Bien</th><th>Date résa</th><th>Entrée</th><th>Sortie</th><th class="num">Nuits</th><th>Client</th><th>Canal</th><th class="num">Montant</th><th class="num">Commission</th><th class="num">Bénéfice net</th><th class="num">Reste à payer</th><th>Saisi par</th><th>Actions</th></tr>`;
+}
+function reservRowHTML(d){
+  const canAct = d.id!=null;
+  const acts = canAct ? `<button class="mini-act" title="Modifier la réservation entière" data-act="edit" data-id="${d.id}">✏️</button><button class="mini-act" title="Historique" data-act="hist" data-id="${d.id}">🕑</button><button class="mini-act del" title="Supprimer" data-act="del" data-id="${d.id}">🗑️</button>` : '<span style="color:var(--muted);font-size:11px">—</span>';
+  return `<tr>
+    <td><span class="pill ${d.logement==='Ambassador'?'amb':'lodge'}">${d.logement}</span>${(d.version>1)?` <span class="vbadge">v${d.version}</span>`:''}</td>
+    <td>${d.date_resa?fmtDate(d.date_resa):'—'}</td>
+    <td>${fmtDate(d.entree)}${d._split?` <span class="vbadge" title="Quote-part du mois : ${d._partN}/${d._totN} nuits">${(MONTHS[d.mois-1]||'').slice(0,3)} ${d._partN}/${d._totN}n</span>`:''}</td><td>${fmtDate(d.sortie)}</td><td class="num${HILITE==='nuitees'?' hl':''}">${d.nuitees??'—'}</td>
+    <td>${(d.nom||'')+' '+(d.prenom||'')}</td><td>${d.origine}</td>
+    <td class="num${HILITE==='montant'?' hl':''}">${eur(d.montant)}</td><td class="num${HILITE==='commission'?' hl':''}">${eur(d._appComm!=null?d._appComm:d.commission)}</td>
+    <td class="num${HILITE==='benefice'?' hl':''}" style="color:${css('--green')}">${eur(d.benefice)}</td>
+    <td class="num${HILITE==='reste_a_payer'?' hl':''}" style="color:${(d.reste_a_payer||0)>1?css('--orange'):'var(--muted)'}">${d.reste_a_payer?eur(d.reste_a_payer):'—'}</td>
+    <td style="color:var(--muted);font-size:11px">${d.created_by_email||'—'}</td>
+    <td class="actions">${acts}</td></tr>`;
+}
+const BRK={};
+function renderBreakdownTable(cfg){
+  const host=document.getElementById(cfg.host); if(!host) return;
+  const rows=cfg.rows||currentRows(); const cols=cfg.columns; const tid=cfg.id||cfg.host;
+  const S={}; cols.forEach(c=>{ if(c.field&&!S[c.field]) S[c.field]=monthly(rows,c.field); });
+  const T={}; Object.keys(S).forEach(fld=>T[fld]=S[fld].reduce((a,b)=>a+b,0));
+  const cellVal=(c,m)=> c.kind==='calc'? c.calc(S,m) : S[c.field][m];
+  const totVal=(c)=> c.kind==='calc'? c.total(T) : T[c.field];
+  const fmtc=(c,v)=> v==null?'—':(c.fmt?c.fmt(v):eur(v));
+  const cstyle=c=>c.color?` style="color:${css(c.color)}"`:'';
+  if(!BRK[tid]) BRK[tid]=new Set();
+  let h=`<div class="brk-bar"><button class="ctool" data-brk-csv title="Exporter le tableau en CSV">⤓ CSV</button></div>`;
+  h+=`<div class="scroll"><table class="tbl brk"><thead><tr><th>Mois</th>${cols.map(c=>`<th class="num">${c.label}</th>`).join('')}</tr></thead><tbody>`;
+  for(let m=0;m<12;m++){
+    const det=cfg.detail!==false; const open=BRK[tid].has(m);
+    h+=`<tr class="brk-mrow" data-m="${m}"><td>${det?`<span class="brk-tog">${open?'▾':'▸'}</span> `:''}${MONTHS[m]}</td>`
+      + cols.map(c=>{ const v=cellVal(c,m); const tip=c.tip?c.tip(S,m,v):''; return `<td class="num"${cstyle(c)}${tip?` title="${tip}"`:''}>${fmtc(c,v)}</td>`; }).join('') + `</tr>`;
+    if(det && open){
+      const dr=rows.filter(d=>d.mois===m+1);
+      h+=`<tr class="brk-detail"><td colspan="${cols.length+1}"><div class="brk-detail-in">`
+        + (dr.length? `<table class="tbl"><thead>${reservHeadHTML()}</thead><tbody>${dr.map(reservRowHTML).join('')}</tbody></table>` : `<div style="padding:8px;color:var(--muted)">Aucune réservation ce mois.</div>`)
+        + `</div></td></tr>`;
+    }
+  }
+  h+=`<tr class="brk-total"><td>TOTAL ${state.year}</td>`+cols.map(c=>{ const v=totVal(c); return `<td class="num"${cstyle(c)}>${fmtc(c,v)}</td>`; }).join('')+`</tr>`;
+  h+=`</tbody></table></div>`;
+  host.innerHTML=h;
+  const cb=host.querySelector('[data-brk-csv]'); if(cb) cb.onclick=()=>exportBrkCSV(cfg);
+  host.querySelectorAll('.brk-mrow').forEach(tr=>{ if(tr.querySelector('.brk-tog')) tr.onclick=()=>{ const m=+tr.dataset.m; if(BRK[tid].has(m))BRK[tid].delete(m); else BRK[tid].add(m); renderBreakdownTable(cfg); }; });
+  host.querySelectorAll('.brk-detail .mini-act').forEach(b=>b.onclick=(e)=>{ e.stopPropagation(); const id=b.dataset.id,a=b.dataset.act; if(a==='edit')actEdit(id); else if(a==='del')actDelete(id); else if(a==='hist')actHistory(id); });
+}
+function exportBrkCSV(cfg){
+  const rows=cfg.rows||currentRows(); const cols=cfg.columns;
+  const S={}; cols.forEach(c=>{ if(c.field&&!S[c.field]) S[c.field]=monthly(rows,c.field); });
+  const T={}; Object.keys(S).forEach(fld=>T[fld]=S[fld].reduce((a,b)=>a+b,0));
+  const cv=(c,m)=>c.kind==='calc'?c.calc(S,m):S[c.field][m];
+  const tv=(c)=>c.kind==='calc'?c.total(T):T[c.field];
+  const num=v=>v==null?'':String(Math.round(v*100)/100).replace('.',',');
+  const L=[['Mois',...cols.map(c=>c.label)].join(';')];
+  for(let m=0;m<12;m++) L.push([MONTHS[m],...cols.map(c=>num(cv(c,m)))].join(';'));
+  L.push([`TOTAL ${state.year}`,...cols.map(c=>num(tv(c)))].join(';'));
+  download((cfg.title||cfg.id||'tableau')+'.csv','text/csv;charset=utf-8','﻿'+L.join('\n'));
+}
+
 function renderReservs(rows){
   const AF=state.appFilter;
   if(AF&&AF!=='all'){ const _pf=(d)=>AF==='Immosphera'?(d.comm_immo||0):((d.comm_bibiz_new||0)+(d.comm_bibiz_runoff||0)); rows=rows.filter(d=>_pf(d)>0.005).map(d=>Object.assign({},d,{_appComm:Math.round(_pf(d)*100)/100})); }
@@ -1946,19 +2024,7 @@ function renderReservs(rows){
   document.getElementById('rcount').innerHTML=_rc;
   const _clr=document.getElementById('clrApp'); if(_clr)_clr.onclick=()=>{ state.appFilter='all'; render(); };
   document.querySelectorAll('#rthead th[data-k]').forEach(th=>{ th.classList.toggle('sorted',th.dataset.k===key); const base=th.getAttribute('data-base')||th.textContent.replace(/[ ▲▼]+$/,''); th.setAttribute('data-base',base); th.textContent=base+(th.dataset.k===key?(dir>0?' ▲':' ▼'):''); });
-  document.getElementById('rtbody').innerHTML=sorted.map(d=>{
-    const canAct = d.id!=null;
-    const acts = canAct ? `<button class="mini-act" title="Modifier la réservation entière" data-act="edit" data-id="${d.id}">✏️</button><button class="mini-act" title="Historique" data-act="hist" data-id="${d.id}">🕑</button><button class="mini-act del" title="Supprimer" data-act="del" data-id="${d.id}">🗑️</button>` : '<span style="color:var(--muted);font-size:11px">—</span>';
-    return `<tr>
-    <td><span class="pill ${d.logement==='Ambassador'?'amb':'lodge'}">${d.logement}</span>${(d.version>1)?` <span class="vbadge">v${d.version}</span>`:''}</td>
-    <td>${d.date_resa?fmtDate(d.date_resa):'—'}</td>
-    <td>${fmtDate(d.entree)}${d._split?` <span class="vbadge" title="Quote-part du mois : ${d._partN}/${d._totN} nuits">${(MONTHS[d.mois-1]||'').slice(0,3)} ${d._partN}/${d._totN}n</span>`:''}</td><td>${fmtDate(d.sortie)}</td><td class="num${HILITE==='nuitees'?' hl':''}">${d.nuitees??'—'}</td>
-    <td>${(d.nom||'')+' '+(d.prenom||'')}</td><td>${d.origine}</td>
-    <td class="num${HILITE==='montant'?' hl':''}">${eur(d.montant)}</td><td class="num${HILITE==='commission'?' hl':''}">${eur(d._appComm!=null?d._appComm:d.commission)}</td>
-    <td class="num${HILITE==='benefice'?' hl':''}" style="color:${css('--green')}">${eur(d.benefice)}</td>
-    <td class="num${HILITE==='reste_a_payer'?' hl':''}" style="color:${(d.reste_a_payer||0)>1?css('--orange'):'var(--muted)'}">${d.reste_a_payer?eur(d.reste_a_payer):'—'}</td>
-    <td style="color:var(--muted);font-size:11px">${d.created_by_email||'—'}</td>
-    <td class="actions">${acts}</td></tr>`;}).join('');
+  document.getElementById('rtbody').innerHTML=sorted.map(reservRowHTML).join('');
   document.querySelectorAll('#rtbody .mini-act').forEach(b=>b.onclick=()=>{
     const id=b.dataset.id, a=b.dataset.act;
     if(a==='edit') actEdit(id); else if(a==='del') actDelete(id); else if(a==='hist') actHistory(id);
