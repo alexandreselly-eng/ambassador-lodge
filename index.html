@@ -145,6 +145,7 @@ td.actions{white-space:nowrap}
       <button class="btn" id="btnLogin">Se connecter</button>
       <button class="btn sec" id="btnSignup">Créer un compte</button>
     </div>
+    <div style="margin-top:10px;text-align:center"><a href="#" id="btnForgot" style="font-size:12.5px;color:var(--lodge)">Mot de passe oublié ?</a></div>
     <div class="authmsg" id="authMsg"></div>
   </div>
 </div>
@@ -1212,6 +1213,15 @@ function wireAuth(){
     msg.textContent=error?('Échec : '+error.message):'Compte créé. Vérifiez vos e-mails si la confirmation est activée, puis connectez-vous.';
     msg.className='authmsg '+(error?'err':'ok');
   };
+  const fb=document.getElementById('btnForgot'); if(fb) fb.onclick=async(e)=>{ e.preventDefault();
+    if(!SUPA){ msg.textContent='Mode local actif : pas d\'authentification.'; return; }
+    const email=val('authEmail');
+    if(!email){ msg.textContent='Entrez d\'abord votre adresse e-mail, puis cliquez « Mot de passe oublié ».'; msg.className='authmsg err'; return; }
+    msg.textContent='Envoi du lien de réinitialisation…'; msg.className='authmsg';
+    try{ const {error}=await SUPA.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin+window.location.pathname});
+      msg.textContent=error?('Échec : '+error.message):('Si un compte existe pour '+email+', un e-mail de réinitialisation vient d\'être envoyé. Vérifiez votre boîte de réception et vos spams.');
+      msg.className='authmsg '+(error?'err':'ok');
+    }catch(err){ msg.textContent='Erreur : '+(err.message||err); msg.className='authmsg err'; } };
   const lb=document.getElementById('btnLogout'); if(lb) lb.onclick=async()=>{ if(SUPA) await SUPA.auth.signOut(); };
 }
 function val(id){ return document.getElementById(id).value.trim(); }
