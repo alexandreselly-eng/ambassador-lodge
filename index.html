@@ -532,7 +532,7 @@ td.actions{white-space:nowrap}
   #v-tarif .calnav{display:flex;align-items:center;gap:6px}
   #v-tarif .calnav button{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:5px 10px;cursor:pointer;font-weight:600}
   #v-tarif #tfLabel{min-width:54px;text-align:center;font-weight:700}
-  #v-tarif .tfaggr,#v-tarif .tfwe{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  #v-tarif .tfwe{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
   #v-tarif .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px}
   #v-tarif .g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   #v-tarif .chartbox{position:relative;height:240px}
@@ -900,7 +900,7 @@ const eur=(n)=>(n==null?'—':Math.round(n).toLocaleString('fr-FR')+' €');
 const pct=(n)=>(n==null?'—':(n*100).toFixed(0)+' %');
 const n0=(v)=>(typeof v==='number'?v:0);
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260630-112211';
+const APP_BUILD='20260630-113437';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
     const d=document.createElement('div'); d.id='newVerBar';
@@ -926,7 +926,7 @@ const state={ year:null, log:'all', chan:'all', month:'all', labels:true, commCh
   sortChan:'val-desc', sortLog:'val-desc', expDim:'mois', expMes:'montant', expSort:'val-desc',
   rsort:{key:'entree',dir:-1}, editId:null, unit:'eur', cumul:true,
   commAnaPeriod:'annee', commAnaMonth:null, commAnaSort:{key:'comm',dir:-1},
-  dataSource:'saisies', shMontantConv:'paye_taxe' };
+  dataSource:'saisies', shMontantConv:'paye_taxe', appFilter:'all' };
 let SAISIES_ROWS=[], SH_ROWS=[], SH_RAW=[], SH_DIAG={};   // caches : saisies vs données Superhote (CSV validé) + diagnostic d'intégrité
 function cumulDS(label,arr,color,fmt){ fmt=fmt||eur; return {label, type:'line', data:cumul(arr), borderColor:color, borderWidth:2, pointRadius:2, pointBackgroundColor:color, tension:.25, yAxisID:'y1', order:0, datalabels: state.labels?{display:true,align:'top',color, font:{size:9,weight:'600'}, formatter:v=>fmt(v)}:{display:false}}; }
 function addY1(opts,color,fmt){ fmt=fmt||eur; opts.scales=opts.scales||{}; opts.scales.y1={position:'right',beginAtZero:true,grid:{display:false},ticks:{callback:v=>fmt(v),font:{size:9},color}}; return opts; }
@@ -1083,10 +1083,11 @@ function syncFilters(){ const fM=document.getElementById('fMonth'); if(fM)fM.val
 function gotoReservs(){ const t=document.querySelector('.tabs button[data-t="reservs"]'); if(t){ document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('on')); t.classList.add('on'); document.querySelectorAll('.view').forEach(v=>v.classList.remove('on')); document.getElementById('v-reservs').classList.add('on'); } }
 function drillFromChart(id,i,chart){
   const lab=(chart.data.labels||[])[i];
+  state.appFilter='all';
   if(id in MONTHLY_METRIC){ state.month=String(i+1); HILITE=MONTHLY_METRIC[id]; }
   else if(id==='cChan'){ state.chan=lab; HILITE='montant'; }
   else if(id==='cLog'){ state.log=lab; HILITE='montant'; }
-  else if(id==='cCommApp'){ state.chan=lab; HILITE='commission'; }
+  else if(id==='cCommApp'){ state.appFilter=lab; HILITE='commission'; }   // apporteur ≠ canal : filtre dédié sur la part de commission de l'apporteur
   else if(id==='cExp'){ const dim=state.expDim; if(dim==='mois'){ state.month=String(MONTHS.indexOf(lab)+1); } else if(dim==='origine'){ state.chan=lab; } else if(dim==='logement'){ state.log=lab; } else if(dim==='annee'){ state.year=+lab; } HILITE=(MEASURES[state.expMes]&&MEASURES[state.expMes].field)||null; }
   else { return; }
   syncFilters(); gotoReservs(); render();
@@ -1934,10 +1935,16 @@ function renderExplorer(){
 }
 
 function renderReservs(rows){
-  const {key,dir}=state.rsort; const v=(d)=>key==='client'?((d.nom||'')+' '+(d.prenom||'')).trim():(key==='saisi'?(d.created_by_email||''):d[key]);
+  const AF=state.appFilter;
+  if(AF&&AF!=='all'){ const _pf=(d)=>AF==='Immosphera'?(d.comm_immo||0):((d.comm_bibiz_new||0)+(d.comm_bibiz_runoff||0)); rows=rows.filter(d=>_pf(d)>0.005).map(d=>Object.assign({},d,{_appComm:Math.round(_pf(d)*100)/100})); }
+  const {key,dir}=state.rsort; const v=(d)=>key==='client'?((d.nom||'')+' '+(d.prenom||'')).trim():(key==='saisi'?(d.created_by_email||''):(key==='commission'&&d._appComm!=null?d._appComm:d[key]));
   const sorted=[...rows].sort((a,b)=>{let x=v(a),y=v(b); if(x==null)x=-Infinity; if(y==null)y=-Infinity; if(typeof x==='number'&&typeof y==='number')return (x-y)*dir; return (''+x).localeCompare(''+y)*dir;});
   const HLABEL={montant:'Montant',commission:'Commission',benefice:'Bénéfice net',reste_a_payer:'Reste à payer',nuitees:'Nuitées'};
-  document.getElementById('rcount').textContent=`${sorted.length} lignes`+(HILITE&&HLABEL[HILITE]?` · colonne « ${HLABEL[HILITE]} » mise en évidence`:'');
+  let _rc=`${sorted.length} lignes`;
+  if(AF&&AF!=='all'){ const _tot=sorted.reduce((s,d)=>s+(d._appComm||0),0); _rc+=` · apporteur <b style="color:var(--violet)">« ${AF} »</b> · Σ commission ${eur(_tot)} <button id="clrApp" class="kbtn" title="Retirer le filtre apporteur">✕ retirer</button>`; }
+  else if(HILITE&&HLABEL[HILITE]){ _rc+=` · colonne « ${HLABEL[HILITE]} » mise en évidence`; }
+  document.getElementById('rcount').innerHTML=_rc;
+  const _clr=document.getElementById('clrApp'); if(_clr)_clr.onclick=()=>{ state.appFilter='all'; render(); };
   document.querySelectorAll('#rthead th[data-k]').forEach(th=>{ th.classList.toggle('sorted',th.dataset.k===key); const base=th.getAttribute('data-base')||th.textContent.replace(/[ ▲▼]+$/,''); th.setAttribute('data-base',base); th.textContent=base+(th.dataset.k===key?(dir>0?' ▲':' ▼'):''); });
   document.getElementById('rtbody').innerHTML=sorted.map(d=>{
     const canAct = d.id!=null;
@@ -1947,7 +1954,7 @@ function renderReservs(rows){
     <td>${d.date_resa?fmtDate(d.date_resa):'—'}</td>
     <td>${fmtDate(d.entree)}${d._split?` <span class="vbadge" title="Quote-part du mois : ${d._partN}/${d._totN} nuits">${(MONTHS[d.mois-1]||'').slice(0,3)} ${d._partN}/${d._totN}n</span>`:''}</td><td>${fmtDate(d.sortie)}</td><td class="num${HILITE==='nuitees'?' hl':''}">${d.nuitees??'—'}</td>
     <td>${(d.nom||'')+' '+(d.prenom||'')}</td><td>${d.origine}</td>
-    <td class="num${HILITE==='montant'?' hl':''}">${eur(d.montant)}</td><td class="num${HILITE==='commission'?' hl':''}">${eur(d.commission)}</td>
+    <td class="num${HILITE==='montant'?' hl':''}">${eur(d.montant)}</td><td class="num${HILITE==='commission'?' hl':''}">${eur(d._appComm!=null?d._appComm:d.commission)}</td>
     <td class="num${HILITE==='benefice'?' hl':''}" style="color:${css('--green')}">${eur(d.benefice)}</td>
     <td class="num${HILITE==='reste_a_payer'?' hl':''}" style="color:${(d.reste_a_payer||0)>1?css('--orange'):'var(--muted)'}">${d.reste_a_payer?eur(d.reste_a_payer):'—'}</td>
     <td style="color:var(--muted);font-size:11px">${d.created_by_email||'—'}</td>
@@ -2745,7 +2752,6 @@ const AL_TARIF = (function(){
   const MOIS=['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
   const MOISL=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
   const DOW=['L','M','M','J','V','S','D'];
-  const AGGR={prudent:0.5,equilibre:1,agressif:1.5};
   const _eur=(typeof eur==='function')?eur:(n=>n==null?'—':Math.round(n).toLocaleString('fr-FR')+' €');
   function ymd(d){return d.toISOString().slice(0,10);}
   function fd(s){if(!s)return '—';const[y,m,d]=s.split('-');return `${d}/${m}/${y.slice(2)}`;}
@@ -2758,7 +2764,7 @@ const AL_TARIF = (function(){
   const charts={};
   function mkch(id,cfg){if(charts[id])charts[id].destroy();const e=document.getElementById(id);if(e)charts[id]=new Chart(e,cfg);}
 
-  let st={bien:null, year:null, aggr:'equilibre', menage:'horsmenage', G:null, H:null, PONT:new Set()};
+  let st={bien:null, year:null, menage:'horsmenage', G:null, H:null, PONT:new Set()};
   function avecM(){ return st.menage==='avecmenage'; }
   function rows(){ return (typeof ROWS!=='undefined'?ROWS:[]).filter(r=>r.entree&&r.sortie); }
   // lignes selon la convention : montant brut (hors ménage) ou montant + ménage forfait (= « montant versé » Superhote)
@@ -2773,7 +2779,7 @@ const AL_TARIF = (function(){
     const gl = (typeof state!=='undefined') ? state.log : 'all';
     st.bien = (gl && gl!=='all') ? gl : (biens()[0]);
     st.PONT=new Set(); if(typeof AL_HOL!=='undefined') AL_HOL.ponts('reunion').forEach(p=>st.PONT.add(p.date));
-    st.G=AL_PRICE.grid(rwsConv(), st.year, holCtx, {aggr:AGGR[st.aggr]});
+    st.G=AL_PRICE.grid(rwsConv(), st.year, holCtx);
     st.LU={}; st.G.grid.forEach(g=>{ st.LU[g.bien+'|'+g.week]=g; });
     // carte des nuits réalisées : bien|date -> {rate(hors ménage), rateWM(ménage inclus), menage, nuits, total}
     st.nightMap={};
@@ -2788,10 +2794,10 @@ const AL_TARIF = (function(){
   function sameDateYr(d,delta){ const y=(+d.slice(0,4))+delta; return y+d.slice(4); }
   function priceForDay(d){ const w=AL_PRICE.isoWeek(d).week; const g=st.LU[st.bien+'|'+w]; if(!g||g.mid==null)return null;
     const we=dowMon(d); return (we===4||we===5)? g.midWE : g.mid; }
-  // tarif actuel (ADR médian réalisé) + 3 scénarios pour une semaine
+  // tarif actuel (ADR médian réalisé) + prix conseillé (base historique)
   function scenarios(week, ctx){ const wp=(st.G.wePremium&&st.G.wePremium[st.bien])||1.12;
-    const f=a=>AL_PRICE.suggest(st.G.stats, st.bien, week, ctx, {aggr:a, wePremium:wp});
-    return {base:f(1).base, pru:f(0.5), equ:f(1), agr:f(1.5)}; }
+    const s=AL_PRICE.suggest(st.G.stats, st.bien, week, ctx, {wePremium:wp});
+    return {base:s.base, reco:s}; }
 
   // ---------- contrôles ----------
   function controls(){
@@ -2799,7 +2805,6 @@ const AL_TARIF = (function(){
     const wp=(st.G&&st.G.wePremium&&st.G.wePremium[st.bien])||1.12;
     return `<div class="calctrls">
       <div class="tflabel"><span class="pill ${st.bien==='Ambassador'?'amb':'lodge'}">${st.bien||'—'}</span> · Exercice <b>${st.year}</b> <span class="hint">(choix via les filtres du haut)</span></div>
-      <div class="tfaggr">Agressivité <span class="xi" data-explain="Politique de prix|Prix conseillé = ADR médian + (cible − ADR médian) × agressivité|Cible = ADR × occupation historique × contexte (vacances, fériés, ponts)|Curseur : Prudent ×0,5 · Équilibré ×1 · Agressif ×1,5" tabindex="0" role="button" aria-label="Explication de la politique de prix">ⓘ</span> ${seg('tfAggr',[['prudent','Prudent',"Prudent (×0,5)|N'applique que la MOITIÉ de l'ajustement calculé|Prix proches du tarif actuel : hausses modérées en forte demande, baisses douces en creux|Objectif : sécuriser le remplissage / l'occupation"],['equilibre','Équilibré',"Équilibré (×1)|Applique l'INTÉGRALITÉ de l'ajustement demande (occupation × contexte saisonnier)|Compromis remplissage / recette|Réglage recommandé par défaut"],['agressif','Agressif',"Agressif (×1,5)|AMPLIFIE l'ajustement de 50 %|Prix poussés plus haut en forte demande (vacances, ponts), plus bas dans les creux|Objectif : maximiser la recette/nuit, au risque de baisser l'occupation"]],st.aggr)}</div>
       <div class="tfmen">Tarifs ${seg('tfMen',[['horsmenage','Hors ménage',"Hors ménage|Prix = hébergement seul, sans frais de ménage|= prix/nuit à programmer dans le calendrier de la plateforme"],['avecmenage','Ménage inclus',"Ménage inclus|Prix = hébergement + frais de ménage|= montant versé observé côté Superhote"]],st.menage)} <span class="hint">${avecM()?'= montant versé Superhote':'= prix/nuit à programmer'}</span></div>
       <div class="tfwe">Premium week-end <b>×${wp.toFixed(2)}</b> <span class="hint">(observé)</span></div>
     </div>`;
@@ -2822,7 +2827,7 @@ const AL_TARIF = (function(){
       K('ADR médian moyen',_eur(adrMoy),'par nuit','b3',`ADR médian moyen|Moyenne des ADR hebdomadaires|ADR/semaine = médiane de (montant ÷ nuitées)|Convention : ${avecM()?'ménage inclus':'hors ménage'}`),
       K('Premium week-end','×'+wp.toFixed(2),'ven. & sam. observés','b4',`Premium week-end|Tarif médian ven.+sam. ÷ tarif médian en semaine|Observé sur l'historique, borné 1,00–1,45|Valeur : ×${wp.toFixed(2)}`),
       K('Semaines creuses',creuses,'occ. < 35 % à dynamiser','b5',`Semaines creuses|Nb de semaines avec occupation historique < 35 %|À dynamiser : baisse de prix, séjour min. réduit, promo`),
-      K('Hausse conseillée',(hMoy>=0?'+':'')+Math.round(hMoy*100)+'%','potentiel ~'+_eur(pot)+'/an','b2',`Hausse conseillée|Écart moyen : prix conseillé ÷ ADR actuel − 1|Potentiel ≈ Σ (conseillé − ADR) × nuits attendues (occ × 7) ≈ ${_eur(pot)}/an|Scénario : ${st.aggr}`),
+      K('Hausse conseillée',(hMoy>=0?'+':'')+Math.round(hMoy*100)+'%','potentiel ~'+_eur(pot)+'/an','b2',`Hausse conseillée|Écart moyen : prix conseillé ÷ ADR actuel − 1|Potentiel ≈ Σ (conseillé − ADR) × nuits attendues (occ × 7) ≈ ${_eur(pot)}/an`),
     ].join('');
   }
 
@@ -2842,7 +2847,7 @@ const AL_TARIF = (function(){
         const w=AL_PRICE.isoWeek(d).week; const sc=(p!=null)?scenarios(w,cx):null; const wknd=(we===4||we===5);
         const we2=v=>wknd?Math.round(v*((st.G.wePremium&&st.G.wePremium[st.bien])||1.12)):v;
         const conv=avecM(), clab=conv?'ménage inclus':'hors ménage';
-        const scTip=sc?`|Conseillé ${wknd?'(week-end) ':''}(${clab}) — Prudent ${we2(sc.pru.mid)} € · Équilibré ${we2(sc.equ.mid)} € · Agressif ${we2(sc.agr.mid)} €`:'';
+        const scTip=sc?`|Conseillé ${wknd?'(week-end) ':''}(${clab}) — ${we2(sc.reco.mid)} €`:'';
         const rThis=realized(d), r1=realized(sameDateYr(d,-1)), r2=realized(sameDateYr(d,-2));
         const rt=info=> info?('loué '+rNuit(info)+' €'):'vide';
         const histTip=`|· Réalisé /nuit (${clab}) ·|${st.year} : ${rThis?rt(rThis):(d<today?'vide':'à venir')}|${st.year-1} : ${rt(r1)}|${st.year-2} : ${rt(r2)}`;
@@ -2885,24 +2890,21 @@ const AL_TARIF = (function(){
     return `<div class="g2">${tbl('🔻 Périodes creuses récurrentes (vacance locative)',cre,'cre')}${tbl('🔺 Périodes fortes à valoriser',fort,'fort')}</div>`;
   }
 
-  // ---------- grille prix conseillés (tarif actuel + 3 scénarios) ----------
+  // ---------- grille prix conseillés (tarif actuel + prix conseillé) ----------
   function gridTable(){ const g=st.G.grid.filter(x=>x.bien===st.bien);
-    const ah=a=>st.aggr===a?'tfact':''; // colonne active surlignée
     const body=g.map(x=>{ const tags=[]; if(x.ctx){if(x.ctx.vacMetro)tags.push('<span class="ptag met">Métro</span>');if(x.ctx.vacReunion)tags.push('<span class="ptag reu">Réú</span>');if(x.ctx.ferie)tags.push('<span class="ptag fer">Férié</span>');if(x.ctx.pont)tags.push('<span class="ptag pont">Pont</span>');}
       const cf=x.confidence==='élevée'?'#3fb950':x.confidence==='moyenne'?'#e3893b':'#8b97a8';
       const sc=scenarios(x.week,x.ctx||{}); if(sc.base==null) return '';
       const d=(v,b)=>{ if(v==null)return '—'; const delta=b?Math.round((v/b-1)*100):0; return v+' €'+(b&&delta!==0?` <span class="tfd2 ${delta>0?'up':'dn'}">${delta>0?'+':''}${delta}%</span>`:''); };
       return `<tr><td>S${x.week}<br><span class="muted">${fd(x.dateRef)}</span></td><td>${x.occ!=null?Math.round(x.occ*100)+'%':'—'}</td>`+
         `<td class="tfbase">${sc.base} €</td>`+
-        `<td class="${ah('prudent')}">${d(sc.pru.mid,sc.base)}</td>`+
-        `<td class="${ah('equilibre')}">${d(sc.equ.mid,sc.base)}</td>`+
-        `<td class="${ah('agressif')}">${d(sc.agr.mid,sc.base)}</td>`+
-        `<td class="muted">${sc.equ.midWE} €</td>`+
+        `<td class="tfact">${d(sc.reco.mid,sc.base)}</td>`+
+        `<td class="muted">${sc.reco.midWE} €</td>`+
         `<td><span style="color:${cf}">●</span> ${x.confidence}</td><td>${tags.join(' ')||'<span class="muted">—</span>'}</td></tr>`; }).join('');
     return `<div class="card"><h3>Grille de prix conseillés ${st.year} — <span class="pill ${st.bien==='Ambassador'?'amb':'lodge'}">${st.bien}</span> <button class="tfexp" id="tfExport">⌄ Exporter CSV</button></h3>
-      <div class="desc">« Tarif actuel » = ADR médian réalisé = médiane de (montant ÷ nuitées) sur l'historique ${st.G.years.join(', ')}. Les 3 scénarios montrent le prix/nuit conseillé et l'écart vs l'actuel. La colonne du curseur choisi est surlignée. « WE » = prix week-end (premium observé), scénario équilibré.
+      <div class="desc">« Tarif actuel » = ADR médian réalisé = médiane de (montant ÷ nuitées) sur l'historique ${st.G.years.join(', ')}. « Prix conseillé » = prix/nuit recommandé (base historique) avec l'écart vs l'actuel. « WE » = prix week-end (premium observé).
       <br><b>Convention :</b> ${avecM()?'<b>Ménage inclus</b> — chaque nuit = (montant + ménage forfait) ÷ nuitées, comparable au « montant versé » Superhote.':'<b>Hors ménage</b> — chaque nuit = montant ÷ nuitées (hors ménage & taxe), = le prix/nuit à programmer dans Superhote.'} Forfait ménage : Ambassador 300 € / Lodge 200 € (réglé séparément), utilisé si l'Excel ne renseigne pas le ménage (cas le plus fréquent).</div>
-      <div class="scroll" style="max-height:440px"><table class="tbl tfgrid"><thead><tr><th>Semaine</th><th>Occ. hist.</th><th>Tarif actuel</th><th>Prudent</th><th>Équilibré</th><th>Agressif</th><th>WE</th><th>Confiance</th><th>Contexte</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
+      <div class="scroll" style="max-height:440px"><table class="tbl tfgrid"><thead><tr><th>Semaine</th><th>Occ. hist.</th><th>Tarif actuel</th><th>Prix conseillé</th><th>WE</th><th>Confiance</th><th>Contexte</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
   }
 
   function render(){
@@ -2917,13 +2919,12 @@ const AL_TARIF = (function(){
   }
   function tip(html,x,y){const t=document.getElementById('tarifTip');if(!t)return;t.innerHTML=html;t.style.display='block';const w=t.offsetWidth,h=t.offsetHeight;let nx=x+14,ny=y+14;if(nx+w>window.innerWidth)nx=x-w-14;if(ny+h>window.innerHeight)ny=y-h-14;t.style.left=nx+'px';t.style.top=ny+'px';}
   function exportCSV(){ const g=st.G.grid.filter(x=>x.bien===st.bien); const conv=avecM()?'menage_inclus':'hors_menage';
-    const lines=[['Bien','Convention','Menage_forfait','Semaine','Date','Occ_hist_%','Tarif_actuel_ADR_median','Prudent','Equilibre','Agressif','Prix_weekend_eq','Confiance','Vac_metro','Vac_reunion','Ferie','Pont']];
-    g.forEach(x=>{ const sc=scenarios(x.week,x.ctx||{}); lines.push([st.bien,conv,FORFAIT[st.bien]||'','S'+x.week,x.dateRef,x.occ!=null?Math.round(x.occ*100):'',sc.base||'',sc.pru.mid||'',sc.equ.mid||'',sc.agr.mid||'',sc.equ.midWE||'',x.confidence,x.ctx&&x.ctx.vacMetro?1:0,x.ctx&&x.ctx.vacReunion?1:0,x.ctx&&x.ctx.ferie?1:0,x.ctx&&x.ctx.pont?1:0]); });
+    const lines=[['Bien','Convention','Menage_forfait','Semaine','Date','Occ_hist_%','Tarif_actuel_ADR_median','Prix_conseille','Prix_weekend','Confiance','Vac_metro','Vac_reunion','Ferie','Pont']];
+    g.forEach(x=>{ const sc=scenarios(x.week,x.ctx||{}); lines.push([st.bien,conv,FORFAIT[st.bien]||'','S'+x.week,x.dateRef,x.occ!=null?Math.round(x.occ*100):'',sc.base||'',sc.reco.mid||'',sc.reco.midWE||'',x.confidence,x.ctx&&x.ctx.vacMetro?1:0,x.ctx&&x.ctx.vacReunion?1:0,x.ctx&&x.ctx.ferie?1:0,x.ctx&&x.ctx.pont?1:0]); });
     const csv=lines.map(r=>r.join(';')).join('\n'); const blob=new Blob(['﻿'+csv],{type:'text/csv'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='prix-conseilles-'+st.bien+'-'+st.year+'-'+conv+'.csv'; a.click();
   }
   function wire(){
-    document.querySelectorAll('#tfAggr button').forEach(b=>b.onclick=()=>{st.aggr=b.dataset.v;render();});
     document.querySelectorAll('#tfMen button').forEach(b=>b.onclick=()=>{st.menage=b.dataset.v;render();});
     const e=document.getElementById('tfExport'); if(e)e.onclick=exportCSV;
     document.querySelectorAll('#tarifCal .tfd[data-tip]').forEach(el=>{ el.onmousemove=ev=>{const parts=(el.dataset.tip||'').split('|');tip('<div class="ttl">'+parts[0]+'</div>'+parts.slice(1).filter(Boolean).map(p=>'<div>'+p+'</div>').join(''),ev.clientX,ev.clientY);}; el.onmouseleave=()=>{const t=document.getElementById('tarifTip');if(t)t.style.display='none';}; });
