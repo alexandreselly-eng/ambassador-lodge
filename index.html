@@ -396,7 +396,7 @@ td.actions{white-space:nowrap}
     <div class="desc">Valeurs recalculées. Cliquez un en-tête pour trier ; « Saisi par » indique l'auteur.</div>
     <div class="scroll">
       <table class="tbl"><thead id="rthead"><tr>
-        <th data-k="logement">Bien</th><th data-k="entree">Entrée</th><th data-k="sortie">Sortie</th><th data-k="nuitees">Nuits</th><th data-k="client">Client</th><th data-k="origine">Canal</th>
+        <th data-k="logement">Bien</th><th data-k="date_resa">Date résa</th><th data-k="entree">Entrée</th><th data-k="sortie">Sortie</th><th data-k="nuitees">Nuits</th><th data-k="client">Client</th><th data-k="origine">Canal</th>
         <th class="num" data-k="montant">Montant</th><th class="num" data-k="commission">Commission</th><th class="num" data-k="benefice">Bénéfice net</th><th class="num" data-k="reste_a_payer">Reste à payer</th><th data-k="saisi">Saisi par</th><th>Actions</th>
       </tr></thead><tbody id="rtbody"></tbody></table>
     </div>
@@ -900,7 +900,7 @@ const eur=(n)=>(n==null?'—':Math.round(n).toLocaleString('fr-FR')+' €');
 const pct=(n)=>(n==null?'—':(n*100).toFixed(0)+' %');
 const n0=(v)=>(typeof v==='number'?v:0);
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260630-110418';
+const APP_BUILD='20260630-112211';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
     const d=document.createElement('div'); d.id='newVerBar';
@@ -1944,6 +1944,7 @@ function renderReservs(rows){
     const acts = canAct ? `<button class="mini-act" title="Modifier la réservation entière" data-act="edit" data-id="${d.id}">✏️</button><button class="mini-act" title="Historique" data-act="hist" data-id="${d.id}">🕑</button><button class="mini-act del" title="Supprimer" data-act="del" data-id="${d.id}">🗑️</button>` : '<span style="color:var(--muted);font-size:11px">—</span>';
     return `<tr>
     <td><span class="pill ${d.logement==='Ambassador'?'amb':'lodge'}">${d.logement}</span>${(d.version>1)?` <span class="vbadge">v${d.version}</span>`:''}</td>
+    <td>${d.date_resa?fmtDate(d.date_resa):'—'}</td>
     <td>${fmtDate(d.entree)}${d._split?` <span class="vbadge" title="Quote-part du mois : ${d._partN}/${d._totN} nuits">${(MONTHS[d.mois-1]||'').slice(0,3)} ${d._partN}/${d._totN}n</span>`:''}</td><td>${fmtDate(d.sortie)}</td><td class="num${HILITE==='nuitees'?' hl':''}">${d.nuitees??'—'}</td>
     <td>${(d.nom||'')+' '+(d.prenom||'')}</td><td>${d.origine}</td>
     <td class="num${HILITE==='montant'?' hl':''}">${eur(d.montant)}</td><td class="num${HILITE==='commission'?' hl':''}">${eur(d.commission)}</td>
