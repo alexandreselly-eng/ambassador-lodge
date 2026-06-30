@@ -28,6 +28,7 @@ header.top{display:flex;justify-content:space-between;align-items:flex-end;flex-
 .fglabel{font-size:10px;letter-spacing:.8px;font-weight:700;text-transform:uppercase;display:flex;align-items:center;gap:6px;opacity:.95}
 .fgrow{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
 .fdiv{align-self:stretch;width:0;border-left:1px solid var(--line)}
+.kbtn{display:inline-block;margin-top:5px;background:var(--panel2);border:1px solid var(--line);color:var(--lodge);border-radius:7px;padding:3px 9px;font-size:11px;font-weight:600;cursor:pointer}.kbtn:hover{border-color:var(--lodge)}
 .fg{display:flex;flex-direction:column;gap:4px}
 .fg label{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);padding-left:2px}
 select,.seg{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;cursor:pointer}
@@ -947,7 +948,10 @@ function compute(r){
   const nuit=(c&&d)?Math.round((d-c)/86400000):null;
   let H=null;
   if(c&&d){ const F=new Date(c.getFullYear(),c.getMonth(),1); const G=new Date(d.getFullYear(),d.getMonth()+1,1); H=Math.round((G-F)/86400000); }
-  const comm=commissionRule(r.logement,r.origine,r.montant,c);
+  const _cr = r.date_resa? new Date(r.date_resa+'T00:00:00') : c;   // date de RÉSERVATION (repli : entrée)
+  const comm=commissionRule(r.logement,r.origine,r.montant,_cr);
+  const _APPCUT=new Date(2026,1,1); // 01/02/2026
+  const apporteur = _cr? (_cr<_APPCUT?'Immosphera':'Bibizfamily') : null;
   let _alloc=null;
   if(c&&d&&nuit>0){ _alloc=[]; const _cur=new Date(c.getTime()); const _ix={};
     for(let _i=0;_i<nuit;_i++){ const _y=_cur.getFullYear(),_m=_cur.getMonth()+1,_k=_y+'-'+_m;
@@ -955,7 +959,7 @@ function compute(r){
       _alloc[_ix[_k]].nights++; _cur.setDate(_cur.getDate()+1); } }
   return Object.assign({},r,{
     annee:c?c.getFullYear():null, mois:c?c.getMonth()+1:null,
-    nuitees:nuit, jours_mois:H, tx_rempl:(nuit!=null&&H)?nuit/H:null, monthsAlloc:_alloc,
+    nuitees:nuit, jours_mois:H, tx_rempl:(nuit!=null&&H)?nuit/H:null, monthsAlloc:_alloc, apporteur:apporteur,
     commission:(comm!=null)?Math.round(comm*100)/100:null,
     benefice:(r.montant!=null&&comm!=null)?Math.round((r.montant-comm)*100)/100:null,
     cout_nuit:(r.montant!=null&&nuit)?r.montant/nuit:null,
@@ -1391,7 +1395,8 @@ function buildFilters(){
   const chans=[...new Set(ROWS.map(d=>d.origine))].sort();
   const fC=document.getElementById('fChan'); fC.innerHTML='<option value="all">Tous</option>'+chans.map(c=>`<option>${c}</option>`).join(''); fC.value=state.chan; fC.onchange=e=>{state.chan=e.target.value; render();};
   const fM=document.getElementById('fMonth'); fM.innerHTML='<option value="all">Toute l\'année</option>'+MONTHS.map((m,i)=>`<option value="${i+1}">${m}</option>`).join(''); fM.value=state.month; fM.onchange=e=>{state.month=e.target.value; render();};
-  const cc=document.getElementById('commChan'); cc.innerHTML='<option value="all">Tous (empilé)</option>'+chans.map(c=>`<option>${c}</option>`).join(''); cc.value=state.commChan;
+  const apps=[...new Set(ROWS.map(d=>d.apporteur).filter(Boolean))].sort();
+  const cc=document.getElementById('commChan'); cc.innerHTML='<option value="all">Tous (empilé)</option>'+apps.map(c=>`<option>${c}</option>`).join(''); if(state.commChan!=='all'&&!apps.includes(state.commChan))state.commChan='all'; cc.value=state.commChan;
 }
 function fillSel(id,map,v){ const s=document.getElementById(id); s.innerHTML=''; for(const k in map){const o=document.createElement('option');o.value=k;o.textContent=map[k];s.appendChild(o);} s.value=v; }
 function bindSort(id){ const s=document.getElementById(id); if(s) s.onchange=e=>{state[id]=e.target.value; render();}; }
@@ -1443,6 +1448,46 @@ function mk(id,cfg){ destroy(id); const el=document.getElementById(id); if(el) c
 function DL(fmt,color){ return state.labels?{display:true,anchor:'end',align:'end',clamp:true,color:color||css('--txt'),font:{size:10,weight:'600'},formatter:v=>{ if(v==null||v===0)return ''; return fmt?fmt(v):v; }}:{display:false}; }
 function applySort(pairs,mode){ const [by,dir]=mode.split('-'); const s=dir==='asc'?1:-1; return pairs.sort((a,b)=> by==='val'?(a[1]-b[1])*s:(''+a[0]).localeCompare(''+b[0])*s); }
 
+// ---------- Justificatif Taxe de séjour (format SCI M&M) ----------
+const TAXE_TAUX=2; // € / adulte / nuit (enfants -18 ans exonérés)
+function genTaxeJustificatif(){
+  const numv=(v)=>(typeof v==='number'&&!isNaN(v))?v:(parseFloat(v)||0);
+  const fdate=s=>{ if(!s)return '—'; const a=(''+s).split('-'); return a.length>=3?(a[2].slice(0,2)+'/'+a[1]):s; };
+  const eur2=v=>numv(v).toFixed(2).replace('.',',')+' €';
+  const rs=ROWS.filter(d=> d.annee===state.year
+      && (state.log==='all'||d.logement===state.log)
+      && (state.chan==='all'||d.origine===state.chan)
+      && (state.month==='all'||d.mois===+state.month) )
+      .slice().sort((a,b)=>(a.entree||'').localeCompare(b.entree||''));
+  let tN=0,tA=0,tE=0,tDue=0,tColl=0;
+  const body=rs.map(d=>{ const nuits=numv(d.nuitees);
+    const adultes=(d.nb_adultes!=null&&d.nb_adultes!=='')?numv(d.nb_adultes):numv(d.nb_pers);
+    const enfants=Math.max(0,numv(d.nb_pers)-adultes);
+    const due=adultes*nuits*TAXE_TAUX, coll=numv(d.taxe);
+    tN+=nuits;tA+=adultes;tE+=enfants;tDue+=due;tColl+=coll;
+    return '<tr><td>'+(((d.prenom||'')+' '+(d.nom||'')).trim()||'—')+'</td><td>'+(d.logement||'')+'</td><td>'+(d.origine||'')+'</td><td class="c">'+fdate(d.entree)+' → '+fdate(d.sortie)+'</td><td class="c">'+nuits+'</td><td class="c">'+adultes+'</td><td class="c">'+enfants+'</td><td class="r">'+eur2(due)+'</td></tr>';
+  }).join('');
+  const periode = state.month==='all'? ('Année '+state.year) : (MONTHS[+state.month-1]+' '+state.year);
+  const bienLbl = state.log==='all'?'tous les biens':state.log;
+  const canalLbl = state.chan==='all'?'tous canaux':state.chan;
+  const today=new Date().toLocaleDateString('fr-FR');
+  const html='<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Taxe de séjour — '+periode+'</title>'
+   +'<style>*{box-sizing:border-box}body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1c2230;margin:32px;font-size:13px}'
+   +'h1{font-size:21px;margin:0 0 4px}.sub{color:#5a6573;font-size:12.5px;margin-bottom:18px}'
+   +'table{width:100%;border-collapse:collapse}thead th{background:#2b3445;color:#fff;text-align:left;padding:9px 11px;font-size:11px;text-transform:uppercase;letter-spacing:.4px}'
+   +'thead th.c{text-align:center}thead th.r{text-align:right}tbody td{padding:8px 11px;border-bottom:1px solid #e4e8ee}tbody tr:nth-child(even){background:#f7f9fc}'
+   +'td.c{text-align:center}td.r{text-align:right}tfoot td{padding:10px 11px;background:#eef1f6;font-weight:700;border-top:2px solid #2b3445}tfoot td.c{text-align:center}tfoot td.r{text-align:right}'
+   +'.note{color:#5a6573;font-size:11.5px;font-style:italic;margin-top:12px;line-height:1.5}@media print{body{margin:12mm}}</style></head><body>'
+   +'<h1>Taxe de séjour — '+periode+'</h1>'
+   +'<div class="sub">SCI M&amp;M · '+bienLbl+' · Canal : '+canalLbl+' · Taux '+eur2(TAXE_TAUX)+' / adulte / nuit · Enfants (−18 ans) exonérés</div>'
+   +'<table><thead><tr><th>Client</th><th>Bien</th><th>Canal</th><th>Dates de séjour</th><th class="c">Nuits</th><th class="c">Adultes</th><th class="c">Enfants</th><th class="r">Taxe due</th></tr></thead>'
+   +'<tbody>'+(body||'<tr><td colspan="8" style="text-align:center;color:#5a6573;padding:16px">Aucun séjour sur la période sélectionnée.</td></tr>')+'</tbody>'
+   +'<tfoot><tr><td colspan="4">TOTAL — '+rs.length+' séjour(s)</td><td class="c">'+tN+'</td><td class="c">'+tA+'</td><td class="c">'+tE+'</td><td class="r">'+eur2(tDue)+'</td></tr></tfoot></table>'
+   +'<div class="note">Taxe due (calcul SCI) = adultes × nuits × taux. Taxe déjà collectée (référence, info) : '+eur2(tColl)+'.<br>Document généré le '+today+' — à transmettre comme justificatif comptable.</div>'
+   +'<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},300);};</scr'+'ipt></body></html>';
+  const w=window.open('','_blank'); if(!w){ alert('Autorisez les pop-ups pour générer le justificatif.'); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+}
 // ---------- rendu principal ----------
 function render(){
   const rows=currentRows();
@@ -1467,11 +1512,12 @@ function render(){
       isSH?`Commissions (estimées)|Barème apporteur appliqué au CA Superhote|Ambassador 25 % · Lodge 13 % · Immosphera 13 % · autres 20 % (dès 01/02/2026)|≠ frais de plateforme (≈6,9 %, déjà dans le CA « Net plateforme »)`
           :`Commissions = commission apporteur|Barème avant 01/02/2026 : Lodge 13 % · autres 20 %|Dès 01/02/2026 : Ambassador 25 %, Lodge 13 %, Immosphera 13 %, autres 20 %`),
     kpiCard('Prix moyen / nuit',eur(prix),`occupation moy. ${pct(occ)}`,'b4',`Prix moyen / nuit|Formule : CA ÷ nuitées = ${eur(ca)} ÷ ${nuit}|Nuitées = Σ (sortie − entrée)|Occupation = moyenne du taux de remplissage (nuitées ÷ jours du mois)|${srcTag}`),
-    kpiCard('Taxes de séjour',eur(taxe),'collectées sur la sélection','b2',`Taxes de séjour|Σ du champ « taxe » des réservations|${isSH?'Taxe réellement collectée (export Superhote)':'Saisie manuelle'}|N'entre pas dans le CA ni le bénéfice`),
+    kpiCard('Taxes de séjour',eur(taxe),'collectées · <button id="taxExtractBtn" class="kbtn" title="Justificatif détaillé de la période sélectionnée">⤓ justificatif</button>','b2',`Taxes de séjour|Σ du champ « taxe » des réservations|${isSH?'Taxe réellement collectée (export Superhote)':'Saisie manuelle'}|N'entre pas dans le CA ni le bénéfice`),
     kpiCard('Reste à encaisser',eur(reste),isSH?'⚠ acomptes absents du CSV':'soldes clients ouverts','b5',
       isSH?`Reste à encaisser|Par résa : montant + taxe − acomptes − ménage|⚠ ${srcTag} : le CSV ne contient PAS les acomptes → reste ≈ montant total|Non comparable aux saisies`
           :`Reste à encaisser|Par résa : montant + taxe − acomptes (1+2+3) − ménage|Somme des soldes clients encore ouverts|Source : saisies`),
   ].join('');
+  const _teb=document.getElementById('taxExtractBtn'); if(_teb)_teb.onclick=genTaxeJustificatif;
   const benefM=monthly(rows,'benefice');
   const benefDS=[
     {label:'Bénéfice net',data:benefM,backgroundColor:css('--gold'),borderRadius:5,order:2,datalabels:DL(eur,css('--gold2'))},
@@ -1626,15 +1672,15 @@ async function removeAuthorized(email){
 function renderCommission(rows){
   const stacked=state.commChan==='all'; let datasets;
   if(stacked){
-    const chans=[...new Set(rows.map(d=>d.origine))].map(c=>[c,rows.filter(d=>d.origine===c).reduce((s,d)=>s+(d.commission||0),0)]).sort((a,b)=>b[1]-a[1]).map(p=>p[0]);
-    datasets=chans.map(c=>{ const arr=Array(12).fill(0); rows.filter(d=>d.origine===c).forEach(d=>{if(d.mois&&d.commission)arr[d.mois-1]+=d.commission;}); return {label:c,data:arr,backgroundColor:chanColor(c),borderRadius:3,stack:'c',datalabels:state.labels?{display:ctx=>ctx.dataset.data[ctx.dataIndex]>120,color:'#0d1117',font:{size:9,weight:'700'},formatter:v=>v?Math.round(v):''}:{display:false}}; });
-  } else { const arr=Array(12).fill(0); rows.filter(d=>d.origine===state.commChan).forEach(d=>{if(d.mois&&d.commission)arr[d.mois-1]+=d.commission;}); datasets=[{label:'Commission '+state.commChan,data:arr,backgroundColor:chanColor(state.commChan,css('--orange')),borderRadius:5,datalabels:DL(eur)}]; }
-  const commTotM=monthly(rows.filter(d=>state.commChan==='all'||d.origine===state.commChan),'commission');
+    const chans=[...new Set(rows.map(d=>d.apporteur))].filter(Boolean).map(c=>[c,rows.filter(d=>d.apporteur===c).reduce((s,d)=>s+(d.commission||0),0)]).sort((a,b)=>b[1]-a[1]).map(p=>p[0]);
+    datasets=chans.map(c=>{ const arr=Array(12).fill(0); rows.filter(d=>d.apporteur===c).forEach(d=>{if(d.mois&&d.commission)arr[d.mois-1]+=d.commission;}); return {label:c,data:arr,backgroundColor:chanColor(c),borderRadius:3,stack:'c',datalabels:state.labels?{display:ctx=>ctx.dataset.data[ctx.dataIndex]>120,color:'#0d1117',font:{size:9,weight:'700'},formatter:v=>v?Math.round(v):''}:{display:false}}; });
+  } else { const arr=Array(12).fill(0); rows.filter(d=>d.apporteur===state.commChan).forEach(d=>{if(d.mois&&d.commission)arr[d.mois-1]+=d.commission;}); datasets=[{label:'Commission '+state.commChan,data:arr,backgroundColor:chanColor(state.commChan,css('--orange')),borderRadius:5,datalabels:DL(eur)}]; }
+  const commTotM=monthly(rows.filter(d=>state.commChan==='all'||d.apporteur===state.commChan),'commission');
   const opt=Object.assign(baseOpt({money:true,legend:stacked}),{scales:{x:{stacked,grid:{display:false}},y:{stacked,beginAtZero:true,grid:{color:'rgba(40,48,64,.5)'},ticks:{callback:v=>eur(v)}}},plugins:{legend:{display:stacked||state.cumul,position:'bottom',labels:{boxWidth:10,padding:7,font:{size:9.5}}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${eur(c.parsed.y)}`}}}});
   if(state.cumul){ datasets=datasets.concat([cumulDS('Commission cumulée',commTotM,css('--green'))]); addY1(opt,css('--green')); }
   mk('cComm',{type:'bar',data:{labels:MONTHS,datasets},options:opt});
   // --- Commission par apporteur : montant € + part % ---
-  const byApp={}; rows.forEach(d=>{ if(d.commission) byApp[d.origine||'Inconnu']=(byApp[d.origine||'Inconnu']||0)+d.commission; });
+  const byApp={}; rows.forEach(d=>{ if(d.commission) byApp[d.apporteur||'Inconnu']=(byApp[d.apporteur||'Inconnu']||0)+d.commission; });
   const appP=Object.entries(byApp).sort((a,b)=>b[1]-a[1]);
   const appTot=appP.reduce((s,x)=>s+x[1],0);
   const PCTa=state.unit==='pct';
@@ -1648,7 +1694,7 @@ function renderCommission(rows){
 function commAgg(year, month){ const m={};
   ROWS.forEach(d=>{ if(!(state.log==='all'||d.logement===state.log))return;
     monthSlices(d,year).forEach(sl=>{ if(month!=null && sl.mois!==month)return;
-      const k=sl.origine||'Inconnu'; const o=m[k]||(m[k]={comm:0,nb:0,ca:0,_ids:new Set()});
+      const k=sl.apporteur||'Inconnu'; const o=m[k]||(m[k]={comm:0,nb:0,ca:0,_ids:new Set()});
       o.comm+=(sl.commission||0); o.ca+=(sl.montant||0); o._ids.add(sl.id!=null?('#'+sl.id):((sl.nom||'')+'|'+sl.entree)); }); });
   Object.values(m).forEach(o=>{ o.nb=o._ids.size; }); return m; }
 function renderCommByApporteur(){ const host=document.getElementById('commAnalysis'); if(!host)return;
