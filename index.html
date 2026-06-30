@@ -576,6 +576,37 @@ td.actions{white-space:nowrap}
   #v-tarif .tfd2{font-size:9px;font-weight:700;margin-left:2px}#v-tarif .tfd2.up{color:var(--green)}#v-tarif .tfd2.dn{color:var(--orange)}
   #tarifTip{display:none;position:fixed;z-index:9999;background:var(--tip-bg);border:1px solid var(--gold);border-radius:9px;padding:9px 11px;font-size:11.5px;box-shadow:0 8px 28px rgba(0,0,0,.55);max-width:260px;pointer-events:none}
   #tarifTip .ttl{font-weight:700;margin-bottom:5px}
+   #v-tarif .tfactions{display:flex;gap:7px;flex-wrap:wrap;margin-left:auto}
+   #v-tarif .tfbtn{background:var(--gold);color:#1a1206;border:none;border-radius:8px;padding:6px 12px;font-weight:700;cursor:pointer;font-size:12px}
+   #v-tarif .tfbtn.sec{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
+   #v-tarif .simbar{display:flex;align-items:center;gap:10px;background:rgba(212,175,55,.12);border:1px solid var(--gold);border-radius:10px;padding:9px 13px;margin:0 0 14px;font-size:12.5px}
+   #v-tarif .occsim{display:flex;flex-direction:column;gap:5px;margin-top:5px}
+   #v-tarif .occbtns{display:flex;gap:3px;flex-wrap:wrap}
+   #v-tarif .occbtns button{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:2px 7px;font-size:10px;cursor:pointer}
+   #v-tarif .occbtns button.on{background:var(--gold);color:#1a1206;font-weight:700;border-color:var(--gold)}
+   #v-tarif input[type=range]{width:100%;accent-color:var(--gold)}
+   #v-tarif .tfd.resa{outline:1px solid rgba(255,255,255,.22)}
+   #v-tarif .tfd.dispo{cursor:pointer}
+   #v-tarif .tfd.dispo:hover{outline:1px solid var(--gold)}
+   #v-tarif .tfd.nr{border:1px dashed var(--line)}
+   #v-tarif .tfh{position:absolute;bottom:0;right:1px;display:flex;gap:1px}
+   #v-tarif .tfh i{width:4px;height:4px;border-radius:50%;display:inline-block}
+   #v-tarif .tfh i.ok{background:#3fb950}#v-tarif .tfh i.no{background:#f85149}#v-tarif .tfh i.absent{background:#5a6573}
+   #v-tarif .rtag{display:inline-block;font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;color:#fff}
+   #v-tarif .rtag.manuel{background:#6e40c9}#v-tarif .rtag.special{background:#f85149}#v-tarif .rtag.weekend{background:#e3893b}#v-tarif .rtag.semaine{background:#58a6ff}#v-tarif .rtag.defaut{background:var(--panel2);color:var(--muted)}
+   #v-tarif .tflegend i.lg{width:9px;height:9px;border-radius:2px;display:inline-block;margin-right:3px;vertical-align:middle}
+   #v-tarif .tflegend i.lg.manuel{background:#6e40c9}#v-tarif .tflegend i.lg.special{background:#f85149}#v-tarif .tflegend i.lg.weekend{background:#e3893b}#v-tarif .tflegend i.lg.semaine{background:#58a6ff}
+   #v-tarif .tflegend i.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin:0 2px;vertical-align:middle}
+   #v-tarif .tflegend i.dot.ok{background:#3fb950}#v-tarif .tflegend i.dot.no{background:#f85149}#v-tarif .tflegend i.dot.absent{background:#5a6573}
+   #v-tarif .rules .x{cursor:pointer;color:var(--red);font-weight:700}
+   #tfModal{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center}
+   #tfModal .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;width:min(560px,92vw);max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+   #tfModal h3{margin:0 0 12px}
+   #tfModal label{display:block;font-size:12px;color:var(--muted);margin:9px 0 3px}
+   #tfModal input,#tfModal select{width:100%;background:var(--input-bg);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:7px 9px;font-size:13px;box-sizing:border-box}
+   #tfModal .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+   #tfModal .prev{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px;margin-top:13px;font-size:12.5px;line-height:1.65}
+   #tfModal .acts{display:flex;gap:9px;justify-content:flex-end;margin-top:15px;flex-wrap:wrap}
   @media(max-width:1100px){#v-tarif .kpis{grid-template-columns:repeat(2,1fr)}#v-tarif .g2{grid-template-columns:1fr}#v-tarif .tfcal{grid-template-columns:repeat(2,1fr)}}
   </style>
   <div id="tarifControls"></div>
@@ -917,7 +948,7 @@ const eur=(n)=>(n==null?'—':Math.round(n).toLocaleString('fr-FR')+' €');
 const pct=(n)=>(n==null?'—':(n*100).toFixed(0)+' %');
 const n0=(v)=>(typeof v==='number'?v:0);
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260630-124216';
+const APP_BUILD='20260630-130158';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
     const d=document.createElement('div'); d.id='newVerBar';
@@ -2900,32 +2931,68 @@ const AL_TARIF = (function(){
   function ymd(d){return d.toISOString().slice(0,10);}
   function fd(s){if(!s)return '—';const[y,m,d]=s.split('-');return `${d}/${m}/${y.slice(2)}`;}
   function dowMon(s){return (new Date(s+'T00:00:00Z').getUTCDay()+6)%7;}
+  function isWE(s){const w=dowMon(s);return w===4||w===5;} // ven.(4) & sam.(5) = vendredi soir & samedi soir
   function daysInMonth(y,m){return new Date(Date.UTC(y,m+1,0)).getUTCDate();}
   function addDays(s,n){const d=new Date(s+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
-  // forfait ménage observé (Superhote l'inclut dans le « montant versé »)
+  function diy(y){return ((y%4===0&&y%100!==0)||y%400===0)?366:365;} // base d'occupation dynamique 365/366
   const FORFAIT={Ambassador:300,Lodge:200};
   function menageOf(r){ return (r.frais_menage&&r.frais_menage>0)?r.frais_menage:(FORFAIT[r.logement]||0); }
   const charts={};
   function mkch(id,cfg){if(charts[id])charts[id].destroy();const e=document.getElementById(id);if(e)charts[id]=new Chart(e,cfg);}
 
-  let st={bien:null, year:null, menage:'horsmenage', G:null, H:null, PONT:new Set()};
+  // ===== couches tarifaires =====
+  const PRIO={manuel:100,special:80,weekend:60,semaine:40,defaut:20};
+  const RLBL={manuel:'Manuel',special:'Spécial',weekend:'Week-end',semaine:'Semaine',defaut:'Défaut',reco:'Conseillé'};
+
+  let st={bien:null, year:null, menage:'horsmenage', G:null, LU:{}, nightMap:{}, PONT:new Set(),
+          RULES:[], SIM:null, occSim:0.7, _rulesLoaded:false, _rulesErr:null};
   function avecM(){ return st.menage==='avecmenage'; }
   function rows(){ return (typeof ROWS!=='undefined'?ROWS:[]).filter(r=>r.entree&&r.sortie); }
-  // lignes selon la convention : montant brut (hors ménage) ou montant + ménage forfait (= « montant versé » Superhote)
   function rwsConv(){ const a=avecM(); return rows().map(r=> (a&&r.montant>0)?Object.assign({},r,{montant:r.montant+menageOf(r)}):r); }
   function biens(){ const b=[...new Set(rows().map(r=>r.logement).filter(Boolean))].sort(); return b.length?b:['Ambassador','Lodge']; }
   function holCtx(d){ if(typeof AL_HOL==='undefined')return {};
     return {vacMetro:AL_HOL.inVacation(d,['A','B','C']).length>0, vacReunion:AL_HOL.inVacation(d,['Réunion']).length>0, ferie:AL_HOL.isFerie(d,'reunion'), pont:st.PONT.has(d)}; }
 
+  // ---- chargement des règles tarifaires (Supabase) avec repli gracieux ----
+  async function loadRules(){ st.RULES=[]; st._rulesErr=null;
+    if(typeof SUPA==='undefined'||!SUPA)return;
+    try{ const {data,error}=await SUPA.from('price_rules').select('*'); if(error)throw error;
+      st.RULES=(data||[]).map(r=>({id:r.id,logement:r.logement,nom:r.nom,type:r.type,date_debut:r.date_debut,date_fin:r.date_fin,
+        prix:+r.prix,scope:r.scope,priorite:r.priorite!=null?+r.priorite:(PRIO[r.type]||0),actif:r.actif!==false,updated_at:r.updated_at||''}));
+    }catch(e){ st.RULES=[]; st._rulesErr=(e&&e.message)||String(e); }
+  }
+  async function saveRule(rule){ if(typeof SUPA==='undefined'||!SUPA){alert('Supabase indisponible — impossible d\'enregistrer.');return false;}
+    const rec={logement:rule.logement,nom:rule.nom,type:rule.type,date_debut:rule.date_debut,date_fin:rule.date_fin,
+      prix:rule.prix,scope:rule.scope,priorite:rule.priorite||PRIO[rule.type]||0,actif:true,
+      created_by_email:(typeof CURRENT_USER!=='undefined'&&CURRENT_USER&&CURRENT_USER.email)||null};
+    try{ const {error}=await SUPA.from('price_rules').insert(rec); if(error)throw error; return true; }
+    catch(e){ alert('Erreur enregistrement règle : '+((e&&e.message)||e)); return false; }
+  }
+  async function toggleRule(id,actif){ if(!SUPA)return; try{ await SUPA.from('price_rules').update({actif}).eq('id',id);}catch(e){alert('Erreur : '+e.message);} }
+  async function deleteRule(id){ if(!SUPA)return; try{ await SUPA.from('price_rules').delete().eq('id',id);}catch(e){alert('Erreur : '+e.message);} }
+
+  // ---- résolution par couches ----
+  function ruleMatchesDay(r,d){ if(d<r.date_debut||d>r.date_fin)return false; // bornes incluses
+    if(r.type==='weekend')return isWE(d); return true; }
+  function rPrio(r){ return r.priorite!=null?r.priorite:(PRIO[r.type]||0); }
+  function rSpan(r){ return (new Date(r.date_fin+'T00:00:00Z')-new Date(r.date_debut+'T00:00:00Z'))/864e5; }
+  function cmpRule(a,b){ return (rPrio(b)-rPrio(a)) || (rSpan(a)-rSpan(b)) || (((b.updated_at||'')<(a.updated_at||''))?-1:1); }
+  function pickRule(list,bien,d){ const c=list.filter(r=>r&&r.actif!==false&&r.logement===bien&&ruleMatchesDay(r,d)); if(!c.length)return null; c.sort(cmpRule); return c[0]; }
+  function activeList(){ return st.SIM?st.RULES.concat([st.SIM]):st.RULES; }
+  function resolveRule(bien,d){ return pickRule(activeList(),bien,d); }
+  // prix applicable : règle gagnante, sinon conseillé (reco historique), sinon null
+  function priceApplicable(d,bien){ bien=bien||st.bien; const r=resolveRule(bien,d);
+    if(r) return {prix:Math.round(r.prix), rule:r, type:r.type};
+    const reco=priceForDay(d,bien); if(reco!=null) return {prix:reco, rule:null, type:'reco'};
+    return null; }
+
   function compute(){
-    // piloté par les sélecteurs du haut (Exercice + Bien)
     st.year = (typeof state!=='undefined' && state.year) ? state.year : (st.year||new Date().getUTCFullYear());
     const gl = (typeof state!=='undefined') ? state.log : 'all';
     st.bien = (gl && gl!=='all') ? gl : (biens()[0]);
     st.PONT=new Set(); if(typeof AL_HOL!=='undefined') AL_HOL.ponts('reunion').forEach(p=>st.PONT.add(p.date));
     st.G=AL_PRICE.grid(rwsConv(), st.year, holCtx);
     st.LU={}; st.G.grid.forEach(g=>{ st.LU[g.bien+'|'+g.week]=g; });
-    // carte des nuits réalisées : bien|date -> {rate(hors ménage), rateWM(ménage inclus), menage, nuits, total}
     st.nightMap={};
     rows().forEach(r=>{ if(!r.entree||!r.sortie||!r.montant)return;
       const n=Math.round((new Date(r.sortie+'T00:00:00Z')-new Date(r.entree+'T00:00:00Z'))/864e5); if(!n||n<1)return;
@@ -2933,88 +3000,185 @@ const AL_TARIF = (function(){
       const info={rate:Math.round(r.montant/n), rateWM:Math.round((r.montant+m)/n), menage:m, nuits:n, total:Math.round(r.montant+m)};
       for(let i=0;i<n;i++){ st.nightMap[r.logement+'|'+addDays(r.entree,i)]=info; } });
   }
-  function realized(d){ return st.nightMap[st.bien+'|'+d]; } // objet {rate,rateWM,menage,nuits,total} si loué, sinon undefined
-  function rNuit(info){ return info?(avecM()?info.rateWM:info.rate):null; } // €/nuit selon convention
+  function realized(d,bien){ return st.nightMap[(bien||st.bien)+'|'+d]; }
+  function rNuit(info){ return info?(avecM()?info.rateWM:info.rate):null; }
   function sameDateYr(d,delta){ const y=(+d.slice(0,4))+delta; return y+d.slice(4); }
-  function priceForDay(d){ const w=AL_PRICE.isoWeek(d).week; const g=st.LU[st.bien+'|'+w]; if(!g||g.mid==null)return null;
-    const we=dowMon(d); return (we===4||we===5)? g.midWE : g.mid; }
-  // tarif actuel (ADR médian réalisé) + prix conseillé (base historique)
-  function scenarios(week, ctx){ const wp=(st.G.wePremium&&st.G.wePremium[st.bien])||1.12;
-    const s=AL_PRICE.suggest(st.G.stats, st.bien, week, ctx, {wePremium:wp});
-    return {base:s.base, reco:s}; }
+  function priceForDay(d,bien){ bien=bien||st.bien; const w=AL_PRICE.isoWeek(d).week; const g=st.LU[bien+'|'+w]; if(!g||g.mid==null)return null;
+    return isWE(d)? g.midWE : g.mid; }
+  function yearsPresent(){ const s=new Set(); Object.keys(st.nightMap).forEach(k=>{const i=k.indexOf('|'); if(k.slice(0,i)===st.bien)s.add(k.slice(i+1,i+5));}); return s; }
+
+  // statut d'une nuitée : reservee / passee / disponible / non_renseignee (bloquee: réservé, inactif)
+  function statusOf(d,today){ if(realized(d))return 'reservee'; if(d<today)return 'passee';
+    return priceApplicable(d)?'disponible':'non_renseignee'; }
+  // nuitées disponibles = futures, non réservées, non passées, non bloquées (blocage hors périmètre)
+  function availableList(bien){ bien=bien||st.bien; const today=ymd(new Date()); const y=st.year; const out=[];
+    for(let m=0;m<12;m++){ const dim=daysInMonth(y,m); for(let dd=1;dd<=dim;dd++){ const d=ymd(new Date(Date.UTC(y,m,dd)));
+      if(d<today)continue; if(st.nightMap[bien+'|'+d])continue; out.push(d); } }
+    return out; }
+  // somme CA + nuits réservées d'une année (uptoToday = uniquement nuits passées/en cours)
+  function sumYear(bien,year,uptoToday){ const today=ymd(new Date()); const pfx=String(year); let ca=0,n=0;
+    Object.keys(st.nightMap).forEach(k=>{ const i=k.indexOf('|'); if(k.slice(0,i)!==bien)return; const dt=k.slice(i+1);
+      if(dt.slice(0,4)!==pfx)return; if(uptoToday&&dt>today)return; ca+=rNuit(st.nightMap[k])||0; n++; });
+    return {ca:Math.round(ca),nights:n}; }
+
+  function projection(){ const bien=st.bien;
+    const A2=sumYear(bien,st.year,false);   // CA engagé annuel confirmé (futures incluses)
+    const A1=sumYear(bien,st.year,true);    // CA réalisé à date (nuits passées/en cours)
+    const avail=availableList(bien); let B=0,priced=0;
+    avail.forEach(d=>{ const pa=priceApplicable(d,bien); if(pa){ B+=pa.prix; priced++; } });
+    const dyear=diy(st.year); const occAct=dyear?A2.nights/dyear:0; const occS=st.occSim;
+    const projB=B*occS; const total=A2.ca+projB; const soldSim=Math.round(avail.length*occS);
+    const pm=A2.nights?A2.ca/A2.nights:0;
+    return {A1,A2,B:Math.round(B),priced,avail:avail.length,occAct,occS,projB:Math.round(projB),
+      total:Math.round(total),soldSim,unsold:avail.length-soldSim,pm:Math.round(pm),dyear}; }
 
   // ---------- contrôles ----------
   function controls(){
     const seg=(id,opts,cur)=>`<div class="seg" id="${id}">`+opts.map(o=>`<button data-v="${o[0]}"${o[2]?` data-explain="${String(o[2]).replace(/"/g,'&quot;')}"`:''} class="${o[0]===cur?'on':''}">${o[1]}</button>`).join('')+'</div>';
     const wp=(st.G&&st.G.wePremium&&st.G.wePremium[st.bien])||1.12;
+    let sim='';
+    if(st.SIM){ const p=previewRule(st.SIM);
+      sim=`<div class="simbar"><b>● Simulation active</b> — ${st.SIM.nom} (${RLBL[st.SIM.type]}, ${st.SIM.prix} €) · ${p.impacted} nuit(s) impactée(s) · CA th. ${_eur(p.ca)}
+        <span style="margin-left:auto;display:flex;gap:8px"><button class="tfbtn" id="tfSimApply">Appliquer définitivement</button><button class="tfbtn sec" id="tfSimCancel">Annuler la simulation</button></span></div>`; }
+    const errNote = st._rulesErr ? `<div class="hint" style="color:var(--orange)">⚠ Règles non chargées (table price_rules absente ?). L'onglet fonctionne ; exécutez price_rules_v9.sql dans Supabase.</div>` : '';
     return `<div class="calctrls">
       <div class="tflabel"><span class="pill ${st.bien==='Ambassador'?'amb':'lodge'}">${st.bien||'—'}</span> · Exercice <b>${st.year}</b> <span class="hint">(choix via les filtres du haut)</span></div>
-      <div class="tfmen">Tarifs ${seg('tfMen',[['horsmenage','Hors ménage',"Hors ménage|Prix = hébergement seul, sans frais de ménage|= prix/nuit à programmer dans le calendrier de la plateforme"],['avecmenage','Ménage inclus',"Ménage inclus|Prix = hébergement + frais de ménage|= montant versé observé côté Superhote"]],st.menage)} <span class="hint">${avecM()?'= montant versé Superhote':'= prix/nuit à programmer'}</span></div>
+      <div class="tfmen">Tarifs ${seg('tfMen',[['horsmenage','Hors ménage',"Hors ménage|Prix = hébergement seul, sans frais de ménage|= prix/nuit à programmer dans la plateforme"],['avecmenage','Ménage inclus',"Ménage inclus|Prix = hébergement + frais de ménage|= montant versé observé côté Superhote"]],st.menage)} <span class="hint">${avecM()?'= montant versé Superhote':'= prix/nuit à programmer'}</span></div>
       <div class="tfwe">Premium week-end <b>×${wp.toFixed(2)}</b> <span class="hint">(observé)</span></div>
-    </div>`;
+      <div class="tfactions">
+        <button class="tfbtn" id="tfNewSemaine">+ Tarif semaine</button>
+        <button class="tfbtn" id="tfNewWeekend">+ Tarif week-end</button>
+        <button class="tfbtn" id="tfNewSpecial">+ Tarif spécial</button>
+      </div>
+    </div>${errNote}${sim}`;
   }
 
-  // ---------- KPIs ----------
-  function kpis(){
-    const g=st.G.grid.filter(x=>x.bien===st.bien && x.samples>0);
-    const occs=g.map(x=>x.occ).filter(v=>v!=null); const occMoy=occs.length?occs.reduce((a,b)=>a+b,0)/occs.length:0;
-    const adrs=g.map(x=>x.base).filter(Boolean); const adrMoy=adrs.length?adrs.reduce((a,b)=>a+b,0)/adrs.length:0;
-    const creuses=g.filter(x=>x.occ!=null&&x.occ<0.35).length;
-    const haus=g.filter(x=>x.base&&x.mid).map(x=>x.mid/x.base-1); const hMoy=haus.length?haus.reduce((a,b)=>a+b,0)/haus.length:0;
-    const wp=(st.G.wePremium&&st.G.wePremium[st.bien])||1.12;
-    // potentiel : somme (mid-base)*nuits attendues (occ*7) sur l'année
-    let pot=0; g.forEach(x=>{ if(x.base&&x.mid&&x.occ) pot+=Math.max(0,x.mid-x.base)*x.occ*7; });
-    const XI=(typeof xi==='function')?xi:()=>'';
+  // ---------- KPIs / projection ----------
+  function kpis(){ const P=projection(); const XI=(typeof xi==='function')?xi:()=>'';
+    const prev1=sumYear(st.bien,st.year-1,false), prev2=sumYear(st.bien,st.year-2,false);
     const K=(l,v,s,c,ex)=>`<div class="kpi ${c||''}"><div class="lab">${l}${ex?XI(ex):''}</div><div class="val">${v}</div><div class="sub">${s||''}</div></div>`;
+    const occBtns=[50,60,70,80,90,100].map(p=>`<button data-occ="${p/100}" class="${Math.round(P.occS*100)===p?'on':''}">${p}%</button>`).join('');
+    const simCard=`<div class="kpi b2"><div class="lab">Occupation simulée${XI('Occupation simulée|Hypothèse de remplissage des nuitées disponibles restantes|Sert au calcul du CA projeté|Modifiable au clic (boutons) ou au curseur 0–100 %')}</div>
+      <div class="val">${Math.round(P.occS*100)} %</div>
+      <div class="occsim"><div class="occbtns" id="tfOccBtns">${occBtns}</div><input type="range" id="tfOccRange" min="0" max="100" step="5" value="${Math.round(P.occS*100)}"></div></div>`;
+    const cmpYr=(o,yr)=> (o&&o.nights)? `${yr} : ${_eur(o.ca)} · ${Math.round(o.nights/diy(yr)*100)}%` : `${yr} : —`;
     return [
-      K('Occupation moyenne',Math.round(occMoy*100)+'%','historique '+st.G.years.join(', '),'',`Occupation moyenne|Moyenne des taux d'occupation hebdomadaires|Occupation/semaine = nuits réservées ÷ 7|Historique ${st.G.years.join(', ')} · ${st.bien}`),
-      K('ADR médian moyen',_eur(adrMoy),'par nuit','b3',`ADR médian moyen|Moyenne des ADR hebdomadaires|ADR/semaine = médiane de (montant ÷ nuitées)|Convention : ${avecM()?'ménage inclus':'hors ménage'}`),
-      K('Premium week-end','×'+wp.toFixed(2),'ven. & sam. observés','b4',`Premium week-end|Tarif médian ven.+sam. ÷ tarif médian en semaine|Observé sur l'historique, borné 1,00–1,45|Valeur : ×${wp.toFixed(2)}`),
-      K('Semaines creuses',creuses,'occ. < 35 % à dynamiser','b5',`Semaines creuses|Nb de semaines avec occupation historique < 35 %|À dynamiser : baisse de prix, séjour min. réduit, promo`),
-      K('Hausse conseillée',(hMoy>=0?'+':'')+Math.round(hMoy*100)+'%','potentiel ~'+_eur(pot)+'/an','b2',`Hausse conseillée|Écart moyen : prix conseillé ÷ ADR actuel − 1|Potentiel ≈ Σ (conseillé − ADR) × nuits attendues (occ × 7) ≈ ${_eur(pot)}/an`),
+      K('CA réalisé à date',_eur(P.A1.ca),P.A1.nights+' nuits passées/en cours','b3',`CA réalisé à date|Σ (montant ÷ nuitées) des nuits déjà passées ou en cours en ${st.year}|Convention : ${avecM()?'ménage inclus':'hors ménage'}|Prorata à la nuit (séjours à cheval scindés)`),
+      K('CA engagé annuel',_eur(P.A2.ca),'réservations '+st.year+' (futures incl.)','b4',`CA engagé annuel confirmé|Σ de toutes les réservations confirmées de ${st.year}, y compris à venir|${P.A2.nights} nuits réservées|Convention : ${avecM()?'ménage inclus':'hors ménage'}`),
+      K('CA potentiel restant',_eur(P.B),P.priced+'/'+P.avail+' nuits dispo tarifées','b5',`CA brut potentiel restant @100%|Σ prix applicable sur les nuitées disponibles (today → 31/12)|Prix applicable = règle gagnante, sinon prix conseillé|Exclut les nuits futures déjà réservées (comptées dans l'engagé)`),
+      K('CA annuel projeté',_eur(P.total),'engagé + potentiel × '+Math.round(P.occS*100)+'%','b2',`CA brut annuel projeté|= CA engagé annuel confirmé + (CA potentiel restant × taux d'occupation simulé)|${_eur(P.A2.ca)} + (${_eur(P.B)} × ${Math.round(P.occS*100)}%) = ${_eur(P.total)}`),
+      simCard,
+      K('Nuitées dispo restantes',P.avail,P.soldSim+' vendues / '+P.unsold+' invendues (simulé)','',`Nuitées disponibles restantes|Futures, non réservées, non passées|Vendues simulées = dispo × taux simulé (${Math.round(P.occS*100)}%)`),
+      K('Nuitées réservées',P.A2.nights,'sur '+P.dyear+' j (base '+(P.dyear===366?'bissextile':'standard')+')','',`Nuitées réservées|Nb de nuits réservées sur ${st.year}|Base d'occupation = ${P.dyear} jours (${P.dyear===366?'année bissextile':'année standard'})`),
+      K('Taux occupation actuel',Math.round(P.occAct*100)+'%','réservées ÷ '+P.dyear+' j','b6',`Taux d'occupation actuel|Nuits réservées ÷ jours de l'exercice|${P.A2.nights} ÷ ${P.dyear} = ${Math.round(P.occAct*100)}%`),
+      K('Panier moyen / nuitée',_eur(P.pm),'CA engagé ÷ nuits réservées','',`Panier moyen par nuitée|CA engagé annuel ÷ nuits réservées|${_eur(P.A2.ca)} ÷ ${P.A2.nights||0} = ${_eur(P.pm)}|Convention : ${avecM()?'ménage inclus':'hors ménage'}`),
+      `<div class="kpi"><div class="lab">Comparaison N-1 / N-2${XI('Comparaison N-1/N-2|CA réalisé et occupation des deux exercices précédents|Occupation = nuits réservées ÷ jours de l année')}</div><div class="val" style="font-size:13px;line-height:1.5">${cmpYr(prev1,st.year-1)}<br>${cmpYr(prev2,st.year-2)}</div><div class="sub">historique réalisé</div></div>`,
     ].join('');
   }
 
-  // ---------- calendrier de prix (demande) ----------
-  function priceRange(){ const ps=st.G.grid.filter(x=>x.bien===st.bien&&x.mid!=null).map(x=>x.mid); if(!ps.length)return [0,1]; return [Math.min(...ps),Math.max(...ps)]; }
-  function heatColor(t){ t=Math.max(0,Math.min(1,t)); // 0=vert (bas) -> 0.5 or -> 1 rouge (haut)
+  // ---------- calendrier enrichi ----------
+  function heatColor(t){ t=Math.max(0,Math.min(1,t));
     const stops=[[34,110,79],[212,175,55],[200,70,50]]; const seg=t<0.5?0:1; const lt=t<0.5?t/0.5:(t-0.5)/0.5;
     const a=stops[seg],b=stops[seg+1]; const c=a.map((v,i)=>Math.round(v+(b[i]-v)*lt)); return `rgb(${c[0]},${c[1]},${c[2]})`; }
-  function demandCal(){ const [mn,mx]=priceRange(); const today=ymd(new Date());
+  const RCOL={manuel:'#6e40c9',special:'#f85149',weekend:'#e3893b',semaine:'#58a6ff',defaut:'#8b97a8'};
+  function rangeAll(){ const y=st.year; let ps=[];
+    for(let m=0;m<12;m++){ const dim=daysInMonth(y,m); for(let dd=1;dd<=dim;dd++){ const d=ymd(new Date(Date.UTC(y,m,dd)));
+      const rz=realized(d); if(rz){ps.push(rNuit(rz));continue;} const pa=priceApplicable(d); if(pa)ps.push(pa.prix); } }
+    ps=ps.filter(v=>v!=null); if(!ps.length)return[0,1]; return [Math.min(...ps),Math.max(...ps)]; }
+  function histDot(d,delta){ const yr=st.year+delta; const info=realized(sameDateYr(d,delta));
+    if(info)return {c:'ok',t:`${yr} : loué ${rNuit(info)} €`};
+    if(!yearsPresent().has(String(yr)))return {c:'absent',t:`${yr} : donnée absente`};
+    return {c:'no',t:`${yr} : non loué`}; }
+  function demandCal(){ const [mn,mx]=rangeAll(); const today=ymd(new Date());
     let h='<div class="tfcal">';
     for(let m=0;m<12;m++){ const dim=daysInMonth(st.year,m); const lead=(new Date(Date.UTC(st.year,m,1)).getUTCDay()+6)%7;
       h+=`<div class="tfm"><div class="tfmttl">${MOIS[m]}</div><div class="tfdow">${DOW.map(x=>`<span>${x}</span>`).join('')}</div><div class="tfdays">`;
       for(let i=0;i<lead;i++)h+='<div class="tfd empty"></div>';
-      for(let dd=1;dd<=dim;dd++){ const d=ymd(new Date(Date.UTC(st.year,m,dd))); const p=priceForDay(d);
-        const t=(p!=null&&mx>mn)?(p-mn)/(mx-mn):0; const bg=p!=null?heatColor(t):'transparent';
-        const we=dowMon(d); const cx=holCtx(d); const mark=cx.ferie?'•':cx.pont?'▴':'';
-        const w=AL_PRICE.isoWeek(d).week; const sc=(p!=null)?scenarios(w,cx):null; const wknd=(we===4||we===5);
-        const we2=v=>wknd?Math.round(v*((st.G.wePremium&&st.G.wePremium[st.bien])||1.12)):v;
-        const conv=avecM(), clab=conv?'ménage inclus':'hors ménage';
-        const scTip=sc?`|Conseillé ${wknd?'(week-end) ':''}(${clab}) — ${we2(sc.reco.mid)} €`:'';
-        const rThis=realized(d), r1=realized(sameDateYr(d,-1)), r2=realized(sameDateYr(d,-2));
-        const rt=info=> info?('loué '+rNuit(info)+' €'):'vide';
-        const histTip=`|· Réalisé /nuit (${clab}) ·|${st.year} : ${rThis?rt(rThis):(d<today?'vide':'à venir')}|${st.year-1} : ${rt(r1)}|${st.year-2} : ${rt(r2)}`;
-        let rec=null,recYr=null; // réconciliation ménage : on privilégie l'année survolée, sinon N-1, sinon N-2
-        if(rThis){rec=rThis;recYr=st.year;} else if(r1){rec=r1;recYr=st.year-1;} else if(r2){rec=r2;recYr=st.year-2;}
-        const recTip=rec?`|↳ ${recYr} : ménage ${rec.menage} € · séjour ${rec.nuits} nuit${rec.nuits>1?'s':''} · total payé ≈ ${rec.total} €`:'';
-        const ctxTip=`${cx.vacMetro?'Vac. métropole':''}${cx.vacReunion?' · Vac. Réunion':''}${cx.ferie?' · Férié':''}${cx.pont?' · Pont':''}`;
-        h+=`<div class="tfd ${d<today?'past':''}" style="background:${p!=null?bg:'var(--panel)'}" data-tip="${st.bien} · ${fd(d)}${scTip}${histTip}${recTip}${ctxTip?'|'+ctxTip:''}"><span class="tfdn">${dd}</span><span class="tfdp">${p!=null?p:''}</span><span class="tfmk">${mark}</span></div>`; }
+      for(let dd=1;dd<=dim;dd++){ const d=ymd(new Date(Date.UTC(st.year,m,dd)));
+        const cx=holCtx(d); const mark=cx.ferie?'•':cx.pont?'▴':''; const wknd=isWE(d);
+        const status=statusOf(d,today); const rz=realized(d); const pa=rz?null:priceApplicable(d);
+        const price = rz? rNuit(rz) : (pa?pa.prix:null);
+        const t=(price!=null&&mx>mn)?(price-mn)/(mx-mn):0;
+        let bg='var(--panel)', cls=['tfd'], bl='';
+        if(rz){ bg='#2a3344'; cls.push('resa'); }
+        else if(price!=null){ bg=heatColor(t); }
+        if(status==='disponible'||status==='non_renseignee'){ cls.push('dispo'); }
+        if(d<today) cls.push('past');
+        if(status==='non_renseignee') cls.push('nr');
+        if(pa&&pa.rule){ bl=`border-left:3px solid ${RCOL[pa.type]||'#888'};`; }
+        const h1=histDot(d,-1), h2=histDot(d,-2);
+        const dots=`<span class="tfh"><i class="${h1.c}"></i><i class="${h2.c}"></i></span>`;
+        // tooltip
+        const clab=avecM()?'ménage inclus':'hors ménage';
+        const stLbl={reservee:'Réservée',passee:'Passée',disponible:'Disponible',non_renseignee:'Non renseignée (prix à définir)'}[status];
+        let pLine='';
+        if(rz) pLine=`|Prix engagé : ${rNuit(rz)} € (${clab})`;
+        else if(pa&&pa.rule) pLine=`|Prix appliqué : ${pa.prix} € — ${RLBL[pa.type]} « ${pa.rule.nom} »`;
+        else if(pa) pLine=`|Prix proposé (conseillé) : ${pa.prix} €`;
+        else pLine='|Prix : à définir';
+        const ctxTip=[cx.vacMetro?'Vac. métropole':'',cx.vacReunion?'Vac. Réunion':'',cx.ferie?'Férié':'',cx.pont?'Pont':''].filter(Boolean).join(' · ');
+        const tip=`${st.bien} · ${fd(d)}|Statut : ${stLbl}${pLine}|N-1 — ${h1.t}|N-2 — ${h2.t}${ctxTip?'|'+ctxTip:''}`;
+        const clickable=(status==='disponible'||status==='non_renseignee')?` data-d="${d}"`:'';
+        h+=`<div class="${cls.join(' ')}"${clickable} style="background:${bg};${bl}" data-tip="${tip}"><span class="tfdn">${dd}</span><span class="tfdp">${price!=null?price:''}</span><span class="tfmk">${mark}</span>${dots}</div>`; }
       h+='</div></div>'; }
     h+='</div>';
-    h+=`<div class="tflegend"><span>Prix bas</span><span class="tfbar"></span><span>Prix élevé</span> &nbsp;·&nbsp; <span>• férié</span> <span>▴ pont</span></div>`;
+    h+=`<div class="tflegend"><span>Prix bas</span><span class="tfbar"></span><span>Prix élevé</span> &nbsp;·&nbsp;
+      <span><i class="lg manuel"></i>Manuel</span><span><i class="lg special"></i>Spécial</span><span><i class="lg weekend"></i>WE</span><span><i class="lg semaine"></i>Semaine</span>
+      &nbsp;·&nbsp; <span>N-1/N-2 : <i class="dot ok"></i>loué <i class="dot no"></i>non loué <i class="dot absent"></i>absent</span>
+      &nbsp;·&nbsp; <span>• férié</span> <span>▴ pont</span> &nbsp;·&nbsp; <span class="hint">clic sur une nuitée dispo = prix manuel</span></div>`;
     return h;
   }
 
-  // ---------- courbes mensuelles (occupation par mois / ADR vs conseillé) ----------
+  // ---------- table de gestion des règles ----------
+  function rulesTable(){ const rs=st.RULES.filter(r=>r.logement===st.bien).sort((a,b)=>rPrio(b)-rPrio(a)||(a.date_debut<b.date_debut?-1:1));
+    const body=rs.map(r=>`<tr>
+      <td><span class="rtag ${r.type}">${RLBL[r.type]}</span></td>
+      <td>${r.nom||'—'}</td>
+      <td>${fd(r.date_debut)} → ${fd(r.date_fin)}</td>
+      <td><b>${r.prix} €</b></td>
+      <td>${r.scope}</td>
+      <td>${rPrio(r)}</td>
+      <td><span class="t" data-act="toggle" data-id="${r.id}" style="cursor:pointer">${r.actif?'🟢 actif':'⚪ inactif'}</span></td>
+      <td><span class="x" data-act="del" data-id="${r.id}" title="Supprimer">✕</span></td></tr>`).join('')
+      || `<tr><td colspan="8" class="muted" style="padding:10px">Aucune règle pour ${st.bien}. Créez un tarif semaine, week-end ou spécial.</td></tr>`;
+    const reset = rs.some(r=>r.actif)?`<button class="tfexp" id="tfResetRules">⟲ Désactiver toutes les règles</button>`:'';
+    return `<div class="card"><h3>Règles tarifaires — <span class="pill ${st.bien==='Ambassador'?'amb':'lodge'}">${st.bien}</span> ${reset}</h3>
+      <div class="desc">Résolution par priorité : manuel > spécial > week-end > semaine > défaut. Une règle moins prioritaire reste active mais ne s'applique pas sur les dates couvertes par une priorité supérieure. Dates en bornes incluses (la date = la nuit du jour).</div>
+      <div class="scroll" style="max-height:320px"><table class="tbl rules"><thead><tr><th>Type</th><th>Nom</th><th>Période</th><th>Prix/nuit</th><th>Périmètre</th><th>Prio</th><th>Statut</th><th></th></tr></thead><tbody>${body}</tbody></table></div></div>`;
+  }
+
+  // ---------- périodes creuses & fortes (historique) ----------
+  function periods(){ const g=st.G.grid.filter(x=>x.bien===st.bien&&x.samples>0);
+    const creuses=g.filter(x=>x.occ!=null&&x.occ<0.35).sort((a,b)=>a.occ-b.occ).slice(0,10);
+    const fortes=g.filter(x=>(x.ctx&&(x.ctx.vacMetro||x.ctx.vacReunion||x.ctx.ferie||x.ctx.pont))||(x.occ!=null&&x.occ>=0.8)).sort((a,b)=>(b.occ||0)-(a.occ||0)).slice(0,10);
+    const row=(x,act)=>`<tr><td>S${x.week}<br><span class="muted">${fd(x.dateRef)}</span></td><td>${x.occ!=null?Math.round(x.occ*100)+'%':'—'}</td><td>${x.base?x.base+' €':'—'}</td><td><b>${x.mid?x.mid+' €':'—'}</b></td><td class="muted">${act}</td></tr>`;
+    const cre=creuses.map(x=>row(x,'Baisser le prix · promo · séjour min. réduit')).join('')||'<tr><td colspan="5" class="muted" style="padding:10px">Aucune semaine creuse marquée.</td></tr>';
+    const fort=fortes.map(x=>{const tags=[];if(x.ctx){if(x.ctx.vacMetro)tags.push('Vac. métro');if(x.ctx.vacReunion)tags.push('Vac. Réú');if(x.ctx.ferie)tags.push('Férié');if(x.ctx.pont)tags.push('Pont');}return row(x,'Monter le prix'+(tags.length?' · '+tags.join('/'):'')+' · séjour min. ↑');}).join('')||'<tr><td colspan="5" class="muted" style="padding:10px">—</td></tr>';
+    const tbl=(ttl,bd,cls)=>`<div class="card tfper ${cls}"><h3>${ttl}</h3><div class="scroll" style="max-height:280px"><table class="tbl"><thead><tr><th>Semaine</th><th>Occ.</th><th>ADR</th><th>Conseillé</th><th>Action</th></tr></thead><tbody>${bd}</tbody></table></div></div>`;
+    return `<div class="g2">${tbl('🔻 Périodes creuses récurrentes',cre,'cre')}${tbl('🔺 Périodes fortes à valoriser',fort,'fort')}</div>`;
+  }
+
+  // ---------- grille de référence (tarif actuel + conseillé) ----------
+  function gridTable(){ const g=st.G.grid.filter(x=>x.bien===st.bien);
+    const body=g.map(x=>{ const tags=[]; if(x.ctx){if(x.ctx.vacMetro)tags.push('<span class="ptag met">Métro</span>');if(x.ctx.vacReunion)tags.push('<span class="ptag reu">Réú</span>');if(x.ctx.ferie)tags.push('<span class="ptag fer">Férié</span>');if(x.ctx.pont)tags.push('<span class="ptag pont">Pont</span>');}
+      const cf=x.confidence==='élevée'?'#3fb950':x.confidence==='moyenne'?'#e3893b':'#8b97a8';
+      const wp=(st.G.wePremium&&st.G.wePremium[st.bien])||1.12;
+      const s=AL_PRICE.suggest(st.G.stats, st.bien, x.week, x.ctx||{}, {wePremium:wp}); if(s.base==null) return '';
+      const d=(v,b)=>{ if(v==null)return '—'; const delta=b?Math.round((v/b-1)*100):0; return v+' €'+(b&&delta!==0?` <span class="tfd2 ${delta>0?'up':'dn'}">${delta>0?'+':''}${delta}%</span>`:''); };
+      return `<tr><td>S${x.week}<br><span class="muted">${fd(x.dateRef)}</span></td><td>${x.occ!=null?Math.round(x.occ*100)+'%':'—'}</td>`+
+        `<td class="tfbase">${s.base} €</td>`+`<td class="tfact">${d(s.mid,s.base)}</td>`+`<td class="muted">${s.midWE} €</td>`+
+        `<td><span style="color:${cf}">●</span> ${x.confidence}</td><td>${tags.join(' ')||'<span class="muted">—</span>'}</td></tr>`; }).join('');
+    return `<div class="card"><h3>Grille de référence (historique) ${st.year} — <span class="pill ${st.bien==='Ambassador'?'amb':'lodge'}">${st.bien}</span> <button class="tfexp" id="tfExport">⌄ Exporter CSV</button></h3>
+      <div class="desc">« Tarif actuel » = ADR médian réalisé sur l'historique ${st.G.years.join(', ')}. « Prix conseillé » = recommandation (base historique) ; sert de prix proposé par défaut quand aucune règle ne s'applique. « WE » = prix week-end (premium observé).</div>
+      <div class="scroll" style="max-height:420px"><table class="tbl tfgrid"><thead><tr><th>Semaine</th><th>Occ. hist.</th><th>Tarif actuel</th><th>Prix conseillé</th><th>WE</th><th>Confiance</th><th>Contexte</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
+  }
+
   function renderCharts(){ const med=AL_PRICE._median; const yrs=st.G.years; const colors=['#58a6ff','#d4af37','#bc8cff','#3fb950'];
     const N=AL_PRICE.nights(rwsConv()).filter(x=>x.bien===st.bien);
-    // occupation moyenne par mois, une barre par année
-    const occYM={}; N.forEach(x=>{ const d=new Date(x.date+'T00:00:00Z'); const y=d.getUTCFullYear(); if(y>=st.year)return; occYM[y+'|'+d.getUTCMonth()]=(occYM[y+'|'+d.getUTCMonth()]||0)+1; });
+    const occYM={}; N.forEach(x=>{ const dd=new Date(x.date+'T00:00:00Z'); const y=dd.getUTCFullYear(); if(y>=st.year)return; occYM[y+'|'+dd.getUTCMonth()]=(occYM[y+'|'+dd.getUTCMonth()]||0)+1; });
     const occDs=yrs.map((y,i)=>({label:String(y),data:MOIS.map((_,mo)=>Math.round((occYM[y+'|'+mo]||0)/daysInMonth(y,mo)*100)),backgroundColor:colors[i%4],borderRadius:4,maxBarThickness:22}));
     mkch('tfOccChart',{type:'bar',data:{labels:MOIS,datasets:occDs},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:11}},tooltip:{callbacks:{label:c=>c.dataset.label+' : '+c.parsed.y+'%'}}},scales:{y:{min:0,max:100,ticks:{callback:v=>v+'%'},grid:{color:'rgba(40,48,64,.5)'}},x:{grid:{display:false}}}}});
-    // ADR médian par mois (historique) vs prix conseillé moyen par mois
-    const ratesM={}; N.forEach(x=>{ const d=new Date(x.date+'T00:00:00Z'); if(d.getUTCFullYear()>=st.year)return; (ratesM[d.getUTCMonth()]=ratesM[d.getUTCMonth()]||[]).push(x.rate); });
+    const ratesM={}; N.forEach(x=>{ const dd=new Date(x.date+'T00:00:00Z'); if(dd.getUTCFullYear()>=st.year)return; (ratesM[dd.getUTCMonth()]=ratesM[dd.getUTCMonth()]||[]).push(x.rate); });
     const adrM=MOIS.map((_,mo)=>{ const a=ratesM[mo]; return a&&a.length?Math.round(med(a)):null; });
     const recoM=MOIS.map((_,mo)=>{ const dim=daysInMonth(st.year,mo); const ps=[]; for(let dd=1;dd<=dim;dd++){ const w=AL_PRICE.isoWeek(ymd(new Date(Date.UTC(st.year,mo,dd)))).week; const g=st.LU[st.bien+'|'+w]; if(g&&g.mid!=null)ps.push(g.mid);} return ps.length?Math.round(med(ps)):null; });
     mkch('tfAdrChart',{type:'line',data:{labels:MOIS,datasets:[
@@ -3023,58 +3187,117 @@ const AL_TARIF = (function(){
     ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:11}},tooltip:{callbacks:{label:c=>c.dataset.label+' : '+(c.parsed.y!=null?c.parsed.y+' €':'—')}}},scales:{y:{ticks:{callback:v=>v+' €'},grid:{color:'rgba(40,48,64,.5)'}},x:{grid:{display:false}}}}});
   }
 
-  // ---------- périodes creuses & fortes ----------
-  function periods(){ const g=st.G.grid.filter(x=>x.bien===st.bien&&x.samples>0);
-    const creuses=g.filter(x=>x.occ!=null&&x.occ<0.35).sort((a,b)=>a.occ-b.occ).slice(0,12);
-    const fortes=g.filter(x=>(x.ctx&&(x.ctx.vacMetro||x.ctx.vacReunion||x.ctx.ferie||x.ctx.pont))||(x.occ!=null&&x.occ>=0.8)).sort((a,b)=>(b.occ||0)-(a.occ||0)).slice(0,12);
-    const row=(x,act)=>`<tr><td>S${x.week}<br><span class="muted">${fd(x.dateRef)}</span></td><td>${x.occ!=null?Math.round(x.occ*100)+'%':'—'}</td><td>${x.base?x.base+' €':'—'}</td><td><b>${x.mid?x.mid+' €':'—'}</b></td><td class="muted">${act}</td></tr>`;
-    const cre=creuses.map(x=>row(x,'Baisser le prix · promo · séjour min. réduit')).join('')||'<tr><td colspan="5" class="muted" style="padding:10px">Aucune semaine creuse marquée.</td></tr>';
-    const fort=fortes.map(x=>{const tags=[];if(x.ctx){if(x.ctx.vacMetro)tags.push('Vac. métro');if(x.ctx.vacReunion)tags.push('Vac. Réú');if(x.ctx.ferie)tags.push('Férié');if(x.ctx.pont)tags.push('Pont');}return row(x,'Monter le prix'+(tags.length?' · '+tags.join('/'):'')+' · séjour min. ↑');}).join('')||'<tr><td colspan="5" class="muted" style="padding:10px">—</td></tr>';
-    const tbl=(ttl,body,cls)=>`<div class="card tfper ${cls}"><h3>${ttl}</h3><div class="scroll" style="max-height:300px"><table class="tbl"><thead><tr><th>Semaine</th><th>Occ.</th><th>ADR</th><th>Conseillé</th><th>Action</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
-    return `<div class="g2">${tbl('🔻 Périodes creuses récurrentes (vacance locative)',cre,'cre')}${tbl('🔺 Périodes fortes à valoriser',fort,'fort')}</div>`;
-  }
+  // ---------- prévisualisation d'une règle candidate ----------
+  function previewRule(cand){ const bien=cand.logement; const today=ymd(new Date());
+    let concerned=0,impacted=0,neutral=0,ignored=0,ca=0; const conflicts={};
+    const base=st.RULES.filter(r=>r.id!==cand.id); const withCand=base.concat([cand]);
+    let d=cand.date_debut;
+    while(d<=cand.date_fin){ if(ruleMatchesDay(cand,d)){ concerned++;
+        if(st.nightMap[bien+'|'+d]||d<today){ ignored++; }
+        else { const w=pickRule(withCand,bien,d);
+          if(w===cand){ impacted++; ca+=cand.prix; }
+          else { neutral++; const nm=(w&&(w.nom||RLBL[w.type]))||'?'; conflicts[nm]=(conflicts[nm]||0)+1; } } }
+      d=addDays(d,1); }
+    return {concerned,impacted,neutral,ignored,ca:Math.round(ca),conflicts}; }
 
-  // ---------- grille prix conseillés (tarif actuel + prix conseillé) ----------
-  function gridTable(){ const g=st.G.grid.filter(x=>x.bien===st.bien);
-    const body=g.map(x=>{ const tags=[]; if(x.ctx){if(x.ctx.vacMetro)tags.push('<span class="ptag met">Métro</span>');if(x.ctx.vacReunion)tags.push('<span class="ptag reu">Réú</span>');if(x.ctx.ferie)tags.push('<span class="ptag fer">Férié</span>');if(x.ctx.pont)tags.push('<span class="ptag pont">Pont</span>');}
-      const cf=x.confidence==='élevée'?'#3fb950':x.confidence==='moyenne'?'#e3893b':'#8b97a8';
-      const sc=scenarios(x.week,x.ctx||{}); if(sc.base==null) return '';
-      const d=(v,b)=>{ if(v==null)return '—'; const delta=b?Math.round((v/b-1)*100):0; return v+' €'+(b&&delta!==0?` <span class="tfd2 ${delta>0?'up':'dn'}">${delta>0?'+':''}${delta}%</span>`:''); };
-      return `<tr><td>S${x.week}<br><span class="muted">${fd(x.dateRef)}</span></td><td>${x.occ!=null?Math.round(x.occ*100)+'%':'—'}</td>`+
-        `<td class="tfbase">${sc.base} €</td>`+
-        `<td class="tfact">${d(sc.reco.mid,sc.base)}</td>`+
-        `<td class="muted">${sc.reco.midWE} €</td>`+
-        `<td><span style="color:${cf}">●</span> ${x.confidence}</td><td>${tags.join(' ')||'<span class="muted">—</span>'}</td></tr>`; }).join('');
-    return `<div class="card"><h3>Grille de prix conseillés ${st.year} — <span class="pill ${st.bien==='Ambassador'?'amb':'lodge'}">${st.bien}</span> <button class="tfexp" id="tfExport">⌄ Exporter CSV</button></h3>
-      <div class="desc">« Tarif actuel » = ADR médian réalisé = médiane de (montant ÷ nuitées) sur l'historique ${st.G.years.join(', ')}. « Prix conseillé » = prix/nuit recommandé (base historique) avec l'écart vs l'actuel. « WE » = prix week-end (premium observé).
-      <br><b>Convention :</b> ${avecM()?'<b>Ménage inclus</b> — chaque nuit = (montant + ménage forfait) ÷ nuitées, comparable au « montant versé » Superhote.':'<b>Hors ménage</b> — chaque nuit = montant ÷ nuitées (hors ménage & taxe), = le prix/nuit à programmer dans Superhote.'} Forfait ménage : Ambassador 300 € / Lodge 200 € (réglé séparément), utilisé si l'Excel ne renseigne pas le ménage (cas le plus fréquent).</div>
-      <div class="scroll" style="max-height:440px"><table class="tbl tfgrid"><thead><tr><th>Semaine</th><th>Occ. hist.</th><th>Tarif actuel</th><th>Prix conseillé</th><th>WE</th><th>Confiance</th><th>Contexte</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
+  // ---------- modale de création / saisie ----------
+  function periodFromScope(scope,mIdx){ const y=st.year; const today=ymd(new Date());
+    if(scope==='annee')return [y+'-01-01',y+'-12-31'];
+    if(scope==='mois'){ const m=(mIdx==null)?new Date().getUTCMonth():mIdx; return [ymd(new Date(Date.UTC(y,m,1))),ymd(new Date(Date.UTC(y,m,daysInMonth(y,m))))]; }
+    if(scope==='mois_restants'){ const cm=(String(y)===today.slice(0,4))?new Date().getUTCMonth():0; return [ymd(new Date(Date.UTC(y,cm,1))),y+'-12-31']; }
+    return [null,null]; }
+  function closeModal(){ const m=document.getElementById('tfModal'); if(m)m.remove(); }
+  function openRuleModal(type,presetDay){
+    const isManual=type==='manuel'; const y=st.year;
+    const defNom={manuel:'Prix manuel '+(presetDay?fd(presetDay):''),semaine:'Tarif semaine',weekend:'Tarif week-end',special:'Tarif spécial'}[type];
+    const monthsOpt=MOISL.map((m,i)=>`<option value="${i}"${i===new Date().getUTCMonth()?' selected':''}>${m} ${y}</option>`).join('');
+    const prefill=presetDay?(priceApplicable(presetDay)?priceApplicable(presetDay).prix:''):'';
+    const scopeSel=isManual?'':`<label>Périmètre d'application</label>
+      <select id="mScope"><option value="mois">Un mois précis</option><option value="mois_restants">Mois restants de l'année</option><option value="annee">Toute l'année ${y}</option><option value="perso">Période personnalisée</option></select>
+      <div id="mMonthWrap"><label>Mois</label><select id="mMonth">${monthsOpt}</select></div>
+      <div id="mPersoWrap" style="display:none"><div class="row"><div><label>Du</label><input type="date" id="mDeb" min="${y}-01-01" max="${y}-12-31"></div><div><label>Au</label><input type="date" id="mFin" min="${y}-01-01" max="${y}-12-31"></div></div></div>`;
+    const manualInfo=isManual?`<div class="hint">Nuitée : <b>${fd(presetDay)}</b> · ${st.bien}</div>`:'';
+    const html=`<div id="tfModal"><div class="box">
+      <h3>${{manuel:'Prix manuel sur une nuitée',semaine:'Nouveau tarif semaine',weekend:'Nouveau tarif week-end',special:'Nouveau tarif spécial'}[type]} — <span class="pill ${st.bien==='Ambassador'?'amb':'lodge'}">${st.bien}</span></h3>
+      ${manualInfo}
+      <label>Nom de la règle</label><input id="mNom" value="${defNom}">
+      <label>Prix par nuit (€, ${avecM()?'ménage inclus':'hors ménage'})</label><input type="number" id="mPrix" min="0" step="1" value="${prefill}">
+      ${scopeSel}
+      ${type==='weekend'?'<div class="hint">Le tarif week-end ne s\'applique qu\'aux vendredis et samedis de la période.</div>':''}
+      <div class="prev" id="tfPrev">Renseignez un prix pour voir l'impact.</div>
+      <div class="acts"><button class="tfbtn sec" id="mCancel">Annuler</button><button class="tfbtn sec" id="mSim">Simuler (sans enregistrer)</button><button class="tfbtn" id="mApply">Appliquer définitivement</button></div>
+    </div></div>`;
+    const wrap=document.createElement('div'); wrap.innerHTML=html; document.body.appendChild(wrap.firstChild);
+    const $=id=>document.getElementById(id);
+    function curRule(){ let deb,fin;
+      if(isManual){ deb=fin=presetDay; }
+      else{ const sc=$('mScope').value; if(sc==='perso'){ deb=$('mDeb').value; fin=$('mFin').value; } else { const pr=periodFromScope(sc, sc==='mois'?+$('mMonth').value:null); deb=pr[0]; fin=pr[1]; } }
+      return {logement:st.bien,nom:$('mNom').value||defNom,type,date_debut:deb,date_fin:fin,prix:+$('mPrix').value||0,
+        scope:isManual?'perso':$('mScope').value,priorite:PRIO[type],actif:true}; }
+    function refresh(){ const r=curRule();
+      if(!isManual){ const sc=$('mScope').value; $('mMonthWrap').style.display=(sc==='mois')?'block':'none'; $('mPersoWrap').style.display=(sc==='perso')?'block':'none'; }
+      if(!r.prix||!r.date_debut||!r.date_fin){ $('tfPrev').innerHTML='Renseignez un prix et une période pour voir l\'impact.'; return; }
+      const p=previewRule(r); const cf=Object.keys(p.conflicts);
+      $('tfPrev').innerHTML=`<b>Période :</b> ${fd(r.date_debut)} → ${fd(r.date_fin)} · <b>${r.prix} €</b>/nuit<br>
+        Nuitées concernées : <b>${p.concerned}</b><br>
+        ↳ disponibles impactées : <b style="color:var(--green)">${p.impacted}</b><br>
+        ↳ neutralisées par une règle prioritaire : <b style="color:var(--orange)">${p.neutral}</b><br>
+        ↳ ignorées (réservées/passées) : <b>${p.ignored}</b><br>
+        <b>CA brut théorique généré :</b> ${_eur(p.ca)}<br>
+        ${cf.length?('<b style="color:var(--orange)">Conflits :</b> '+cf.map(k=>k+' ('+p.conflicts[k]+')').join(', ')):'<span class="muted">Aucun conflit de priorité.</span>'}`; }
+    wrap_listeners($, isManual, refresh, curRule);
+    refresh();
   }
+  function wrap_listeners($, isManual, refresh, curRule){
+    $('mCancel').onclick=closeModal;
+    $('mPrix').oninput=refresh;
+    if(!isManual){ $('mScope').onchange=refresh; const mm=$('mMonth'); if(mm)mm.onchange=refresh; const a=$('mDeb'),b=$('mFin'); if(a)a.onchange=refresh; if(b)b.onchange=refresh; }
+    $('mSim').onclick=()=>{ const r=curRule(); if(!valid(r))return; st.SIM=Object.assign({},r,{_sim:true}); closeModal(); render(); };
+    $('mApply').onclick=async()=>{ const r=curRule(); if(!valid(r))return; const ok=await saveRule(r); if(ok){ st.SIM=null; closeModal(); await loadRules(); render(); } };
+  }
+  function valid(r){ if(!r.prix||r.prix<=0){alert('Indiquez un prix par nuit valide.');return false;} if(!r.date_debut||!r.date_fin){alert('Indiquez une période.');return false;} if(r.date_fin<r.date_debut){alert('La date de fin doit être ≥ à la date de début.');return false;} return true; }
 
+  // ---------- rendu ----------
   function render(){
     compute();
     document.getElementById('tarifControls').innerHTML=controls();
     document.getElementById('tarifKpis').innerHTML=kpis();
     document.getElementById('tarifCal').innerHTML=demandCal();
-    document.getElementById('tarifPeriods').innerHTML=periods();
+    document.getElementById('tarifPeriods').innerHTML=rulesTable()+periods();
     document.getElementById('tarifGrid').innerHTML=gridTable();
     renderCharts();
     wire();
   }
+  function renderKpis(){ document.getElementById('tarifKpis').innerHTML=kpis(); wireOcc(); }
   function tip(html,x,y){const t=document.getElementById('tarifTip');if(!t)return;t.innerHTML=html;t.style.display='block';const w=t.offsetWidth,h=t.offsetHeight;let nx=x+14,ny=y+14;if(nx+w>window.innerWidth)nx=x-w-14;if(ny+h>window.innerHeight)ny=y-h-14;t.style.left=nx+'px';t.style.top=ny+'px';}
-  function exportCSV(){ const g=st.G.grid.filter(x=>x.bien===st.bien); const conv=avecM()?'menage_inclus':'hors_menage';
-    const lines=[['Bien','Convention','Menage_forfait','Semaine','Date','Occ_hist_%','Tarif_actuel_ADR_median','Prix_conseille','Prix_weekend','Confiance','Vac_metro','Vac_reunion','Ferie','Pont']];
-    g.forEach(x=>{ const sc=scenarios(x.week,x.ctx||{}); lines.push([st.bien,conv,FORFAIT[st.bien]||'','S'+x.week,x.dateRef,x.occ!=null?Math.round(x.occ*100):'',sc.base||'',sc.reco.mid||'',sc.reco.midWE||'',x.confidence,x.ctx&&x.ctx.vacMetro?1:0,x.ctx&&x.ctx.vacReunion?1:0,x.ctx&&x.ctx.ferie?1:0,x.ctx&&x.ctx.pont?1:0]); });
-    const csv=lines.map(r=>r.join(';')).join('\n'); const blob=new Blob(['﻿'+csv],{type:'text/csv'});
-    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='prix-conseilles-'+st.bien+'-'+st.year+'-'+conv+'.csv'; a.click();
-  }
+  function exportCSV(){ const g=st.G.grid.filter(x=>x.bien===st.bien); const conv=avecM()?'menage_inclus':'hors_menage'; const wp=(st.G.wePremium&&st.G.wePremium[st.bien])||1.12;
+    const lines=[['Bien','Convention','Semaine','Date','Occ_hist_%','Tarif_actuel_ADR_median','Prix_conseille','Prix_weekend','Confiance']];
+    g.forEach(x=>{ const s=AL_PRICE.suggest(st.G.stats,st.bien,x.week,x.ctx||{},{wePremium:wp}); lines.push([st.bien,conv,'S'+x.week,x.dateRef,x.occ!=null?Math.round(x.occ*100):'',s.base||'',s.mid||'',s.midWE||'',x.confidence]); });
+    const csv=lines.map(r=>r.join(';')).join(String.fromCharCode(10)); const blob=new Blob(['﻿'+csv],{type:'text/csv'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='reference-prix-'+st.bien+'-'+st.year+'-'+conv+'.csv'; a.click(); }
+  function wireOcc(){ document.querySelectorAll('#tfOccBtns button').forEach(b=>b.onclick=()=>{st.occSim=+b.dataset.occ;renderKpis();});
+    const r=document.getElementById('tfOccRange'); if(r)r.oninput=()=>{st.occSim=(+r.value)/100;renderKpis();}; }
   function wire(){
     document.querySelectorAll('#tfMen button').forEach(b=>b.onclick=()=>{st.menage=b.dataset.v;render();});
     const e=document.getElementById('tfExport'); if(e)e.onclick=exportCSV;
+    const ns=document.getElementById('tfNewSemaine'); if(ns)ns.onclick=()=>openRuleModal('semaine');
+    const nw=document.getElementById('tfNewWeekend'); if(nw)nw.onclick=()=>openRuleModal('weekend');
+    const np=document.getElementById('tfNewSpecial'); if(np)np.onclick=()=>openRuleModal('special');
+    const sa=document.getElementById('tfSimApply'); if(sa)sa.onclick=async()=>{ if(st.SIM){ const ok=await saveRule(st.SIM); if(ok){ st.SIM=null; await loadRules(); render(); } } };
+    const sc=document.getElementById('tfSimCancel'); if(sc)sc.onclick=()=>{ st.SIM=null; render(); };
+    const rr=document.getElementById('tfResetRules'); if(rr)rr.onclick=async()=>{ if(!confirm('Désactiver toutes les règles actives de '+st.bien+' ? (réversible)'))return; for(const r of st.RULES.filter(x=>x.logement===st.bien&&x.actif)){ await toggleRule(r.id,false); } await loadRules(); render(); };
+    document.querySelectorAll('#tarifPeriods .rules [data-act]').forEach(el=>el.onclick=async()=>{ const id=el.dataset.id, act=el.dataset.act;
+      if(act==='del'){ if(!confirm('Supprimer définitivement cette règle ?'))return; await deleteRule(id); }
+      else if(act==='toggle'){ const r=st.RULES.find(x=>x.id===id); if(r)await toggleRule(id,!r.actif); }
+      await loadRules(); render(); });
+    document.querySelectorAll('#tarifCal .tfd[data-d]').forEach(el=>el.onclick=()=>openRuleModal('manuel',el.dataset.d));
+    wireOcc();
     document.querySelectorAll('#tarifCal .tfd[data-tip]').forEach(el=>{ el.onmousemove=ev=>{const parts=(el.dataset.tip||'').split('|');tip('<div class="ttl">'+parts[0]+'</div>'+parts.slice(1).filter(Boolean).map(p=>'<div>'+p+'</div>').join(''),ev.clientX,ev.clientY);}; el.onmouseleave=()=>{const t=document.getElementById('tarifTip');if(t)t.style.display='none';}; });
   }
-  async function init(){ if(typeof AL_HOL!=='undefined' && !AL_TARIF._hr){ const t=new Date().getUTCFullYear(); try{ await AL_HOL.load([t-2,t-1,t,t+1],{fallback:(typeof AL_HOL_FALLBACK!=='undefined'?AL_HOL_FALLBACK:null)}); }catch(e){} AL_TARIF._hr=true; } render(); }
-  return {init,render,_state:()=>st,_hr:false};
+  async function init(){ if(typeof AL_HOL!=='undefined' && !AL_TARIF._hr){ const t=new Date().getUTCFullYear(); try{ await AL_HOL.load([t-2,t-1,t,t+1],{fallback:(typeof AL_HOL_FALLBACK!=='undefined'?AL_HOL_FALLBACK:null)}); }catch(e){} AL_TARIF._hr=true; }
+    if(!st._rulesLoaded){ await loadRules(); st._rulesLoaded=true; }
+    render(); }
+  return {init,render,_state:()=>st,_hr:false,_reloadRules:loadRules};
 })();
 function renderTarif(){ AL_TARIF.init(); }
 if(typeof module!=='undefined') module.exports=AL_TARIF;
