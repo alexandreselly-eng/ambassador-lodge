@@ -286,7 +286,7 @@ td.actions{white-space:nowrap}
   </div>
   <div class="grid g2">
     <div class="card"><h3>Commission par mois <span class="hint">Apporteur : <select id="commChan" class="mini"></select></span></h3><div class="desc">Empilé par apporteur ou isolé sur un seul.</div><div class="chartbox sm"><canvas id="cComm"></canvas></div></div>
-    <div class="card"><h3>Taxes de séjour <span class="hint">€ collectées</span></h3><div class="desc">Par mois d'entrée.</div><div class="chartbox sm"><canvas id="cTaxe"></canvas></div></div>
+    <div class="card"><h3>Taxes de séjour <span class="hint">€ collectées</span> <button id="taxExtractBtn2" class="kbtn" title="Justificatif détaillé de la période sélectionnée">⤓ Justificatif</button></h3><div class="desc">Par mois d'entrée.</div><div class="chartbox sm"><canvas id="cTaxe"></canvas></div></div>
   </div>
   <div class="card"><h3>Commission par apporteur <span class="hint">total sur le périmètre · montant et part</span></h3><div class="desc">Qui apporte le plus de commission. Barres triées ; chaque barre indique le <b>montant €</b> et la <b>part %</b> du total. Le sélecteur €/% du haut change l'axe.</div><div class="chartbox sm"><canvas id="cCommApp"></canvas></div></div>
 </div>
@@ -1517,6 +1517,7 @@ function render(){
           :`Reste à encaisser|Par résa : montant + taxe − acomptes (1+2+3) − ménage|Somme des soldes clients encore ouverts|Source : saisies`),
   ].join('');
   const _teb=document.getElementById('taxExtractBtn'); if(_teb)_teb.onclick=genTaxeJustificatif;
+  const _teb2=document.getElementById('taxExtractBtn2'); if(_teb2)_teb2.onclick=genTaxeJustificatif;
   const benefM=monthly(rows,'benefice');
   const benefDS=[
     {label:'Bénéfice net',data:benefM,backgroundColor:css('--gold'),borderRadius:5,order:2,datalabels:DL(eur,css('--gold2'))},
