@@ -610,13 +610,14 @@ td.actions{white-space:nowrap}
       <ol>
         <li>Dans Superhote V2 : <b>Réservations → Exporter (CSV)</b> en sélectionnant <b>les deux logements</b> (Villa Ambassador <i>et</i> Lodge) sur la période voulue.</li>
         <li>Déposez le fichier <code>.csv</code> dans votre dossier&nbsp;:<div class="sh-path">…/De Alexandre/SUPERHOTE/</div></li>
-        <li>Revenez ici et cliquez <b>Synchroniser</b> (ou glissez le fichier dans la zone à droite). Tout est recalculé dans le navigateur — rien n'est envoyé en ligne.</li>
+        <li>Importez-le dans <b>« Validation des données »</b> (bouton ci-contre) : il y est contrôlé, validé et enregistré au registre. Cette vue de rapprochement se met alors à jour automatiquement.</li>
       </ol>
     </div>
-    <div class="sh-drop" id="shDrop">
-      <div style="font-size:13px;color:var(--muted)">Glissez l'export CSV ici</div>
-      <button class="sh-syncbtn" id="shSyncBtn">⟳ Synchroniser le CSV</button>
+    <div class="sh-drop" id="shDrop" style="cursor:default">
+      <div style="font-size:13px;color:var(--muted)">Données Superhote <b style="color:var(--lodge)">validées</b></div>
+      <button class="sh-syncbtn" id="shImportBtn">⤓ Importer / mettre à jour un CSV →</button>
       <div class="sh-scope" id="shScope"></div>
+      <div class="hint" style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center;max-width:280px">Un seul point d'import : « Validation des données » (contrôlé + journalisé). Cette vue lit automatiquement les données déjà validées.</div>
     </div>
   </div>
 
@@ -656,7 +657,7 @@ td.actions{white-space:nowrap}
     <div class="kpis" id="shKpis"></div>
     <div id="shTaxCtrl"></div>
     <div class="g2">
-      <div class="card"><h3>Distribution des écarts de montant</h3><div class="desc">Superhote − Excel, par réservation rapprochée.</div><div class="chartbox"><canvas id="shGap"></canvas></div></div>
+      <div class="card"><h3>Distribution des écarts de montant</h3><div class="desc">Superhote − Excel, par réservation rapprochée. <b style="color:var(--lodge)">Cliquez une barre</b> pour le détail et le fichier des écarts.</div><div class="chartbox"><canvas id="shGap"></canvas></div></div>
       <div class="card"><h3>Couverture des sources</h3><div class="desc">Communes vs présentes dans une seule source.</div><div class="chartbox"><canvas id="shCov"></canvas></div></div>
     </div>
     <div class="card">
@@ -2091,6 +2092,8 @@ function _shXLsource(){
 }
 
 function renderSuperhote(){
+  SH_DATA = (typeof SH_RAW!=='undefined'&&SH_RAW)?SH_RAW.slice():[];
+  _shBucket=null;
   _shXL=_shXLsource();
   _shComp=SHmatch.reconcile(SH_DATA,_shXL);
   if(!_shWired){ _shWire(); _shWired=true; }
@@ -2107,18 +2110,38 @@ function _shBuildBienFilter(){ const el=document.getElementById('shSrcBien'); if
 function _shUpdateScope(){
   const biens=[...new Set(SH_DATA.map(s=>s.logement))], yrs=[...new Set(SH_DATA.map(s=>s.annee).filter(Boolean))].sort();
   const el=document.getElementById('shScope');
-  if(el) el.innerHTML = SH_DATA.length? `Export chargé : <b style="color:var(--lodge)">${SH_DATA.length} réservations</b> · ${biens.join(' + ')} · ${yrs.join(', ')}${state.log!=='all'?` · <b style="color:var(--gold)">filtre : ${state.log}</b>`:''}` : 'Aucun export chargé.';
+  if(el) el.innerHTML = SH_DATA.length? `Validées : <b style="color:var(--lodge)">${SH_DATA.length} réservations</b> · ${biens.join(' + ')} · ${yrs.join(', ')}${state.log!=='all'?` · <b style="color:var(--gold)">filtre : ${state.log}</b>`:''}` : 'Aucune donnée Superhote validée — importez un CSV via « Validation des données ».';
 }
 
 // ---------- ÉCARTS LIGNE À LIGNE ----------
+let _shBucket=null, _shEcartRows=[];
+const _SH_BUCKETS=['Identique','+200 € (Lodge)','+300 € (Ambass.)','Autre écart'];
+function _shInBucket(c,b){ if(c.statut!=='match')return false; const ad=Math.abs(c.delta||0);
+  if(b===0)return ad<1; if(b===1)return Math.abs((c.delta||0)-200)<1; if(b===2)return Math.abs((c.delta||0)-300)<1;
+  if(b===3)return ad>=1 && Math.abs((c.delta||0)-200)>=1 && Math.abs((c.delta||0)-300)>=1; return false; }
+function _shShowSub(sn){ _shSub=sn; document.querySelectorAll('#shSub button').forEach(x=>x.classList.toggle('on',x.dataset.s===sn));
+  document.querySelectorAll('#v-superhote .sh-sub').forEach(v=>v.classList.toggle('on',v.id==='sh-'+sn)); }
+function _shExportEcarts(rows){ try{
+  const H=['Bien','Entree','Sortie','Client','Excel','Superhote_verse','Taxe_sejour','Delta','Apporteur_reel','Explication'];
+  const esc=v=>{ v=(v==null?'':String(v)); return /[";\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  const lines=[H.join(';')].concat(rows.map(c=>[c.logement,c.entree,c.sortie,((c.prenom||'')+' '+(c.nom||'')).trim(),c.xl_montant,c.sh_montant,c.sh_taxe,c.delta,c.apporteur_reel,c.explication].map(esc).join(';')));
+  const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob); const a=document.createElement('a');
+  const lab=(_shBucket!=null?_SH_BUCKETS[_shBucket]:'tous').replace(/[^a-zA-Z0-9]+/g,'_');
+  a.href=url; a.download='ecarts_'+lab+'_'+(state.log==='all'?'tous':state.log)+'.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1500);
+}catch(e){ _shToast('Export impossible : '+e.message,true); } }
 function _shRenderEcarts(){
   let rows=_shComp.filter(c=>state.log==='all'||c.logement===state.log);
-  if(_shFilt==='gap')rows=rows.filter(c=>c.statut==='match'&&Math.abs(c.delta||0)>=1);
+  if(_shBucket!=null){ rows=rows.filter(c=>_shInBucket(c,_shBucket)); }
+  else if(_shFilt==='gap')rows=rows.filter(c=>c.statut==='match'&&Math.abs(c.delta||0)>=1);
   else if(_shFilt==='fuzzy')rows=rows.filter(c=>c.fuzzy);
   else if(_shFilt==='chan')rows=rows.filter(c=>c.statut==='match'&&(c.explication||'').includes('Canal'));
   else if(_shFilt==='sh_only')rows=rows.filter(c=>c.statut==='sh_only');
   else if(_shFilt==='xl_only')rows=rows.filter(c=>c.statut==='xl_only');
-  const cnt=document.getElementById('shEcartCount'); if(cnt)cnt.textContent=`${rows.length} lignes`;
+  _shEcartRows=rows;
+  const cnt=document.getElementById('shEcartCount');
+  if(cnt){ if(_shBucket!=null){ cnt.innerHTML=`<b style="color:var(--gold)">Catégorie : ${_SH_BUCKETS[_shBucket]}</b> · ${rows.length} lignes · <a href="#" id="shBucketDl" style="color:var(--lodge)">⤓ télécharger le détail (CSV)</a> · <a href="#" id="shBucketClear" style="color:var(--muted)">× tout afficher</a>`; }
+    else cnt.innerHTML=`${rows.length} lignes · <a href="#" id="shBucketDl" style="color:var(--lodge)">⤓ télécharger (CSV)</a>`; }
   const body=document.getElementById('shEcartBody'); if(!body)return;
   body.innerHTML=rows.map(c=>{
     const st=c.statut==='sh_only'?'<span class="badge sh">Superhote seul</span>':c.statut==='xl_only'?'<span class="badge xl">Excel seul</span>':(c.fuzzy?'<span class="badge fuzzy">Approché</span>':(Math.abs(c.delta||0)<1?'<span class="badge match">Identique</span>':'<span class="badge gap">Écart</span>'));
@@ -2126,6 +2149,8 @@ function _shRenderEcarts(){
     const ap=c.apporteur_reel?`<span class="appr">${c.apporteur_reel}</span>`:'—';
     return `<tr><td>${st}</td><td><span class="pill ${c.logement==='Ambassador'?'amb':'lodge'}">${c.logement}</span></td><td>${_shFd(c.entree)}</td><td>${(c.prenom||'')+' '+(c.nom||'')}</td><td class="num">${_shEur(c.xl_montant)}</td><td class="num">${_shEur(c.sh_montant)}</td><td class="num" style="color:var(--lodge)">${c.sh_taxe!=null?_shEur(c.sh_taxe):'—'}</td>${dcell}<td>${ap}</td><td class="expl">${c.explication||''}</td></tr>`;
   }).join('') || '<tr><td colspan="10" style="color:var(--muted);padding:14px">Aucune ligne pour ce filtre.</td></tr>';
+  const _dl=document.getElementById('shBucketDl'); if(_dl)_dl.onclick=(e)=>{e.preventDefault();_shExportEcarts(_shEcartRows);};
+  const _cl=document.getElementById('shBucketClear'); if(_cl)_cl.onclick=(e)=>{e.preventDefault();_shBucket=null;_shRenderEcarts();};
 }
 
 // ---------- SYNTHÈSE ----------
@@ -2166,7 +2191,7 @@ function _shRenderSynth(){
   const bk={'Identique':0,'+200 € (Lodge)':0,'+300 € (Ambass.)':0,'Autre écart':0};
   ident.forEach(()=>bk['Identique']++);
   gaps.forEach(c=>{const d=c.delta;if(Math.abs(d-300)<1)bk['+300 € (Ambass.)']++;else if(Math.abs(d-200)<1)bk['+200 € (Lodge)']++;else bk['Autre écart']++;});
-  _shMk('shGap',{type:'bar',data:{labels:Object.keys(bk),datasets:[{data:Object.values(bk),backgroundColor:[_shCss('--green'),_shCss('--lodge'),_shCss('--gold'),_shCss('--orange')],borderRadius:5,datalabels:{display:false}}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(40,48,64,.5)'}},x:{grid:{display:false}}}}});
+  _shMk('shGap',{type:'bar',data:{labels:Object.keys(bk),datasets:[{data:Object.values(bk),backgroundColor:[_shCss('--green'),_shCss('--lodge'),_shCss('--gold'),_shCss('--orange')],borderRadius:5,datalabels:{display:false}}]},options:{responsive:true,maintainAspectRatio:false,onClick:(e,els)=>{ if(els&&els.length){ _shBucket=els[0].index; _shFilt='all'; document.querySelectorAll('#shFilt button').forEach(x=>x.classList.toggle('on',x.dataset.v==='all')); _shShowSub('ecarts'); _shRenderEcarts(); const el=document.getElementById('sh-ecarts'); if(el)el.scrollIntoView({behavior:'smooth',block:'start'}); } },onHover:(e,els)=>{ if(e&&e.native&&e.native.target)e.native.target.style.cursor=els&&els.length?'pointer':'default'; },plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(40,48,64,.5)'}},x:{grid:{display:false}}}}});
   _shMk('shCov',{type:'doughnut',data:{labels:['Communes','Superhote seul','Excel seul'],datasets:[{data:[match.length,so.length,xo.length],backgroundColor:[_shCss('--green'),_shCss('--blue'),_shCss('--violet')],borderColor:_shCss('--panel'),borderWidth:2,datalabels:{display:false}}]},options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'bottom',labels:{boxWidth:11,padding:10}}}}});
   const chg={};match.forEach(c=>{if((c.explication||'').includes('Canal')){const key=(c.apporteur_reel||c.xl_origine||'?')+'→'+(c.sh_origine||'?');chg[key]=chg[key]||{a:c.apporteur_reel||c.xl_origine,b:c.sh_origine,n:0};chg[key].n++;}});
   const cb=document.getElementById('shChanBody');
@@ -2203,15 +2228,10 @@ let _shTT;
 function _shToast(m,err){const t=document.getElementById('shToast');if(!t)return;t.textContent=m;t.style.background=err?'#f85149':'#3fb950';t.style.color=err?'#fff':'#04220f';t.style.display='block';clearTimeout(_shTT);_shTT=setTimeout(()=>t.style.display='none',4200);}
 
 function _shWire(){
-  const file=document.getElementById('shCsvFile');
-  document.getElementById('shSyncBtn').onclick=()=>file.click();
-  file.onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>_shSyncText(rd.result,f.name);rd.readAsText(f,'utf-8');e.target.value='';};
-  const drop=document.getElementById('shDrop');
-  ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
-  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
-  drop.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(f&&/\.csv$/i.test(f.name)){const rd=new FileReader();rd.onload=()=>_shSyncText(rd.result,f.name);rd.readAsText(f,'utf-8');}else _shToast('Déposez un fichier .csv',true);});
+  const impBtn=document.getElementById('shImportBtn');
+  if(impBtn) impBtn.onclick=()=>{ const vt=document.querySelector('.tabs button[data-t="validation"]'); if(vt){ vt.style.display='inline-block'; vt.click(); } };
   document.querySelectorAll('#shSub button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#shSub button').forEach(x=>x.classList.remove('on'));b.classList.add('on');_shSub=b.dataset.s;document.querySelectorAll('#v-superhote .sh-sub').forEach(v=>v.classList.remove('on'));document.getElementById('sh-'+_shSub).classList.add('on');if(_shSub==='synth')setTimeout(_shRenderSynth,30);});
-  document.querySelectorAll('#shFilt button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#shFilt button').forEach(x=>x.classList.remove('on'));b.classList.add('on');_shFilt=b.dataset.v;_shRenderEcarts();});
+  document.querySelectorAll('#shFilt button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#shFilt button').forEach(x=>x.classList.remove('on'));b.classList.add('on');_shFilt=b.dataset.v;_shBucket=null;_shRenderEcarts();});
   document.querySelectorAll('#shSrc button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#shSrc button').forEach(x=>x.classList.remove('on'));b.classList.add('on');_shSrc=b.dataset.src;_shRenderSource();});
   document.querySelectorAll('#shSrcBien button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#shSrcBien button').forEach(x=>x.classList.remove('on'));b.classList.add('on');_shSrcBien=b.dataset.b;_shRenderSource();});
 }
@@ -2880,7 +2900,11 @@ const AL_VALID = (function(){
       btn.disabled=true; btn.textContent='…'; try{ await mapLabel(b,decodeURIComponent(btn.dataset.l)); if(typeof loadProperties==='function')await loadProperties(); close(); openGate(source,incoming,label,applyCb); }catch(e){ btn.disabled=false; btn.textContent='Mapper'; alert('Erreur mapping : '+e.message); } });
     const ok=m.querySelector('#valOk'); if(ok&&canValidate) ok.onclick=async()=>{ ok.disabled=true; ok.textContent='Enregistrement…';
       try{ for(const g of groups){ await commit(source,g.bien,g.version,g.snap?g.snap.version:null,label,g.d,g.sub); }
-        close(); if(applyCb)applyCb(known); if(typeof valToast==='function')valToast('✓ '+groups.length+' bien(s) validé(s) · enregistré au registre.'); if(typeof renderValidation==='function')renderValidation(); if(typeof renderSyncBadge==='function')renderSyncBadge(); }
+        close(); if(applyCb)applyCb(known);
+        if(source==='superhote_csv' && typeof loadSuperhoteRows==='function'){ try{ await loadSuperhoteRows(); }catch(e){} }
+        if(typeof window.render==='function'){ try{ window.render(); }catch(e){} }
+        if(typeof window.renderSuperhote==='function'){ try{ window.renderSuperhote(); }catch(e){} }
+        if(typeof valToast==='function')valToast('✓ '+groups.length+' bien(s) validé(s) · enregistré au registre.'); if(typeof renderValidation==='function')renderValidation(); if(typeof renderSyncBadge==='function')renderSyncBadge(); }
       catch(e){ ok.disabled=false; ok.textContent='✓ Valider'; alert('Erreur : '+(e.message||e)); } };
   }
   function close(){ const m=document.getElementById('valModal'); if(m)m.style.display='none'; }
