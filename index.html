@@ -287,6 +287,7 @@ td.actions{white-space:nowrap}
     <div class="card"><h3>Commission par mois <span class="hint">Apporteur : <select id="commChan" class="mini"></select></span></h3><div class="desc">Empilé par apporteur ou isolé sur un seul.</div><div class="chartbox sm"><canvas id="cComm"></canvas></div></div>
     <div class="card"><h3>Taxes de séjour <span class="hint">€ collectées</span></h3><div class="desc">Par mois d'entrée.</div><div class="chartbox sm"><canvas id="cTaxe"></canvas></div></div>
   </div>
+  <div class="card"><h3>Commission par apporteur <span class="hint">total sur le périmètre · montant et part</span></h3><div class="desc">Qui apporte le plus de commission. Barres triées ; chaque barre indique le <b>montant €</b> et la <b>part %</b> du total. Le sélecteur €/% du haut change l'axe.</div><div class="chartbox sm"><canvas id="cCommApp"></canvas></div></div>
 </div>
 
 <style>
@@ -1456,7 +1457,7 @@ function render(){
   const convLbl=state.shMontantConv==='brut_menage'?'revenu brut − ménage':state.shMontantConv==='verse'?'montant versé':_net?'payé − taxe − commission (net plateforme ≈ Excel)':'montant payé − taxe';
   const srcTag=isSH?'Source Superhote (CSV validé)':'Source Saisies';
   document.getElementById('kpis').innerHTML=[
-    kpiCard('Chiffre d\'affaires',eur(ca),`${nResa} réservations · ${nuit} nuitées`,'',
+    kpiCard(isSH?'Chiffre d\'affaires':'CA brut',eur(ca),`${nResa} réservations · ${nuit} nuitées${isSH?'':' · hors ménage & taxe de séjour'}`,'',
       isSH?`Chiffre d'affaires|Σ des montants — convention « ${convLbl} »|${srcTag} : canaux plateforme uniquement (directs non inclus)|Périmètre : ${rows.length} résa`
           :`Chiffre d'affaires|Formule : Σ des montants hébergement|Hors taxe de séjour et hors ménage|${srcTag}|Périmètre : ${rows.length} résa de la sélection`),
     kpiCard('Bénéfice net',eur(benef),`marge ${ca?Math.round(benef/ca*100):0} % du CA${isSH?' · estimé':''}`,'b3',
@@ -1632,6 +1633,15 @@ function renderCommission(rows){
   const opt=Object.assign(baseOpt({money:true,legend:stacked}),{scales:{x:{stacked,grid:{display:false}},y:{stacked,beginAtZero:true,grid:{color:'rgba(40,48,64,.5)'},ticks:{callback:v=>eur(v)}}},plugins:{legend:{display:stacked||state.cumul,position:'bottom',labels:{boxWidth:10,padding:7,font:{size:9.5}}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${eur(c.parsed.y)}`}}}});
   if(state.cumul){ datasets=datasets.concat([cumulDS('Commission cumulée',commTotM,css('--green'))]); addY1(opt,css('--green')); }
   mk('cComm',{type:'bar',data:{labels:MONTHS,datasets},options:opt});
+  // --- Commission par apporteur : montant € + part % ---
+  const byApp={}; rows.forEach(d=>{ if(d.commission) byApp[d.origine||'Inconnu']=(byApp[d.origine||'Inconnu']||0)+d.commission; });
+  const appP=Object.entries(byApp).sort((a,b)=>b[1]-a[1]);
+  const appTot=appP.reduce((s,x)=>s+x[1],0);
+  const PCTa=state.unit==='pct';
+  const appData=PCTa?appP.map(x=>appTot?x[1]/appTot*100:0):appP.map(x=>x[1]);
+  mk('cCommApp',{type:'bar',data:{labels:appP.map(x=>x[0]),datasets:[{label:'Commission',data:appData,backgroundColor:appP.map(x=>chanColor(x[0])),borderRadius:5,
+    datalabels:state.labels?{display:true,anchor:'end',align:'end',clamp:true,color:css('--txt'),font:{size:10,weight:'700'},formatter:(v,ctx)=>{ const amt=appP[ctx.dataIndex][1]; const sh=appTot?amt/appTot*100:0; return eur(amt)+' · '+sh.toFixed(0)+'%'; }}:{display:false}}]},
+    options:Object.assign(baseOpt({legend:false}),{indexAxis:'y',scales:{x:{beginAtZero:true,grid:{color:'rgba(40,48,64,.5)'},ticks:{callback:v=>PCTa?v.toFixed(0)+' %':eur(v)}},y:{grid:{display:false}}},plugins:{legend:{display:false},datalabels:{display:state.labels},tooltip:{callbacks:{label:c=>{ const amt=appP[c.dataIndex][1]; const sh=appTot?amt/appTot*100:0; return ' '+eur(amt)+' ('+sh.toFixed(1)+'% du total)'; }}}}})});
 }
 
 // ---------- Analyse des commissions par apporteur (tri + évolution période/période) ----------
