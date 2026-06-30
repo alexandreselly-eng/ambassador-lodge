@@ -66,6 +66,7 @@ canvas{cursor:pointer}
 .tbl th{text-align:left;color:var(--muted);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;padding:8px 9px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
 .tbl td{padding:7px 9px;border-bottom:1px solid rgba(40,48,64,.5)}
 .tbl tr:hover td{background:var(--panel2)}.tbl td.num{text-align:right;font-variant-numeric:tabular-nums}
+.tbl th.num{text-align:right}
 .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10.5px;font-weight:600}
 .pill.amb{background:rgba(212,175,55,.16);color:var(--gold2)}.pill.lodge{background:rgba(63,182,201,.16);color:var(--lodge)}
 .scroll{max-height:460px;overflow-y:auto}
@@ -282,7 +283,7 @@ td.actions{white-space:nowrap}
     <div class="card"><h3>CA par canal <span class="hint"><select id="sortChan" class="mini"><option value="val-desc">Montant ↓</option><option value="val-asc">Montant ↑</option><option value="key-asc">Nom A→Z</option><option value="key-desc">Nom Z→A</option></select></span></h3><div class="desc">Origine de la réservation.</div><div class="chartbox"><canvas id="cChan"></canvas></div></div>
     <div class="card"><h3>Répartition par bien <span class="hint"><select id="sortLog" class="mini"><option value="val-desc">Montant ↓</option><option value="val-asc">Montant ↑</option><option value="key-asc">Nom A→Z</option><option value="key-desc">Nom Z→A</option></select></span></h3><div class="desc">Chiffre d'affaires.</div><div class="chartbox"><canvas id="cLog"></canvas></div></div>
   </div>
-  <div class="card" id="brkBenefCard"><h3>Bénéfice net mensuel — tableau mensuel <span class="hint">cliquez un mois pour le détail des réservations · survolez un chiffre pour le calcul</span></h3><div id="brkBenef"></div></div>
+  <div class="card" id="brkBenefCard"><h3>Bénéfice net mensuel — tableau mensuel <span class="hint">cliquez un mois pour le détail des réservations · survolez un chiffre pour le calcul</span></h3><div id="brkBenef"></div></div><div class="card" id="brkChanCard"><h3>CA par canal — tableau mensuel <span class="hint">cliquez un mois pour le détail · survolez pour le calcul</span></h3><div id="brkChan"></div></div><div class="card" id="brkLogCard"><h3>Répartition par bien — tableau mensuel <span class="hint">CA par bien · cliquez un mois pour le détail</span></h3><div id="brkLog"></div></div>
   <div class="grid g2">
     <div class="card"><h3>Taux d'occupation <span class="hint">nuitées / jours du mois</span></h3><div class="desc">Moyenne des taux de remplissage.</div><div class="chartbox sm"><canvas id="cOcc"></canvas></div></div>
     <div class="card"><h3>Prix moyen / nuit <span class="hint">€</span></h3><div class="desc">CA du mois / nuitées du mois.</div><div class="chartbox sm"><canvas id="cPrix"></canvas></div></div>
@@ -292,6 +293,7 @@ td.actions{white-space:nowrap}
     <div class="card"><h3>Taxes de séjour <span class="hint">€ collectées</span> <button id="taxExtractBtn2" class="kbtn" title="Justificatif détaillé de la période sélectionnée">⤓ Justificatif</button></h3><div class="desc">Par mois d'entrée.</div><div class="chartbox sm"><canvas id="cTaxe"></canvas></div></div>
   </div>
   <div class="card"><h3>Commission par apporteur <span class="hint">total sur le périmètre · montant et part</span></h3><div class="desc">Qui apporte le plus de commission. Barres triées ; chaque barre indique le <b>montant €</b> et la <b>part %</b> du total. Le sélecteur €/% du haut change l'axe.</div><div class="chartbox sm"><canvas id="cCommApp"></canvas></div></div>
+  <div class="card" id="brkCommAppCard"><h3>Commission par apporteur — tableau mensuel <span class="hint">part Immosphéra / Bibizfamily · cliquez un mois pour le détail</span></h3><div id="brkCommApp"></div></div>
 </div>
 
 <style>
@@ -909,7 +911,7 @@ const eur=(n)=>(n==null?'—':Math.round(n).toLocaleString('fr-FR')+' €');
 const pct=(n)=>(n==null?'—':(n*100).toFixed(0)+' %');
 const n0=(v)=>(typeof v==='number'?v:0);
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260630-120310';
+const APP_BUILD='20260630-122312';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
     const d=document.createElement('div'); d.id='newVerBar';
@@ -1608,6 +1610,21 @@ function render(){
     {label:'Bénéfice net', kind:'sum', field:'benefice', fmt:eur, color:'--green', tip:()=>'CA − commission'},
     {label:'Marge %', kind:'calc', calc:(S,m)=>S.montant[m]?S.benefice[m]/S.montant[m]*100:null, total:(T)=>T.montant?T.benefice/T.montant*100:null, fmt:pctv, tip:()=>'Bénéfice ÷ CA'}
   ]});
+  const _chans=[...new Set(rows.map(d=>d.origine).filter(Boolean))].sort();
+  renderBreakdownTable({ id:'brkChan', host:'brkChan', rows:rows, title:'CA_par_canal', detail:true, columns:[
+    ..._chans.map(ch=>({key:'ch_'+ch, label:ch, dim:'origine', val:ch, measure:'montant', fmt:eur, tip:()=>'Σ CA du canal pour le mois'})),
+    {key:'totca', label:'Total CA', field:'montant', fmt:eur, color:'--gold', tip:()=>'Σ CA tous canaux'}
+  ]});
+  const _biens=[...new Set(rows.map(d=>d.logement).filter(Boolean))].sort();
+  renderBreakdownTable({ id:'brkLog', host:'brkLog', rows:rows, title:'CA_par_bien', detail:true, columns:[
+    ..._biens.map(bn=>({key:'b_'+bn, label:bn, dim:'logement', val:bn, measure:'montant', fmt:eur, tip:()=>'Σ CA du bien pour le mois'})),
+    {key:'totb', label:'Total CA', field:'montant', fmt:eur, color:'--gold', tip:()=>'Σ CA tous biens'}
+  ]});
+  renderBreakdownTable({ id:'brkCommApp', host:'brkCommApp', rows:rows, title:'Commission_par_apporteur', detail:true, columns:[
+    {key:'immo', label:'Immosphéra', field:'comm_immo', fmt:eur, color:'--gold', tip:()=>'Part de commission Immosphéra'},
+    {key:'bibiz', label:'Bibizfamily', fields:['comm_bibiz_new','comm_bibiz_runoff'], fmt:eur, color:'--violet', tip:()=>'Part Bibizfamily (aff. nouvelles + run off)'},
+    {key:'totc', label:'Total commission', kind:'calc', calc:(S,m)=>(S.immo[m]||0)+(S.bibiz[m]||0), total:(T)=>(T.immo||0)+(T.bibiz||0), fmt:eur, tip:()=>'Immosphéra + Bibizfamily'}
+  ]});
 }
 
 // ---------- Section admin : liste blanche + invitations ----------
@@ -1969,13 +1986,23 @@ function reservRowHTML(d){
     <td class="actions">${acts}</td></tr>`;
 }
 const BRK={};
+function _brkSeries(cfg){
+  const rows=cfg.rows||currentRows(); const cols=cfg.columns;
+  const ser=cols.map(c=>{
+    if(c.kind==='calc') return null;
+    if(c.fields){ const a=Array(12).fill(0); c.fields.forEach(fl=>{ const mm=monthly(rows,fl); for(let i=0;i<12;i++) a[i]+=mm[i]; }); return a; }
+    if(c.dim){ return monthly(rows.filter(d=>d[c.dim]===c.val), c.measure||'montant'); }
+    return monthly(rows,c.field);
+  });
+  const S={}; cols.forEach((c,i)=>{ if(ser[i]){ if(c.key)S[c.key]=ser[i]; if(c.field)S[c.field]=ser[i]; } });
+  const T={}; Object.keys(S).forEach(k=>T[k]=S[k].reduce((a,b)=>a+b,0));
+  return {rows,cols,ser,S,T};
+}
 function renderBreakdownTable(cfg){
   const host=document.getElementById(cfg.host); if(!host) return;
-  const rows=cfg.rows||currentRows(); const cols=cfg.columns; const tid=cfg.id||cfg.host;
-  const S={}; cols.forEach(c=>{ if(c.field&&!S[c.field]) S[c.field]=monthly(rows,c.field); });
-  const T={}; Object.keys(S).forEach(fld=>T[fld]=S[fld].reduce((a,b)=>a+b,0));
-  const cellVal=(c,m)=> c.kind==='calc'? c.calc(S,m) : S[c.field][m];
-  const totVal=(c)=> c.kind==='calc'? c.total(T) : T[c.field];
+  const {rows,cols,ser,S,T}=_brkSeries(cfg); const tid=cfg.id||cfg.host;
+  const cellVal=(c,i,m)=> c.kind==='calc'? c.calc(S,m) : ser[i][m];
+  const totVal=(c,i)=> c.kind==='calc'? c.total(T) : ser[i].reduce((a,b)=>a+b,0);
   const fmtc=(c,v)=> v==null?'—':(c.fmt?c.fmt(v):eur(v));
   const cstyle=c=>c.color?` style="color:${css(c.color)}"`:'';
   if(!BRK[tid]) BRK[tid]=new Set();
@@ -1984,7 +2011,7 @@ function renderBreakdownTable(cfg){
   for(let m=0;m<12;m++){
     const det=cfg.detail!==false; const open=BRK[tid].has(m);
     h+=`<tr class="brk-mrow" data-m="${m}"><td>${det?`<span class="brk-tog">${open?'▾':'▸'}</span> `:''}${MONTHS[m]}</td>`
-      + cols.map(c=>{ const v=cellVal(c,m); const tip=c.tip?c.tip(S,m,v):''; return `<td class="num"${cstyle(c)}${tip?` title="${tip}"`:''}>${fmtc(c,v)}</td>`; }).join('') + `</tr>`;
+      + cols.map((c,i)=>{ const v=cellVal(c,i,m); const tip=c.tip?c.tip(S,m,v):''; return `<td class="num"${cstyle(c)}${tip?` title="${tip}"`:''}>${fmtc(c,v)}</td>`; }).join('') + `</tr>`;
     if(det && open){
       const dr=rows.filter(d=>d.mois===m+1);
       h+=`<tr class="brk-detail"><td colspan="${cols.length+1}"><div class="brk-detail-in">`
@@ -1992,7 +2019,7 @@ function renderBreakdownTable(cfg){
         + `</div></td></tr>`;
     }
   }
-  h+=`<tr class="brk-total"><td>TOTAL ${state.year}</td>`+cols.map(c=>{ const v=totVal(c); return `<td class="num"${cstyle(c)}>${fmtc(c,v)}</td>`; }).join('')+`</tr>`;
+  h+=`<tr class="brk-total"><td>TOTAL ${state.year}</td>`+cols.map((c,i)=>{ const v=totVal(c,i); return `<td class="num"${cstyle(c)}>${fmtc(c,v)}</td>`; }).join('')+`</tr>`;
   h+=`</tbody></table></div>`;
   host.innerHTML=h;
   const cb=host.querySelector('[data-brk-csv]'); if(cb) cb.onclick=()=>exportBrkCSV(cfg);
@@ -2000,15 +2027,13 @@ function renderBreakdownTable(cfg){
   host.querySelectorAll('.brk-detail .mini-act').forEach(b=>b.onclick=(e)=>{ e.stopPropagation(); const id=b.dataset.id,a=b.dataset.act; if(a==='edit')actEdit(id); else if(a==='del')actDelete(id); else if(a==='hist')actHistory(id); });
 }
 function exportBrkCSV(cfg){
-  const rows=cfg.rows||currentRows(); const cols=cfg.columns;
-  const S={}; cols.forEach(c=>{ if(c.field&&!S[c.field]) S[c.field]=monthly(rows,c.field); });
-  const T={}; Object.keys(S).forEach(fld=>T[fld]=S[fld].reduce((a,b)=>a+b,0));
-  const cv=(c,m)=>c.kind==='calc'?c.calc(S,m):S[c.field][m];
-  const tv=(c)=>c.kind==='calc'?c.total(T):T[c.field];
+  const {cols,ser,S,T}=_brkSeries(cfg);
+  const cv=(c,i,m)=>c.kind==='calc'?c.calc(S,m):ser[i][m];
+  const tv=(c,i)=>c.kind==='calc'?c.total(T):ser[i].reduce((a,b)=>a+b,0);
   const num=v=>v==null?'':String(Math.round(v*100)/100).replace('.',',');
   const L=[['Mois',...cols.map(c=>c.label)].join(';')];
-  for(let m=0;m<12;m++) L.push([MONTHS[m],...cols.map(c=>num(cv(c,m)))].join(';'));
-  L.push([`TOTAL ${state.year}`,...cols.map(c=>num(tv(c)))].join(';'));
+  for(let m=0;m<12;m++) L.push([MONTHS[m],...cols.map((c,i)=>num(cv(c,i,m)))].join(';'));
+  L.push([`TOTAL ${state.year}`,...cols.map((c,i)=>num(tv(c,i)))].join(';'));
   download((cfg.title||cfg.id||'tableau')+'.csv','text/csv;charset=utf-8','﻿'+L.join('\n'));
 }
 
