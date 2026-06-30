@@ -948,10 +948,9 @@ function compute(r){
   const nuit=(c&&d)?Math.round((d-c)/86400000):null;
   let H=null;
   if(c&&d){ const F=new Date(c.getFullYear(),c.getMonth(),1); const G=new Date(d.getFullYear(),d.getMonth()+1,1); H=Math.round((G-F)/86400000); }
-  const _cr = r.date_resa? new Date(r.date_resa+'T00:00:00') : c;   // date de RÉSERVATION (repli : entrée)
-  const comm=commissionRule(r.logement,r.origine,r.montant,_cr);
-  const _APPCUT=new Date(2026,1,1); // 01/02/2026
-  const apporteur = _cr? (_cr<_APPCUT?'Immosphera':'Bibizfamily') : null;
+  const comm=commissionRule(r.logement,r.origine,r.montant,c);
+  // Apporteur d'affaires = lu directement dans « origine » (Immosphera / Bibizfamily). Les autres origines sont des canaux (pas d'apporteur).
+  const apporteur = (r.origine==='Immosphera'||r.origine==='Bibizfamily') ? r.origine : null;
   let _alloc=null;
   if(c&&d&&nuit>0){ _alloc=[]; const _cur=new Date(c.getTime()); const _ix={};
     for(let _i=0;_i<nuit;_i++){ const _y=_cur.getFullYear(),_m=_cur.getMonth()+1,_k=_y+'-'+_m;
@@ -1680,7 +1679,7 @@ function renderCommission(rows){
   if(state.cumul){ datasets=datasets.concat([cumulDS('Commission cumulée',commTotM,css('--green'))]); addY1(opt,css('--green')); }
   mk('cComm',{type:'bar',data:{labels:MONTHS,datasets},options:opt});
   // --- Commission par apporteur : montant € + part % ---
-  const byApp={}; rows.forEach(d=>{ if(d.commission) byApp[d.apporteur||'Inconnu']=(byApp[d.apporteur||'Inconnu']||0)+d.commission; });
+  const byApp={}; rows.forEach(d=>{ if(d.commission && d.apporteur) byApp[d.apporteur]=(byApp[d.apporteur]||0)+d.commission; });
   const appP=Object.entries(byApp).sort((a,b)=>b[1]-a[1]);
   const appTot=appP.reduce((s,x)=>s+x[1],0);
   const PCTa=state.unit==='pct';
@@ -1694,7 +1693,7 @@ function renderCommission(rows){
 function commAgg(year, month){ const m={};
   ROWS.forEach(d=>{ if(!(state.log==='all'||d.logement===state.log))return;
     monthSlices(d,year).forEach(sl=>{ if(month!=null && sl.mois!==month)return;
-      const k=sl.apporteur||'Inconnu'; const o=m[k]||(m[k]={comm:0,nb:0,ca:0,_ids:new Set()});
+      if(!sl.apporteur)return; const k=sl.apporteur; const o=m[k]||(m[k]={comm:0,nb:0,ca:0,_ids:new Set()});
       o.comm+=(sl.commission||0); o.ca+=(sl.montant||0); o._ids.add(sl.id!=null?('#'+sl.id):((sl.nom||'')+'|'+sl.entree)); }); });
   Object.values(m).forEach(o=>{ o.nb=o._ids.size; }); return m; }
 function renderCommByApporteur(){ const host=document.getElementById('commAnalysis'); if(!host)return;
