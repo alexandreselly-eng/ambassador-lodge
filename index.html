@@ -328,6 +328,15 @@ td.actions{white-space:nowrap}
   #xiPop .xp-h b{color:var(--gold,#d4af37)}
   #xiPop .xp-x{cursor:pointer;color:var(--muted);font-weight:400}
   #xiPop .xp-l{margin-top:3px}
+  #xiPop.rich{max-width:340px}
+  #xiPop .xl{margin-top:9px;padding-top:8px;border-top:1px dashed var(--line)}
+  #xiPop .xl:first-of-type{border-top:none;padding-top:0;margin-top:4px}
+  #xiPop .xlv{display:block;color:var(--muted);font-size:10px;letter-spacing:.05em;margin-bottom:3px}
+  #xiPop .xmono{font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.8}
+  #xiPop ul{margin:4px 0 0;padding-left:16px;line-height:1.5}
+  #xiPop .xp-meta{color:var(--muted);font-size:11px;margin-top:8px}
+  #xiPop .xp-btns{display:flex;gap:7px;margin-top:11px}
+  #xiPop .xp-btns button{font-size:11.5px;padding:4px 9px;border:1px solid var(--line);border-radius:7px;background:var(--panel2);color:var(--txt);cursor:pointer}
   .syncbadge{display:flex;gap:10px;flex-wrap:wrap;margin-top:9px;font-size:11px}
   .syncbadge .sb{display:inline-flex;align-items:center;gap:7px;background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:4px 12px;color:var(--muted)}
   .syncbadge .sb b{color:var(--txt);font-weight:600}
@@ -973,7 +982,7 @@ const eur=(n)=>(n==null?'—':Math.round(n).toLocaleString('fr-FR')+' €');
 const pct=(n)=>(n==null?'—':(n*100).toFixed(0)+' %');
 const n0=(v)=>(typeof v==='number'?v:0);
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260701-173119';
+const APP_BUILD='20260701-173940';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
     const d=document.createElement('div'); d.id='newVerBar';
@@ -1620,16 +1629,31 @@ function render(){
   const _net=state.shMontantConv==='net_plateforme';
   const convLbl=state.shMontantConv==='brut_menage'?'revenu brut − ménage':state.shMontantConv==='verse'?'montant versé':_net?'payé − taxe − commission (net plateforme ≈ Excel)':'montant payé − taxe';
   const srcTag=isSH?'Source Superhote (CSV validé)':'Source Saisies';
+  window.__xiRich=window.__xiRich||{};
+  const _pmB=ca?Math.round(benef/ca*100):0;
+  const _mdD=srcTag+' · Exercice '+state.year+' · '+(state.log==='all'?'tous biens':state.log)+(state.month!=='all'?' · '+MONTHS[+state.month-1]:'');
+  window.__xiRich.ca={title:(isSH?'Chiffre d\'affaires':'CA brut'),result:eur(ca),
+    n1:isSH?('Σ des montants — convention « '+convLbl+' »'):'Σ des montants d\'hébergement (hors taxe de séjour & ménage)',
+    n2:['Σ sur '+rows.length+' réservation(s)','= '+eur(ca)],
+    n3:(isSH?['Convention : '+convLbl+'.',srcTag+' : canaux plateforme uniquement (réservations directes non incluses).']:['Formule : Σ des montants d\'hébergement.','Hors taxe de séjour et hors frais de ménage.',srcTag+'.']).concat(['Périmètre : '+rows.length+' réservation(s) de la sélection.']),
+    meta:_mdD};
+  window.__xiRich.benef={title:'Bénéfice net',result:eur(benef),
+    n1:'CA − commission apporteur',
+    n2:[eur(ca)+' − '+eur(comm),'= '+eur(benef)],
+    n3:['Commission selon barème apporteur (bien / apporteur / date).','Marge = bénéfice ÷ CA = '+_pmB+' %.'].concat(isSH?['Estimé : le CSV Superhote ne porte pas l\'apporteur réel → barème appliqué au CA.']:[]),
+    meta:_mdD};
+  window.__xiRich.comm={title:'Commissions',result:eur(comm),
+    n1:'Commission apporteur (barème par bien / apporteur / date)',
+    n2:['Immosphéra '+eur(cImmo)+' + Bibizfamily '+eur(cBibT),'= '+eur(comm)],
+    n3:['Avant 01/02/2026 : Lodge 13 % · autres 20 %.','Dès 01/02/2026 : Ambassador 25 % · Lodge 13 % · Immosphera 13 % · autres 20 %.','≠ frais de plateforme (≈ 6,9 %, déjà inclus dans le CA « Net plateforme »).'].concat(isSH?['Estimé : barème appliqué au CA Superhote.']:[]),
+    meta:_mdD};
   document.getElementById('kpis').innerHTML=[
     kpiCard(isSH?'Chiffre d\'affaires':'CA brut',eur(ca),`${nResa} réservations · ${nuit} nuitées${isSH?'':' · hors ménage & taxe de séjour'}`,'',
-      isSH?`Chiffre d'affaires|Σ des montants — convention « ${convLbl} »|${srcTag} : canaux plateforme uniquement (directs non inclus)|Périmètre : ${rows.length} résa`
-          :`Chiffre d'affaires|Formule : Σ des montants hébergement|Hors taxe de séjour et hors ménage|${srcTag}|Périmètre : ${rows.length} résa de la sélection`),
+      {rich:'ca', txt:(isSH?`Chiffre d'affaires|Σ des montants — ${convLbl}`:`Chiffre d'affaires|Σ des montants d'hébergement (hors taxe & ménage)`)}),
     kpiCard('Bénéfice net',eur(benef),`marge ${ca?Math.round(benef/ca*100):0} % du CA${isSH?' · estimé':''}`,'b3',
-      isSH?`Bénéfice net (estimé)|CA − commission apporteur (barème par bien/date) = ${eur(ca)} − ${eur(comm)}|Barème appliqué au CA Superhote car le CSV ne porte pas l'apporteur réel|Marge ${ca?Math.round(benef/ca*100):0} % — comparable aux saisies`
-          :`Bénéfice net|Par résa : montant − commission apporteur|Commission selon barème canal/logement/date|Marge = bénéfice ÷ CA = ${ca?Math.round(benef/ca*100):0} %`),
+      {rich:'benef', txt:`Bénéfice net|CA − commission apporteur|Marge ${ca?Math.round(benef/ca*100):0} %`}),
     kpiCard('Commissions',eur(comm),`${ca?(comm/ca*100).toFixed(1):0} % du CA${isSH?' · estimé':''}`,'b6',
-      isSH?`Commissions (estimées)|Barème apporteur appliqué au CA Superhote|Ambassador 25 % · Lodge 13 % · Immosphera 13 % · autres 20 % (dès 01/02/2026)|≠ frais de plateforme (≈6,9 %, déjà dans le CA « Net plateforme »)`
-          :`Commissions = commission apporteur|Barème avant 01/02/2026 : Lodge 13 % · autres 20 %|Dès 01/02/2026 : Ambassador 25 %, Lodge 13 %, Immosphera 13 %, autres 20 %`),
+      {rich:'comm', txt:`Commissions|Barème apporteur (bien / apporteur / date)${isSH?' · estimé':''}`}),
     kpiCard('Prix moyen / nuit',eur(prix),`occupation moy. ${pct(occ)}`,'b4',`Prix moyen / nuit|Formule : CA ÷ nuitées = ${eur(ca)} ÷ ${nuit}|Nuitées = Σ (sortie − entrée)|Occupation = moyenne du taux de remplissage (nuitées ÷ jours du mois)|${srcTag}`),
     kpiCard('Taxes de séjour',eur(taxeSCI),'à reverser (SCI) · dont OTA '+eur(taxeOTA)+' · <button id="taxExtractBtn" class="kbtn" title="Justificatif détaillé de la période sélectionnée">⤓ justificatif</button>','b2',`Taxes de séjour — à reverser par la SCI|Σ taxe des séjours HORS OTA = ${eur(taxeSCI)}|OTA (Airbnb, Booking, Abritel/VRBO, Expedia) : ${eur(taxeOTA)} collecté & reversé directement par la plateforme (exclu)|Total collecté SCI+OTA : ${eur(taxe)}|N'entre pas dans le CA ni le bénéfice`),
     kpiCard('Reste à encaisser',eur(reste),isSH?'⚠ acomptes absents du CSV':'soldes clients ouverts','b5',
@@ -2264,9 +2288,10 @@ function renderHealth(){ const el=document.getElementById('healthBody'); if(!el)
 
 function kpiCard(lab,v,sub,cls,explain,bar){
   const bh = (bar!=null) ? `<div class="kbar" title="${Math.round(bar*100)} %"><span style="width:${Math.max(0,Math.min(100,Math.round(bar*100)))}%"></span></div>` : '';
-  return `<div class="kpi ${cls}"><div class="lab">${lab}${explain?xi(explain):''}</div><div class="val">${v}</div><div class="sub">${sub}</div>${bh}</div>`; }
+  const _ex = explain ? (typeof explain==='object' ? xi(explain.txt,explain.rich) : xi(explain)) : '';
+  return `<div class="kpi ${cls}"><div class="lab">${lab}${_ex}</div><div class="val">${v}</div><div class="sub">${sub}</div>${bh}</div>`; }
 // ===== Explicabilité : icône ⓘ + tooltip global (formule · source · période · échantillon) =====
-function xi(txt){ return `<span class="xi" data-explain="${String(txt).replace(/"/g,'&quot;')}" tabindex="0" role="button" aria-label="Explication du chiffre">ⓘ</span>`; }
+function xi(txt,rich){ return `<span class="xi" data-explain="${String(txt).replace(/"/g,'&quot;')}"${rich?` data-rich="${rich}"`:''} tabindex="0" role="button" aria-label="Explication du chiffre">ⓘ</span>`; }
 (function(){
   if(typeof document==='undefined'||window.__xiInit)return; window.__xiInit=true;
   function tipEl(){ let t=document.getElementById('xiTip'); if(!t){ t=document.createElement('div'); t.id='xiTip'; (document.body||document.documentElement).appendChild(t);} return t; }
@@ -2283,10 +2308,27 @@ function xi(txt){ return `<span class="xi" data-explain="${String(txt).replace(/
     p.style.left=nx+'px'; p.style.top=ny+'px';
     const x=p.querySelector('.xp-x'); if(x)x.onclick=closePop;
   }
+  function openRichPop(o,el){ closePop(); hide();
+    const n2=(o.n2||[]).join('<br>'); const n3=(o.n3||[]).map(x=>'<li>'+x+'</li>').join('');
+    const p=document.createElement('div'); p.id='xiPop'; p.className='rich';
+    p.innerHTML='<div class="xp-h"><b>'+o.title+' · '+o.result+'</b><span class="xp-x" role="button" aria-label="Fermer">✕</span></div>'
+      +'<div class="xl"><span class="xlv">= Niveau 1 · Résumé</span><div>'+(o.n1||'')+'</div></div>'
+      +'<div class="xl xl2" style="display:none"><span class="xlv">ƒx Niveau 2 · Détail chiffré</span><div class="xmono">'+n2+'</div></div>'
+      +'<div class="xl xl3" style="display:none"><span class="xlv">▤ Niveau 3 · Complet</span><ul>'+n3+'</ul>'+(o.meta?'<div class="xp-meta">'+o.meta+'</div>':'')+'</div>'
+      +'<div class="xp-btns"><button class="xb2">+ Détail chiffré</button><button class="xb3">+ Tout afficher</button></div>';
+    (document.body||document.documentElement).appendChild(p);
+    const r=el.getBoundingClientRect(); const w=p.offsetWidth,h=p.offsetHeight;
+    let nx=r.right+10, ny=r.top; if(nx+w>window.innerWidth-8)nx=Math.max(8,r.left-w-10); if(ny+h>window.innerHeight-8)ny=Math.max(8,window.innerHeight-h-8);
+    p.style.left=nx+'px'; p.style.top=ny+'px';
+    const cx=p.querySelector('.xp-x'); if(cx)cx.onclick=closePop;
+    const b2=p.querySelector('.xb2'); if(b2)b2.onclick=function(){ const l=p.querySelector('.xl2'); l.style.display=l.style.display==='none'?'block':'none'; };
+    const b3=p.querySelector('.xb3'); if(b3)b3.onclick=function(){ const l=p.querySelector('.xl3'),l2=p.querySelector('.xl2'); const sh=l.style.display==='none'; l.style.display=sh?'block':'none'; if(sh)l2.style.display='block'; };
+  }
+  window.openRichPop=openRichPop;
   document.addEventListener('keydown',e=>{ if(e.key==='Escape')closePop(); });
   document.addEventListener('mouseover',e=>{ const el=e.target.closest&&e.target.closest('[data-explain]'); if(el){ const r=el.getBoundingClientRect(); const clickable=!!(el.classList&&el.classList.contains('xi')); show(el.getAttribute('data-explain'),r.right,r.top,clickable); } });
   document.addEventListener('mouseout',e=>{ if(e.target.closest&&e.target.closest('[data-explain]'))hide(); });
-  document.addEventListener('click',e=>{ const badge=e.target.closest&&e.target.closest('.xi[data-explain]'); if(badge){ e.stopPropagation(); openPop(badge.getAttribute('data-explain'),badge); return; } if(!(e.target.closest&&e.target.closest('#xiPop'))) closePop(); });
+  document.addEventListener('click',e=>{ const badge=e.target.closest&&e.target.closest('.xi[data-explain]'); if(badge){ e.stopPropagation(); const rk=badge.getAttribute('data-rich'); if(rk&&window.__xiRich&&window.__xiRich[rk]) openRichPop(window.__xiRich[rk],badge); else openPop(badge.getAttribute('data-explain'),badge); return; } if(!(e.target.closest&&e.target.closest('#xiPop'))) closePop(); });
 })();
 function fmtDate(s){ if(!s)return '—'; const[y,m,d]=s.split('-'); return `${d}/${m}/${y.slice(2)}`; }
 // ===== Thème clair / sombre =====
