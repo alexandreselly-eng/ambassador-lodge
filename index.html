@@ -594,6 +594,7 @@ td.actions{white-space:nowrap}
    #v-tarif .tfactions{display:flex;gap:7px;flex-wrap:wrap;margin-left:auto}
    #v-tarif .tfbtn{background:var(--gold);color:#1a1206;border:none;border-radius:8px;padding:6px 12px;font-weight:700;cursor:pointer;font-size:12px}
    #v-tarif .tfbtn.sec{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
+   #v-tarif .tfbtn.sec.on{background:var(--gold);color:#1a1206;border-color:var(--gold);font-weight:700}
    #v-tarif .simbar{display:flex;align-items:center;gap:10px;background:rgba(212,175,55,.12);border:1px solid var(--gold);border-radius:10px;padding:9px 13px;margin:0 0 14px;font-size:12.5px}
    #v-tarif .occsim{display:flex;flex-direction:column;gap:5px;margin-top:5px}
    #v-tarif .occbtns{display:flex;gap:3px;flex-wrap:wrap}
@@ -603,6 +604,8 @@ td.actions{white-space:nowrap}
    #v-tarif .tfd.resa{outline:1px solid rgba(255,255,255,.22)}
    #v-tarif .tfd.dispo{cursor:pointer}
    #v-tarif .tfd.dispo:hover{outline:1px solid var(--gold)}
+   #v-tarif .tfd.faded{opacity:.16}
+   #v-tarif .tfd.todo{outline:1.5px solid var(--gold);outline-offset:-1px}
    #v-tarif .tfd.nr{border:1px dashed var(--line)}
    #v-tarif .tfh{position:absolute;bottom:0;right:1px;display:flex;gap:1px}
    #v-tarif .tfh i{width:4px;height:4px;border-radius:50%;display:inline-block}
@@ -982,7 +985,7 @@ const eur=(n)=>(n==null?'—':Math.round(n).toLocaleString('fr-FR')+' €');
 const pct=(n)=>(n==null?'—':(n*100).toFixed(0)+' %');
 const n0=(v)=>(typeof v==='number'?v:0);
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260701-182637';
+const APP_BUILD='20260701-183906';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
     const d=document.createElement('div'); d.id='newVerBar';
@@ -3063,7 +3066,7 @@ const AL_TARIF = (function(){
   const PRIO={manuel:100,special:80,weekend:60,semaine:40,defaut:20};
   const RLBL={manuel:'Manuel',special:'Spécial',weekend:'Week-end',semaine:'Semaine',defaut:'Défaut',reco:'Conseillé'};
 
-  let st={bien:null, year:null, menage:'horsmenage', G:null, LU:{}, nightMap:{}, PONT:new Set(),
+  let st={bien:null, year:null, menage:'horsmenage', onlyTodo:false, G:null, LU:{}, nightMap:{}, PONT:new Set(),
           RULES:[], SIM:null, occSim:0.7, _rulesLoaded:false, _rulesErr:null};
   function avecM(){ return st.menage==='avecmenage'; }
   function rows(){ return (typeof ROWS!=='undefined'?ROWS:[]).filter(r=>r.entree&&r.sortie); }
@@ -3143,12 +3146,15 @@ const AL_TARIF = (function(){
   function projection(){ const bien=st.bien;
     const A2=sumYear(bien,st.year,false);   // CA engagé annuel confirmé (futures incluses)
     const A1=sumYear(bien,st.year,true);    // CA réalisé à date (nuits passées/en cours)
-    const avail=availableList(bien); let B=0,priced=0;
-    avail.forEach(d=>{ const pa=priceApplicable(d,bien); if(pa){ B+=pa.prix; priced++; } });
+    const avail=availableList(bien); let B=0,priced=0,Bdec=0,pricedDec=0;
+    avail.forEach(d=>{ const pa=priceApplicable(d,bien); if(pa){ B+=pa.prix; priced++; if(pa.rule){ Bdec+=pa.prix; pricedDec++; } } });
     const dyear=diy(st.year); const occAct=dyear?A2.nights/dyear:0; const occS=st.occSim;
+    const _today=ymd(new Date()), _jan1=st.year+'-01-01', _dec31=st.year+'-12-31';
+    let daysElapsed; if(_today<_jan1) daysElapsed=0; else if(_today>_dec31) daysElapsed=dyear; else daysElapsed=Math.floor((new Date(_today+'T00:00:00Z')-new Date(_jan1+'T00:00:00Z'))/864e5)+1;
+    const occDate=daysElapsed?A1.nights/daysElapsed:0;
     const projB=B*occS; const total=A2.ca+projB; const soldSim=Math.round(avail.length*occS);
     const pm=A2.nights?A2.ca/A2.nights:0;
-    return {A1,A2,B:Math.round(B),priced,avail:avail.length,occAct,occS,projB:Math.round(projB),
+    return {A1,A2,B:Math.round(B),Bdec:Math.round(Bdec),pricedDec,priced,avail:avail.length,occAct,occDate,daysElapsed,occS,projB:Math.round(projB),
       total:Math.round(total),soldSim,unsold:avail.length-soldSim,pm:Math.round(pm),dyear}; }
 
   // ---------- contrôles ----------
@@ -3168,6 +3174,8 @@ const AL_TARIF = (function(){
         <button class="tfbtn" id="tfNewSemaine">+ Tarif semaine</button>
         <button class="tfbtn" id="tfNewWeekend">+ Tarif week-end</button>
         <button class="tfbtn" id="tfNewSpecial">+ Tarif spécial</button>
+        <button class="tfbtn sec${st.onlyTodo?' on':''}" id="tfTodo" title="N'afficher que les nuitées disponibles sans prix décidé">${st.onlyTodo?'✓ ':''}À tarifer</button>
+        <button class="tfbtn sec" id="tfExportCal" title="Exporter le calendrier des prix appliqués (CSV) pour report Superhote">⤓ Calendrier prix</button>
       </div>
     </div>${errNote}${sim}`;
   }
@@ -3190,8 +3198,8 @@ const AL_TARIF = (function(){
         {n1:'Σ (montant ÷ nuitées) des nuits dont la date ≤ aujourd’hui',n2:[`${P.A1.nights} nuits passées/en cours`,`= ${_eur(P.A1.ca)}`],n3:[`Périmètre : nuits ≤ aujourd’hui, exercice ${st.year}.`,'Prorata à la nuit (séjour à cheval scindé jour par jour).',`Convention : ${conv}.`]}),
       KX('a2','CA engagé annuel',_eur(P.A2.ca),'réservations '+st.year+' (futures incl.)','b4','CA engagé annuel confirmé|Toutes les réservations de l’année, futures incluses|Cliquez pour le détail',
         {n1:'Σ de toutes les réservations confirmées de l’année (futures incluses)',n2:[`${P.A2.nights} nuits réservées en ${st.year}`,`= ${_eur(P.A2.ca)}`],n3:['Inclut les réservations futures déjà confirmées.','Prorata à la nuit.',`Convention : ${conv}.`]}),
-      KX('b','CA potentiel restant',_eur(P.B),P.priced+'/'+P.avail+' nuits dispo tarifées','b5','CA potentiel restant @100 %|Σ prix applicable sur les nuitées disponibles|Cliquez pour le détail',
-        {n1:'Σ du prix applicable sur les nuitées disponibles (aujourd’hui → 31/12), à 100 %',n2:[`${P.priced} nuitées tarifées / ${P.avail} disponibles`,`= ${_eur(P.B)} (à 100 % d’occupation)`],n3:['Prix applicable = règle gagnante (manuel > spécial > WE > semaine > défaut), sinon prix conseillé.','Garde-fou : exclut les nuits futures déjà réservées (comptées dans l’engagé).','Nuitée disponible = future, non réservée, non bloquée, non passée.']}),
+      KX('b','CA potentiel restant',_eur(P.B),P.priced+'/'+P.avail+' nuits tarifées · dont '+_eur(P.Bdec)+' décidés','b5','CA potentiel restant @100 %|Σ prix applicable sur les nuitées disponibles|Cliquez pour le détail',
+        {n1:'Σ du prix applicable sur les nuitées disponibles (aujourd’hui → 31/12), à 100 %',n2:[`${P.priced} nuitées tarifées / ${P.avail} disponibles`,`= ${_eur(P.B)} (à 100 % d’occupation)`,`dont prix décidés (règles) : ${_eur(P.Bdec)} · conseillés : ${_eur(P.B-P.Bdec)}`],n3:['Prix « décidés » = règles posées (manuel/spécial/WE/semaine/défaut).','Prix « conseillés » = repli historique tant qu’aucune règle n’est posée.','Garde-fou : exclut les nuits futures déjà réservées (comptées dans l’engagé).','Nuitée disponible = future, non réservée, non bloquée, non passée.']}),
       KX('proj','CA annuel projeté',_eur(P.total),'engagé + potentiel × '+Math.round(P.occS*100)+'%','b2','CA annuel projeté|Engagé + (potentiel × occupation simulée)|Cliquez pour le détail',
         {n1:'CA engagé annuel + (potentiel restant × occupation simulée)',n2:[`${_eur(P.A2.ca)} + (${_eur(P.B)} × ${Math.round(P.occS*100)} %)`,`= ${_eur(P.A2.ca)} + ${_eur(P.projB)}`,`= ${_eur(P.total)}`],n3:['Engagé = réservations confirmées (A2).','Potentiel = nuitées dispo × prix applicable (B).','Occupation simulée = curseur (hypothèse).','Garde-fou anti-double-comptage : une nuit future réservée est dans l’engagé, jamais dans le potentiel.']}),
       simCard,
@@ -3199,8 +3207,10 @@ const AL_TARIF = (function(){
         {n1:'Nuitées futures non réservées jusqu’au 31/12',n2:[`${P.avail} disponibles`,`${P.soldSim} vendues / ${P.unsold} invendues (à ${Math.round(P.occS*100)} %)`],n3:['Disponible = future, non réservée, non bloquée, non passée.',`Vendues simulées = ${P.avail} × ${Math.round(P.occS*100)} % = ${P.soldSim}.`]}),
       KX('nres','Nuitées réservées',P.A2.nights,'sur '+P.dyear+' j (base '+(P.dyear===366?'bissextile':'standard')+')','','Nuitées réservées|Nb de nuits réservées sur l’année|Cliquez pour le détail',
         {n1:'Nombre de nuits réservées sur l’exercice',n2:[`${P.A2.nights} nuits / base ${P.dyear} j`],n3:[`Base d’occupation = ${P.dyear} jours (${P.dyear===366?'année bissextile':'année standard'}).`]}),
-      KX('occact','Taux occupation actuel',Math.round(P.occAct*100)+'%','réservées ÷ '+P.dyear+' j','b6','Taux d’occupation actuel|Nuits réservées ÷ jours de l’exercice|Cliquez pour le détail',
-        {n1:'Nuits réservées ÷ jours de l’exercice',n2:[`${P.A2.nights} ÷ ${P.dyear} = ${Math.round(P.occAct*100)} %`],n3:[`Base dynamique ${P.dyear} j (365 normale / 366 bissextile).`]}),
+      KX('occact','Taux de réservation (année)',Math.round(P.occAct*100)+'%','réservées ÷ '+P.dyear+' j · futures incl.','b6','Taux de réservation (année)|Nuits réservées (futures incluses) ÷ jours de l’exercice|Cliquez pour le détail',
+        {n1:'Nuits réservées de l’année (futures incluses) ÷ jours de l’exercice',n2:[`${P.A2.nights} ÷ ${P.dyear} = ${Math.round(P.occAct*100)} %`],n3:['« On the books » : inclut les réservations à venir.','≠ occupation à date (carte dédiée).',`Base ${P.dyear} j (365/366).`]}),
+      KX('occdate','Occupation à date',Math.round(P.occDate*100)+'%',P.A1.nights+' nuits ÷ '+P.daysElapsed+' j écoulés','b6','Occupation à date|Nuits réservées écoulées ÷ jours écoulés|Cliquez pour le détail',
+        {n1:'Nuits réservées passées/en cours ÷ jours écoulés de l’exercice',n2:[`${P.A1.nights} ÷ ${P.daysElapsed} = ${Math.round(P.occDate*100)} %`],n3:['Reflète le remplissage réel jusqu’à aujourd’hui.','Jours écoulés = 1ᵉʳ janv. → aujourd’hui (0 si exercice futur, année entière si passé).']}),
       KX('pm','Panier moyen / nuitée',_eur(P.pm),'CA engagé ÷ nuits réservées','','Panier moyen par nuitée|CA engagé ÷ nuits réservées|Cliquez pour le détail',
         {n1:'CA engagé annuel ÷ nuits réservées',n2:[`${_eur(P.A2.ca)} ÷ ${P.A2.nights||0} = ${_eur(P.pm)}`],n3:[`Convention : ${conv}.`]}),
       cmpCard,
@@ -3236,6 +3246,8 @@ const AL_TARIF = (function(){
         if(status==='disponible'||status==='non_renseignee'){ cls.push('dispo'); }
         if(d<today) cls.push('past');
         if(status==='non_renseignee') cls.push('nr');
+        const isTodo=(status==='disponible'||status==='non_renseignee')&&!(pa&&pa.rule);
+        if(st.onlyTodo) cls.push(isTodo?'todo':'faded');
         if(pa&&pa.rule){ bl=`border-left:3px solid ${RCOL[pa.type]||'#888'};`; }
         const h1=histDot(d,-1), h2=histDot(d,-2);
         const dots=`<span class="tfh"><i class="${h1.c}"></i><i class="${h2.c}"></i></span>`;
@@ -3406,6 +3418,15 @@ const AL_TARIF = (function(){
     g.forEach(x=>{ const s=AL_PRICE.suggest(st.G.stats,st.bien,x.week,x.ctx||{},{wePremium:wp}); lines.push([st.bien,conv,'S'+x.week,x.dateRef,x.occ!=null?Math.round(x.occ*100):'',s.base||'',s.mid||'',s.midWE||'',x.confidence]); });
     const csv=lines.map(r=>r.join(';')).join(String.fromCharCode(10)); const blob=new Blob(['﻿'+csv],{type:'text/csv'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='reference-prix-'+st.bien+'-'+st.year+'-'+conv+'.csv'; a.click(); }
+  function exportPrixCal(){ const today=ymd(new Date()); const conv=avecM()?'menage_inclus':'hors_menage'; const JN=['lun','mar','mer','jeu','ven','sam','dim'];
+    const lines=[['Bien','Date','Jour','Statut','Prix_applique_EUR','Origine','Regle','Prix_loue_N1','Prix_loue_N2','Convention']];
+    for(let m=0;m<12;m++){ const dim=daysInMonth(st.year,m); for(let dd=1;dd<=dim;dd++){ const d=ymd(new Date(Date.UTC(st.year,m,dd)));
+      const rz=realized(d); const pa=rz?null:priceApplicable(d); const status=statusOf(d,today);
+      const prix=rz?rNuit(rz):(pa?pa.prix:''); const origine=rz?'réservé':(pa?(pa.rule?RLBL[pa.type]:'conseillé'):'');
+      const regle=(pa&&pa.rule)?pa.rule.nom:''; const r1=realized(sameDateYr(d,-1)), r2=realized(sameDateYr(d,-2));
+      lines.push([st.bien,d,JN[dowMon(d)],status,prix,origine,regle,r1?rNuit(r1):'',r2?rNuit(r2):'',conv]); } }
+    const csv=lines.map(r=>r.join(';')).join(String.fromCharCode(10)); const blob=new Blob(['﻿'+csv],{type:'text/csv'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='calendrier-prix-'+st.bien+'-'+st.year+'-'+conv+'.csv'; a.click(); }
   function wireOcc(){ document.querySelectorAll('#tfOccBtns button').forEach(b=>b.onclick=()=>{st.occSim=+b.dataset.occ;renderKpis();});
     const r=document.getElementById('tfOccRange'); if(r)r.oninput=()=>{st.occSim=(+r.value)/100;renderKpis();}; }
   function closeKpiPopover(){ const d=document.getElementById('tfPop'); if(d)d.remove(); }
@@ -3435,6 +3456,8 @@ const AL_TARIF = (function(){
     const ns=document.getElementById('tfNewSemaine'); if(ns)ns.onclick=()=>openRuleModal('semaine');
     const nw=document.getElementById('tfNewWeekend'); if(nw)nw.onclick=()=>openRuleModal('weekend');
     const np=document.getElementById('tfNewSpecial'); if(np)np.onclick=()=>openRuleModal('special');
+    const tt=document.getElementById('tfTodo'); if(tt)tt.onclick=()=>{ st.onlyTodo=!st.onlyTodo; render(); };
+    const ec=document.getElementById('tfExportCal'); if(ec)ec.onclick=exportPrixCal;
     const sa=document.getElementById('tfSimApply'); if(sa)sa.onclick=async()=>{ if(st.SIM){ const ok=await saveRule(st.SIM); if(ok){ st.SIM=null; await loadRules(); render(); } } };
     const sc=document.getElementById('tfSimCancel'); if(sc)sc.onclick=()=>{ st.SIM=null; render(); };
     const rr=document.getElementById('tfResetRules'); if(rr)rr.onclick=async()=>{ if(!confirm('Désactiver toutes les règles actives de '+st.bien+' ? (réversible)'))return; for(const r of st.RULES.filter(x=>x.logement===st.bien&&x.actif)){ await toggleRule(r.id,false); } await loadRules(); render(); };
