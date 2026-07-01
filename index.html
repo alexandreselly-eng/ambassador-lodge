@@ -322,6 +322,12 @@ td.actions{white-space:nowrap}
   #xiTip{display:none;position:fixed;z-index:99999;background:var(--tip-bg);border:1px solid var(--gold,#d4af37);border-radius:9px;padding:9px 11px;font-size:11.5px;line-height:1.45;color:var(--txt);box-shadow:0 8px 28px rgba(0,0,0,.55);max-width:300px;pointer-events:none}
   #xiTip b{display:block;margin-bottom:4px;color:var(--gold,#d4af37)}
   #xiTip .xr{color:var(--txt);margin-top:1px;opacity:.85}
+  #xiTip .xhint{margin-top:6px;color:var(--gold,#d4af37);font-size:10.5px;font-weight:700}
+  #xiPop{display:block;position:fixed;z-index:100000;background:var(--panel,#161b22);border:1px solid var(--gold,#d4af37);border-radius:11px;padding:11px 13px;max-width:320px;font-size:12px;line-height:1.5;color:var(--txt);box-shadow:0 16px 48px rgba(0,0,0,.55)}
+  #xiPop .xp-h{display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:7px;font-weight:700}
+  #xiPop .xp-h b{color:var(--gold,#d4af37)}
+  #xiPop .xp-x{cursor:pointer;color:var(--muted);font-weight:400}
+  #xiPop .xp-l{margin-top:3px}
   .syncbadge{display:flex;gap:10px;flex-wrap:wrap;margin-top:9px;font-size:11px}
   .syncbadge .sb{display:inline-flex;align-items:center;gap:7px;background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:4px 12px;color:var(--muted)}
   .syncbadge .sb b{color:var(--txt);font-weight:600}
@@ -967,7 +973,7 @@ const eur=(n)=>(n==null?'—':Math.round(n).toLocaleString('fr-FR')+' €');
 const pct=(n)=>(n==null?'—':(n*100).toFixed(0)+' %');
 const n0=(v)=>(typeof v==='number'?v:0);
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260701-172550';
+const APP_BUILD='20260701-173119';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
     const d=document.createElement('div'); d.id='newVerBar';
@@ -2264,11 +2270,23 @@ function xi(txt){ return `<span class="xi" data-explain="${String(txt).replace(/
 (function(){
   if(typeof document==='undefined'||window.__xiInit)return; window.__xiInit=true;
   function tipEl(){ let t=document.getElementById('xiTip'); if(!t){ t=document.createElement('div'); t.id='xiTip'; (document.body||document.documentElement).appendChild(t);} return t; }
-  function show(txt,x,y){ const t=tipEl(); const parts=String(txt).split('|'); t.innerHTML='<b>'+parts[0]+'</b>'+parts.slice(1).map(p=>'<div class="xr">'+p+'</div>').join(''); t.style.display='block'; const w=t.offsetWidth,h=t.offsetHeight; let nx=x+14,ny=y+16; if(nx+w>window.innerWidth-8)nx=Math.max(8,x-w-14); if(ny+h>window.innerHeight-8)ny=Math.max(8,y-h-16); t.style.left=nx+'px'; t.style.top=ny+'px'; }
+  function show(txt,x,y,hint){ const t=tipEl(); const parts=String(txt).split('|'); t.innerHTML='<b>'+parts[0]+'</b>'+parts.slice(1).map(p=>'<div class="xr">'+p+'</div>').join('')+(hint?'<div class="xhint">↳ Cliquez pour le détail</div>':''); t.style.display='block'; const w=t.offsetWidth,h=t.offsetHeight; let nx=x+14,ny=y+16; if(nx+w>window.innerWidth-8)nx=Math.max(8,x-w-14); if(ny+h>window.innerHeight-8)ny=Math.max(8,y-h-16); t.style.left=nx+'px'; t.style.top=ny+'px'; }
   function hide(){ const t=document.getElementById('xiTip'); if(t)t.style.display='none'; }
-  document.addEventListener('mouseover',e=>{ const el=e.target.closest&&e.target.closest('[data-explain]'); if(el){ const r=el.getBoundingClientRect(); show(el.getAttribute('data-explain'),r.right,r.top); } });
+  function closePop(){ const p=document.getElementById('xiPop'); if(p)p.remove(); }
+  function openPop(txt,el){ closePop(); hide(); const parts=String(txt).split('|');
+    const p=document.createElement('div'); p.id='xiPop';
+    p.innerHTML='<div class="xp-h"><b>'+parts[0]+'</b><span class="xp-x" role="button" aria-label="Fermer">✕</span></div>'
+      +'<div class="xp-body">'+parts.slice(1).map(x=>'<div class="xp-l">'+x+'</div>').join('')+'</div>';
+    (document.body||document.documentElement).appendChild(p);
+    const r=el.getBoundingClientRect(); const w=p.offsetWidth,h=p.offsetHeight;
+    let nx=r.right+10, ny=r.top; if(nx+w>window.innerWidth-8)nx=Math.max(8,r.left-w-10); if(ny+h>window.innerHeight-8)ny=Math.max(8,window.innerHeight-h-8);
+    p.style.left=nx+'px'; p.style.top=ny+'px';
+    const x=p.querySelector('.xp-x'); if(x)x.onclick=closePop;
+  }
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape')closePop(); });
+  document.addEventListener('mouseover',e=>{ const el=e.target.closest&&e.target.closest('[data-explain]'); if(el){ const r=el.getBoundingClientRect(); const clickable=!!(el.classList&&el.classList.contains('xi')); show(el.getAttribute('data-explain'),r.right,r.top,clickable); } });
   document.addEventListener('mouseout',e=>{ if(e.target.closest&&e.target.closest('[data-explain]'))hide(); });
-  document.addEventListener('click',e=>{ const el=e.target.closest&&e.target.closest('[data-explain]'); if(el){ e.stopPropagation(); const r=el.getBoundingClientRect(); show(el.getAttribute('data-explain'),r.right,r.top); clearTimeout(window.__xiT); window.__xiT=setTimeout(hide,7000); } else { hide(); } });
+  document.addEventListener('click',e=>{ const badge=e.target.closest&&e.target.closest('.xi[data-explain]'); if(badge){ e.stopPropagation(); openPop(badge.getAttribute('data-explain'),badge); return; } if(!(e.target.closest&&e.target.closest('#xiPop'))) closePop(); });
 })();
 function fmtDate(s){ if(!s)return '—'; const[y,m,d]=s.split('-'); return `${d}/${m}/${y.slice(2)}`; }
 // ===== Thème clair / sombre =====
@@ -3328,6 +3346,7 @@ const AL_TARIF = (function(){
   function closeKpiPopover(){ const d=document.getElementById('tfPop'); if(d)d.remove(); }
   function openKpiPopover(key,anchor){ const e=st._ex&&st._ex[key]; if(!e)return; closeKpiPopover();
     const xt=document.getElementById('xiTip'); if(xt)xt.style.display='none';
+    const _gp=document.getElementById('xiPop'); if(_gp)_gp.remove();
     const n2=(e.n2||[]).join('<br>'); const n3=(e.n3||[]).map(x=>'<li>'+x+'</li>').join('');
     const d=document.createElement('div'); d.id='tfPop';
     d.innerHTML=`<div class="tfpop-h"><span>${e.title} · <b>${e.result}</b></span><span class="tfpop-x" role="button" aria-label="Fermer"><i class="ti ti-x"></i></span></div>`+
