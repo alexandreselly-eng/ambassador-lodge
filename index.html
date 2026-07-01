@@ -620,6 +620,12 @@ td.actions{white-space:nowrap}
    #tfPop .tfpop-btns{display:flex;gap:7px;margin-top:11px}
    #tfPop .tfpop-btns button{font-size:11.5px;padding:4px 9px;border:1px solid var(--line);border-radius:7px;background:var(--panel2);color:var(--txt);cursor:pointer}
    #v-tarif .tfkpi-i{cursor:pointer}
+   #v-tarif .kpi.kpiclk{position:relative;cursor:pointer;transition:outline-color .12s}
+   #v-tarif .kpi.kpiclk:hover{outline:1.5px solid var(--gold);outline-offset:-1px}
+   #v-tarif .kpi.kpiclk .xi{opacity:.9}
+   #v-tarif .kpi.kpiclk::after{content:'détail ›';position:absolute;bottom:6px;right:9px;font-size:9.5px;font-weight:700;color:var(--gold);opacity:0;transition:opacity .12s;pointer-events:none}
+   #v-tarif .kpi.kpiclk:hover::after{opacity:.85}
+   #v-tarif .kpi.kpiclk[data-kpi="occ"]::after{display:none}
   @media(max-width:1100px){#v-tarif .kpis{grid-template-columns:repeat(2,1fr)}#v-tarif .g2{grid-template-columns:1fr}#v-tarif .tfcal{grid-template-columns:repeat(2,1fr)}}
   </style>
   <div id="tarifControls"></div>
@@ -961,7 +967,7 @@ const eur=(n)=>(n==null?'—':Math.round(n).toLocaleString('fr-FR')+' €');
 const pct=(n)=>(n==null?'—':(n*100).toFixed(0)+' %');
 const n0=(v)=>(typeof v==='number'?v:0);
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260701-170910';
+const APP_BUILD='20260701-172550';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
     const d=document.createElement('div'); d.id='newVerBar';
@@ -3089,13 +3095,13 @@ const AL_TARIF = (function(){
     const conv=avecM()?'ménage inclus':'hors ménage';
     const META=`<span><i class="ti ti-database" aria-hidden="true"></i> réservations${st.RULES.length?' + price_rules':''}</span><span><i class="ti ti-calendar" aria-hidden="true"></i> ${st.year}</span><span><i class="ti ti-scale" aria-hidden="true"></i> base ${P.dyear} j</span>`;
     const KX=(key,l,v,s,c,hover,ex)=>{ ex.title=ex.title||l; ex.result=ex.result||v; ex.meta=ex.meta||META; st._ex[key]=ex;
-      return `<div class="kpi ${c||''}"><div class="lab">${l}<span class="xi tfkpi-i" data-kpi="${key}" data-explain="${String(hover).replace(/"/g,'&quot;')}" tabindex="0" role="button" aria-label="Détail du calcul">ⓘ</span></div><div class="val">${v}</div><div class="sub">${s||''}</div></div>`; };
+      return `<div class="kpi kpiclk ${c||''}" data-kpi="${key}"><div class="lab">${l}<span class="xi" data-kpi="${key}" data-explain="${String(hover).replace(/"/g,'&quot;')}" tabindex="0" role="button" aria-label="Détail du calcul">ⓘ</span></div><div class="val">${v}</div><div class="sub">${s||''}</div></div>`; };
     const occBtns=[50,60,70,80,90,100].map(p=>`<button data-occ="${p/100}" class="${Math.round(P.occS*100)===p?'on':''}">${p}%</button>`).join('');
     st._ex['occ']={title:'Occupation simulée',result:Math.round(P.occS*100)+' %',n1:'Hypothèse de remplissage des nuitées disponibles restantes',n2:[`${P.avail} dispo × ${Math.round(P.occS*100)} % = ${P.soldSim} vendues (simulé)`],n3:['Modifiable au clic (boutons rapides) ou au curseur 0–100 %.','N’affecte que le CA potentiel restant, jamais l’engagé.'],meta:META};
-    const simCard=`<div class="kpi b2"><div class="lab">Occupation simulée<span class="xi tfkpi-i" data-kpi="occ" data-explain="Occupation simulée|Hypothèse de remplissage des dispo restantes|Cliquez pour le détail" tabindex="0" role="button" aria-label="Détail du calcul">ⓘ</span></div><div class="val">${Math.round(P.occS*100)} %</div><div class="occsim"><div class="occbtns" id="tfOccBtns">${occBtns}</div><input type="range" id="tfOccRange" min="0" max="100" step="5" value="${Math.round(P.occS*100)}"></div></div>`;
+    const simCard=`<div class="kpi kpiclk b2" data-kpi="occ"><div class="lab">Occupation simulée<span class="xi" data-kpi="occ" data-explain="Occupation simulée|Hypothèse de remplissage des dispo restantes|Cliquez pour le détail" tabindex="0" role="button" aria-label="Détail du calcul">ⓘ</span></div><div class="val">${Math.round(P.occS*100)} %</div><div class="occsim"><div class="occbtns" id="tfOccBtns">${occBtns}</div><input type="range" id="tfOccRange" min="0" max="100" step="5" value="${Math.round(P.occS*100)}"></div></div>`;
     const cmpYr=(o,yr)=> (o&&o.nights)? `${yr} : ${_eur(o.ca)} · ${Math.round(o.nights/diy(yr)*100)}%` : `${yr} : —`;
     st._ex['cmp']={title:'Comparaison N-1 / N-2',result:'historique',n1:'CA réalisé et occupation des deux exercices précédents',n2:[`${st.year-1} : ${prev1.nights?_eur(prev1.ca)+' · '+Math.round(prev1.nights/diy(st.year-1)*100)+' %':'—'}`,`${st.year-2} : ${prev2.nights?_eur(prev2.ca)+' · '+Math.round(prev2.nights/diy(st.year-2)*100)+' %':'—'}`],n3:['Occupation = nuits réservées ÷ jours de l’année.',`Convention : ${conv}.`],meta:META};
-    const cmpCard=`<div class="kpi"><div class="lab">Comparaison N-1 / N-2<span class="xi tfkpi-i" data-kpi="cmp" data-explain="Comparaison N-1/N-2|CA réalisé + occupation des 2 années précédentes|Cliquez pour le détail" tabindex="0" role="button" aria-label="Détail du calcul">ⓘ</span></div><div class="val" style="font-size:13px;line-height:1.5">${cmpYr(prev1,st.year-1)}<br>${cmpYr(prev2,st.year-2)}</div><div class="sub">historique réalisé</div></div>`;
+    const cmpCard=`<div class="kpi kpiclk" data-kpi="cmp"><div class="lab">Comparaison N-1 / N-2<span class="xi" data-kpi="cmp" data-explain="Comparaison N-1/N-2|CA réalisé + occupation des 2 années précédentes|Cliquez pour le détail" tabindex="0" role="button" aria-label="Détail du calcul">ⓘ</span></div><div class="val" style="font-size:13px;line-height:1.5">${cmpYr(prev1,st.year-1)}<br>${cmpYr(prev2,st.year-2)}</div><div class="sub">historique réalisé</div></div>`;
     return [
       KX('a1','CA réalisé à date',_eur(P.A1.ca),P.A1.nights+' nuits passées/en cours','b3','CA réalisé à date|Nuits déjà passées ou en cours|Cliquez pour le détail',
         {n1:'Σ (montant ÷ nuitées) des nuits dont la date ≤ aujourd’hui',n2:[`${P.A1.nights} nuits passées/en cours`,`= ${_eur(P.A1.ca)}`],n3:[`Périmètre : nuits ≤ aujourd’hui, exercice ${st.year}.`,'Prorata à la nuit (séjour à cheval scindé jour par jour).',`Convention : ${conv}.`]}),
@@ -3338,7 +3344,7 @@ const AL_TARIF = (function(){
     d.querySelector('.b3').onclick=()=>{ const l=d.querySelector('.l3'),l2=d.querySelector('.l2'); const show=l.style.display==='none'; l.style.display=show?'block':'none'; if(show)l2.style.display='block'; };
     if(!openKpiPopover._wired){ document.addEventListener('click',ev=>{ const p=document.getElementById('tfPop'); if(p && !(ev.target.closest&&ev.target.closest('#tfPop')) && !(ev.target.closest&&ev.target.closest('.tfkpi-i'))) closeKpiPopover(); }); openKpiPopover._wired=true; }
   }
-  function wireKpiInfo(){ document.querySelectorAll('#tarifKpis .tfkpi-i').forEach(el=>{ el.onclick=ev=>{ ev.stopPropagation(); ev.preventDefault(); openKpiPopover(el.getAttribute('data-kpi'),el); }; }); }
+  function wireKpiInfo(){ document.querySelectorAll('#tarifKpis .kpiclk[data-kpi]').forEach(card=>{ card.onclick=ev=>{ if(ev.target.closest('button,input,select,a,.occsim')) return; ev.stopPropagation(); const b=card.querySelector('.xi')||card; openKpiPopover(card.getAttribute('data-kpi'),b); }; }); }
   function wire(){
     document.querySelectorAll('#tfMen button').forEach(b=>b.onclick=()=>{st.menage=b.dataset.v;render();});
     const e=document.getElementById('tfExport'); if(e)e.onclick=exportCSV;
