@@ -982,7 +982,7 @@ const eur=(n)=>(n==null?'—':Math.round(n).toLocaleString('fr-FR')+' €');
 const pct=(n)=>(n==null?'—':(n*100).toFixed(0)+' %');
 const n0=(v)=>(typeof v==='number'?v:0);
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260701-173940';
+const APP_BUILD='20260701-182354';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
     const d=document.createElement('div'); d.id='newVerBar';
@@ -1647,6 +1647,21 @@ function render(){
     n2:['Immosphéra '+eur(cImmo)+' + Bibizfamily '+eur(cBibT),'= '+eur(comm)],
     n3:['Avant 01/02/2026 : Lodge 13 % · autres 20 %.','Dès 01/02/2026 : Ambassador 25 % · Lodge 13 % · Immosphera 13 % · autres 20 %.','≠ frais de plateforme (≈ 6,9 %, déjà inclus dans le CA « Net plateforme »).'].concat(isSH?['Estimé : barème appliqué au CA Superhote.']:[]),
     meta:_mdD};
+  window.__xiRich.prix={title:'Prix moyen / nuit',result:eur(prix),
+    n1:'CA ÷ nuitées',
+    n2:[eur(ca)+' ÷ '+nuit+' nuitées','= '+eur(prix)],
+    n3:['Nuitées = Σ (sortie − entrée).','Occupation moyenne = '+pct(occ)+' (nuitées ÷ jours du mois).',srcTag+'.'],
+    meta:_mdD};
+  window.__xiRich.taxe={title:'Taxes de séjour — à reverser (SCI)',result:eur(taxeSCI),
+    n1:'Σ taxe des séjours hors OTA (à reverser par la SCI)',
+    n2:['À reverser (SCI) : '+eur(taxeSCI),'OTA (reversé plateforme) : '+eur(taxeOTA),'Total collecté SCI+OTA : '+eur(taxe)],
+    n3:['OTA (Airbnb, Booking, Abritel/VRBO, Expedia) : taxe collectée & reversée par la plateforme → exclue du justificatif SCI.','Taux : 2 € / adulte / nuit · enfants (−18 ans) exonérés.','N\'entre ni dans le CA ni dans le bénéfice.'],
+    meta:_mdD};
+  window.__xiRich.reste={title:'Reste à encaisser',result:eur(reste),
+    n1:'Σ des soldes clients encore ouverts',
+    n2:['Par résa : montant + taxe − acomptes (1+2+3) − ménage'],
+    n3:(isSH?['⚠ '+srcTag+' : le CSV ne contient pas les acomptes → reste ≈ montant total.','Non comparable aux saisies.']:['Source : saisies.','Somme des soldes clients ouverts.']),
+    meta:_mdD};
   document.getElementById('kpis').innerHTML=[
     kpiCard(isSH?'Chiffre d\'affaires':'CA brut',eur(ca),`${nResa} réservations · ${nuit} nuitées${isSH?'':' · hors ménage & taxe de séjour'}`,'',
       {rich:'ca', txt:(isSH?`Chiffre d'affaires|Σ des montants — ${convLbl}`:`Chiffre d'affaires|Σ des montants d'hébergement (hors taxe & ménage)`)}),
@@ -1654,11 +1669,9 @@ function render(){
       {rich:'benef', txt:`Bénéfice net|CA − commission apporteur|Marge ${ca?Math.round(benef/ca*100):0} %`}),
     kpiCard('Commissions',eur(comm),`${ca?(comm/ca*100).toFixed(1):0} % du CA${isSH?' · estimé':''}`,'b6',
       {rich:'comm', txt:`Commissions|Barème apporteur (bien / apporteur / date)${isSH?' · estimé':''}`}),
-    kpiCard('Prix moyen / nuit',eur(prix),`occupation moy. ${pct(occ)}`,'b4',`Prix moyen / nuit|Formule : CA ÷ nuitées = ${eur(ca)} ÷ ${nuit}|Nuitées = Σ (sortie − entrée)|Occupation = moyenne du taux de remplissage (nuitées ÷ jours du mois)|${srcTag}`),
-    kpiCard('Taxes de séjour',eur(taxeSCI),'à reverser (SCI) · dont OTA '+eur(taxeOTA)+' · <button id="taxExtractBtn" class="kbtn" title="Justificatif détaillé de la période sélectionnée">⤓ justificatif</button>','b2',`Taxes de séjour — à reverser par la SCI|Σ taxe des séjours HORS OTA = ${eur(taxeSCI)}|OTA (Airbnb, Booking, Abritel/VRBO, Expedia) : ${eur(taxeOTA)} collecté & reversé directement par la plateforme (exclu)|Total collecté SCI+OTA : ${eur(taxe)}|N'entre pas dans le CA ni le bénéfice`),
-    kpiCard('Reste à encaisser',eur(reste),isSH?'⚠ acomptes absents du CSV':'soldes clients ouverts','b5',
-      isSH?`Reste à encaisser|Par résa : montant + taxe − acomptes − ménage|⚠ ${srcTag} : le CSV ne contient PAS les acomptes → reste ≈ montant total|Non comparable aux saisies`
-          :`Reste à encaisser|Par résa : montant + taxe − acomptes (1+2+3) − ménage|Somme des soldes clients encore ouverts|Source : saisies`),
+    kpiCard('Prix moyen / nuit',eur(prix),`occupation moy. ${pct(occ)}`,'b4',{rich:'prix', txt:`Prix moyen / nuit|CA ÷ nuitées`}),
+    kpiCard('Taxes de séjour',eur(taxeSCI),'à reverser (SCI) · dont OTA '+eur(taxeOTA)+' · <button id="taxExtractBtn" class="kbtn" title="Justificatif détaillé de la période sélectionnée">⤓ justificatif</button>','b2',{rich:'taxe', txt:`Taxes de séjour|À reverser (SCI) ${eur(taxeSCI)} · dont OTA ${eur(taxeOTA)}`}),
+    kpiCard('Reste à encaisser',eur(reste),isSH?'⚠ acomptes absents du CSV':'soldes clients ouverts','b5',{rich:'reste', txt:`Reste à encaisser|Soldes clients ouverts${isSH?' · ⚠ acomptes absents du CSV':''}`}),
   ].join('');
   const _teb=document.getElementById('taxExtractBtn'); if(_teb)_teb.onclick=genTaxeJustificatif;
   const _cb=document.getElementById('commBanner');
