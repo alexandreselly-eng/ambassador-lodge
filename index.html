@@ -607,6 +607,19 @@ td.actions{white-space:nowrap}
    #tfModal .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
    #tfModal .prev{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px;margin-top:13px;font-size:12.5px;line-height:1.65}
    #tfModal .acts{display:flex;gap:9px;justify-content:flex-end;margin-top:15px;flex-wrap:wrap}
+   #tfPop{position:fixed;z-index:100000;background:var(--panel);border:1px solid var(--gold);border-radius:12px;padding:12px 14px;width:340px;max-width:92vw;box-shadow:0 16px 48px rgba(0,0,0,.55);font-size:12.5px;color:var(--txt)}
+   #tfPop .tfpop-h{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:7px;margin-bottom:9px;font-weight:600}
+   #tfPop .tfpop-h b{color:var(--gold)}
+   #tfPop .tfpop-x{cursor:pointer;color:var(--muted)}
+   #tfPop .lv{display:block;color:var(--muted);font-size:10px;letter-spacing:.05em;margin-bottom:3px}
+   #tfPop .tfpop-l{margin-top:9px;padding-top:8px;border-top:1px dashed var(--line)}
+   #tfPop .tfpop-l:first-of-type{border-top:none;padding-top:0;margin-top:0}
+   #tfPop .mono{font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.8}
+   #tfPop ul{margin:4px 0 0;padding-left:16px;line-height:1.5}
+   #tfPop .tfpop-meta{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:11px;margin-top:8px}
+   #tfPop .tfpop-btns{display:flex;gap:7px;margin-top:11px}
+   #tfPop .tfpop-btns button{font-size:11.5px;padding:4px 9px;border:1px solid var(--line);border-radius:7px;background:var(--panel2);color:var(--txt);cursor:pointer}
+   #v-tarif .tfkpi-i{cursor:pointer}
   @media(max-width:1100px){#v-tarif .kpis{grid-template-columns:repeat(2,1fr)}#v-tarif .g2{grid-template-columns:1fr}#v-tarif .tfcal{grid-template-columns:repeat(2,1fr)}}
   </style>
   <div id="tarifControls"></div>
@@ -948,7 +961,7 @@ const eur=(n)=>(n==null?'—':Math.round(n).toLocaleString('fr-FR')+' €');
 const pct=(n)=>(n==null?'—':(n*100).toFixed(0)+' %');
 const n0=(v)=>(typeof v==='number'?v:0);
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260630-130158';
+const APP_BUILD='20260630-172555';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
     const d=document.createElement('div'); d.id='newVerBar';
@@ -3054,25 +3067,37 @@ const AL_TARIF = (function(){
   }
 
   // ---------- KPIs / projection ----------
-  function kpis(){ const P=projection(); const XI=(typeof xi==='function')?xi:()=>'';
+  function kpis(){ const P=projection(); st._ex={};
     const prev1=sumYear(st.bien,st.year-1,false), prev2=sumYear(st.bien,st.year-2,false);
-    const K=(l,v,s,c,ex)=>`<div class="kpi ${c||''}"><div class="lab">${l}${ex?XI(ex):''}</div><div class="val">${v}</div><div class="sub">${s||''}</div></div>`;
+    const conv=avecM()?'ménage inclus':'hors ménage';
+    const META=`<span><i class="ti ti-database" aria-hidden="true"></i> réservations${st.RULES.length?' + price_rules':''}</span><span><i class="ti ti-calendar" aria-hidden="true"></i> ${st.year}</span><span><i class="ti ti-scale" aria-hidden="true"></i> base ${P.dyear} j</span>`;
+    const KX=(key,l,v,s,c,hover,ex)=>{ ex.title=ex.title||l; ex.result=ex.result||v; ex.meta=ex.meta||META; st._ex[key]=ex;
+      return `<div class="kpi ${c||''}"><div class="lab">${l}<span class="xi tfkpi-i" data-kpi="${key}" data-explain="${String(hover).replace(/"/g,'&quot;')}" tabindex="0" role="button" aria-label="Détail du calcul">ⓘ</span></div><div class="val">${v}</div><div class="sub">${s||''}</div></div>`; };
     const occBtns=[50,60,70,80,90,100].map(p=>`<button data-occ="${p/100}" class="${Math.round(P.occS*100)===p?'on':''}">${p}%</button>`).join('');
-    const simCard=`<div class="kpi b2"><div class="lab">Occupation simulée${XI('Occupation simulée|Hypothèse de remplissage des nuitées disponibles restantes|Sert au calcul du CA projeté|Modifiable au clic (boutons) ou au curseur 0–100 %')}</div>
-      <div class="val">${Math.round(P.occS*100)} %</div>
-      <div class="occsim"><div class="occbtns" id="tfOccBtns">${occBtns}</div><input type="range" id="tfOccRange" min="0" max="100" step="5" value="${Math.round(P.occS*100)}"></div></div>`;
+    st._ex['occ']={title:'Occupation simulée',result:Math.round(P.occS*100)+' %',n1:'Hypothèse de remplissage des nuitées disponibles restantes',n2:[`${P.avail} dispo × ${Math.round(P.occS*100)} % = ${P.soldSim} vendues (simulé)`],n3:['Modifiable au clic (boutons rapides) ou au curseur 0–100 %.','N’affecte que le CA potentiel restant, jamais l’engagé.'],meta:META};
+    const simCard=`<div class="kpi b2"><div class="lab">Occupation simulée<span class="xi tfkpi-i" data-kpi="occ" data-explain="Occupation simulée|Hypothèse de remplissage des dispo restantes|Cliquez pour le détail" tabindex="0" role="button" aria-label="Détail du calcul">ⓘ</span></div><div class="val">${Math.round(P.occS*100)} %</div><div class="occsim"><div class="occbtns" id="tfOccBtns">${occBtns}</div><input type="range" id="tfOccRange" min="0" max="100" step="5" value="${Math.round(P.occS*100)}"></div></div>`;
     const cmpYr=(o,yr)=> (o&&o.nights)? `${yr} : ${_eur(o.ca)} · ${Math.round(o.nights/diy(yr)*100)}%` : `${yr} : —`;
+    st._ex['cmp']={title:'Comparaison N-1 / N-2',result:'historique',n1:'CA réalisé et occupation des deux exercices précédents',n2:[`${st.year-1} : ${prev1.nights?_eur(prev1.ca)+' · '+Math.round(prev1.nights/diy(st.year-1)*100)+' %':'—'}`,`${st.year-2} : ${prev2.nights?_eur(prev2.ca)+' · '+Math.round(prev2.nights/diy(st.year-2)*100)+' %':'—'}`],n3:['Occupation = nuits réservées ÷ jours de l’année.',`Convention : ${conv}.`],meta:META};
+    const cmpCard=`<div class="kpi"><div class="lab">Comparaison N-1 / N-2<span class="xi tfkpi-i" data-kpi="cmp" data-explain="Comparaison N-1/N-2|CA réalisé + occupation des 2 années précédentes|Cliquez pour le détail" tabindex="0" role="button" aria-label="Détail du calcul">ⓘ</span></div><div class="val" style="font-size:13px;line-height:1.5">${cmpYr(prev1,st.year-1)}<br>${cmpYr(prev2,st.year-2)}</div><div class="sub">historique réalisé</div></div>`;
     return [
-      K('CA réalisé à date',_eur(P.A1.ca),P.A1.nights+' nuits passées/en cours','b3',`CA réalisé à date|Σ (montant ÷ nuitées) des nuits déjà passées ou en cours en ${st.year}|Convention : ${avecM()?'ménage inclus':'hors ménage'}|Prorata à la nuit (séjours à cheval scindés)`),
-      K('CA engagé annuel',_eur(P.A2.ca),'réservations '+st.year+' (futures incl.)','b4',`CA engagé annuel confirmé|Σ de toutes les réservations confirmées de ${st.year}, y compris à venir|${P.A2.nights} nuits réservées|Convention : ${avecM()?'ménage inclus':'hors ménage'}`),
-      K('CA potentiel restant',_eur(P.B),P.priced+'/'+P.avail+' nuits dispo tarifées','b5',`CA brut potentiel restant @100%|Σ prix applicable sur les nuitées disponibles (today → 31/12)|Prix applicable = règle gagnante, sinon prix conseillé|Exclut les nuits futures déjà réservées (comptées dans l'engagé)`),
-      K('CA annuel projeté',_eur(P.total),'engagé + potentiel × '+Math.round(P.occS*100)+'%','b2',`CA brut annuel projeté|= CA engagé annuel confirmé + (CA potentiel restant × taux d'occupation simulé)|${_eur(P.A2.ca)} + (${_eur(P.B)} × ${Math.round(P.occS*100)}%) = ${_eur(P.total)}`),
+      KX('a1','CA réalisé à date',_eur(P.A1.ca),P.A1.nights+' nuits passées/en cours','b3','CA réalisé à date|Nuits déjà passées ou en cours|Cliquez pour le détail',
+        {n1:'Σ (montant ÷ nuitées) des nuits dont la date ≤ aujourd’hui',n2:[`${P.A1.nights} nuits passées/en cours`,`= ${_eur(P.A1.ca)}`],n3:[`Périmètre : nuits ≤ aujourd’hui, exercice ${st.year}.`,'Prorata à la nuit (séjour à cheval scindé jour par jour).',`Convention : ${conv}.`]}),
+      KX('a2','CA engagé annuel',_eur(P.A2.ca),'réservations '+st.year+' (futures incl.)','b4','CA engagé annuel confirmé|Toutes les réservations de l’année, futures incluses|Cliquez pour le détail',
+        {n1:'Σ de toutes les réservations confirmées de l’année (futures incluses)',n2:[`${P.A2.nights} nuits réservées en ${st.year}`,`= ${_eur(P.A2.ca)}`],n3:['Inclut les réservations futures déjà confirmées.','Prorata à la nuit.',`Convention : ${conv}.`]}),
+      KX('b','CA potentiel restant',_eur(P.B),P.priced+'/'+P.avail+' nuits dispo tarifées','b5','CA potentiel restant @100 %|Σ prix applicable sur les nuitées disponibles|Cliquez pour le détail',
+        {n1:'Σ du prix applicable sur les nuitées disponibles (aujourd’hui → 31/12), à 100 %',n2:[`${P.priced} nuitées tarifées / ${P.avail} disponibles`,`= ${_eur(P.B)} (à 100 % d’occupation)`],n3:['Prix applicable = règle gagnante (manuel > spécial > WE > semaine > défaut), sinon prix conseillé.','Garde-fou : exclut les nuits futures déjà réservées (comptées dans l’engagé).','Nuitée disponible = future, non réservée, non bloquée, non passée.']}),
+      KX('proj','CA annuel projeté',_eur(P.total),'engagé + potentiel × '+Math.round(P.occS*100)+'%','b2','CA annuel projeté|Engagé + (potentiel × occupation simulée)|Cliquez pour le détail',
+        {n1:'CA engagé annuel + (potentiel restant × occupation simulée)',n2:[`${_eur(P.A2.ca)} + (${_eur(P.B)} × ${Math.round(P.occS*100)} %)`,`= ${_eur(P.A2.ca)} + ${_eur(P.projB)}`,`= ${_eur(P.total)}`],n3:['Engagé = réservations confirmées (A2).','Potentiel = nuitées dispo × prix applicable (B).','Occupation simulée = curseur (hypothèse).','Garde-fou anti-double-comptage : une nuit future réservée est dans l’engagé, jamais dans le potentiel.']}),
       simCard,
-      K('Nuitées dispo restantes',P.avail,P.soldSim+' vendues / '+P.unsold+' invendues (simulé)','',`Nuitées disponibles restantes|Futures, non réservées, non passées|Vendues simulées = dispo × taux simulé (${Math.round(P.occS*100)}%)`),
-      K('Nuitées réservées',P.A2.nights,'sur '+P.dyear+' j (base '+(P.dyear===366?'bissextile':'standard')+')','',`Nuitées réservées|Nb de nuits réservées sur ${st.year}|Base d'occupation = ${P.dyear} jours (${P.dyear===366?'année bissextile':'année standard'})`),
-      K('Taux occupation actuel',Math.round(P.occAct*100)+'%','réservées ÷ '+P.dyear+' j','b6',`Taux d'occupation actuel|Nuits réservées ÷ jours de l'exercice|${P.A2.nights} ÷ ${P.dyear} = ${Math.round(P.occAct*100)}%`),
-      K('Panier moyen / nuitée',_eur(P.pm),'CA engagé ÷ nuits réservées','',`Panier moyen par nuitée|CA engagé annuel ÷ nuits réservées|${_eur(P.A2.ca)} ÷ ${P.A2.nights||0} = ${_eur(P.pm)}|Convention : ${avecM()?'ménage inclus':'hors ménage'}`),
-      `<div class="kpi"><div class="lab">Comparaison N-1 / N-2${XI('Comparaison N-1/N-2|CA réalisé et occupation des deux exercices précédents|Occupation = nuits réservées ÷ jours de l année')}</div><div class="val" style="font-size:13px;line-height:1.5">${cmpYr(prev1,st.year-1)}<br>${cmpYr(prev2,st.year-2)}</div><div class="sub">historique réalisé</div></div>`,
+      KX('avail','Nuitées dispo restantes',P.avail,P.soldSim+' vendues / '+P.unsold+' invendues (simulé)','','Nuitées disponibles restantes|Futures non réservées jusqu’au 31/12|Cliquez pour le détail',
+        {n1:'Nuitées futures non réservées jusqu’au 31/12',n2:[`${P.avail} disponibles`,`${P.soldSim} vendues / ${P.unsold} invendues (à ${Math.round(P.occS*100)} %)`],n3:['Disponible = future, non réservée, non bloquée, non passée.',`Vendues simulées = ${P.avail} × ${Math.round(P.occS*100)} % = ${P.soldSim}.`]}),
+      KX('nres','Nuitées réservées',P.A2.nights,'sur '+P.dyear+' j (base '+(P.dyear===366?'bissextile':'standard')+')','','Nuitées réservées|Nb de nuits réservées sur l’année|Cliquez pour le détail',
+        {n1:'Nombre de nuits réservées sur l’exercice',n2:[`${P.A2.nights} nuits / base ${P.dyear} j`],n3:[`Base d’occupation = ${P.dyear} jours (${P.dyear===366?'année bissextile':'année standard'}).`]}),
+      KX('occact','Taux occupation actuel',Math.round(P.occAct*100)+'%','réservées ÷ '+P.dyear+' j','b6','Taux d’occupation actuel|Nuits réservées ÷ jours de l’exercice|Cliquez pour le détail',
+        {n1:'Nuits réservées ÷ jours de l’exercice',n2:[`${P.A2.nights} ÷ ${P.dyear} = ${Math.round(P.occAct*100)} %`],n3:[`Base dynamique ${P.dyear} j (365 normale / 366 bissextile).`]}),
+      KX('pm','Panier moyen / nuitée',_eur(P.pm),'CA engagé ÷ nuits réservées','','Panier moyen par nuitée|CA engagé ÷ nuits réservées|Cliquez pour le détail',
+        {n1:'CA engagé annuel ÷ nuits réservées',n2:[`${_eur(P.A2.ca)} ÷ ${P.A2.nights||0} = ${_eur(P.pm)}`],n3:[`Convention : ${conv}.`]}),
+      cmpCard,
     ].join('');
   }
 
@@ -3268,7 +3293,7 @@ const AL_TARIF = (function(){
     renderCharts();
     wire();
   }
-  function renderKpis(){ document.getElementById('tarifKpis').innerHTML=kpis(); wireOcc(); }
+  function renderKpis(){ document.getElementById('tarifKpis').innerHTML=kpis(); wireOcc(); wireKpiInfo(); }
   function tip(html,x,y){const t=document.getElementById('tarifTip');if(!t)return;t.innerHTML=html;t.style.display='block';const w=t.offsetWidth,h=t.offsetHeight;let nx=x+14,ny=y+14;if(nx+w>window.innerWidth)nx=x-w-14;if(ny+h>window.innerHeight)ny=y-h-14;t.style.left=nx+'px';t.style.top=ny+'px';}
   function exportCSV(){ const g=st.G.grid.filter(x=>x.bien===st.bien); const conv=avecM()?'menage_inclus':'hors_menage'; const wp=(st.G.wePremium&&st.G.wePremium[st.bien])||1.12;
     const lines=[['Bien','Convention','Semaine','Date','Occ_hist_%','Tarif_actuel_ADR_median','Prix_conseille','Prix_weekend','Confiance']];
@@ -3277,6 +3302,26 @@ const AL_TARIF = (function(){
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='reference-prix-'+st.bien+'-'+st.year+'-'+conv+'.csv'; a.click(); }
   function wireOcc(){ document.querySelectorAll('#tfOccBtns button').forEach(b=>b.onclick=()=>{st.occSim=+b.dataset.occ;renderKpis();});
     const r=document.getElementById('tfOccRange'); if(r)r.oninput=()=>{st.occSim=(+r.value)/100;renderKpis();}; }
+  function closeKpiPopover(){ const d=document.getElementById('tfPop'); if(d)d.remove(); }
+  function openKpiPopover(key,anchor){ const e=st._ex&&st._ex[key]; if(!e)return; closeKpiPopover();
+    const xt=document.getElementById('xiTip'); if(xt)xt.style.display='none';
+    const n2=(e.n2||[]).join('<br>'); const n3=(e.n3||[]).map(x=>'<li>'+x+'</li>').join('');
+    const d=document.createElement('div'); d.id='tfPop';
+    d.innerHTML=`<div class="tfpop-h"><span>${e.title} · <b>${e.result}</b></span><span class="tfpop-x" role="button" aria-label="Fermer"><i class="ti ti-x"></i></span></div>`+
+      `<div class="tfpop-l"><span class="lv"><i class="ti ti-equal" aria-hidden="true"></i> NIVEAU 1 · RÉSUMÉ</span><div>${e.n1||''}</div></div>`+
+      `<div class="tfpop-l l2" style="display:none"><span class="lv"><i class="ti ti-math-function" aria-hidden="true"></i> NIVEAU 2 · DÉTAIL CHIFFRÉ</span><div class="mono">${n2}</div></div>`+
+      `<div class="tfpop-l l3" style="display:none"><span class="lv"><i class="ti ti-list-details" aria-hidden="true"></i> NIVEAU 3 · COMPLET</span><ul>${n3}</ul>${e.meta?('<div class="tfpop-meta">'+e.meta+'</div>'):''}</div>`+
+      `<div class="tfpop-btns"><button class="b2"><i class="ti ti-plus" aria-hidden="true"></i> Détail chiffré</button><button class="b3"><i class="ti ti-plus" aria-hidden="true"></i> Tout afficher</button></div>`;
+    document.body.appendChild(d);
+    const r=anchor.getBoundingClientRect(); const w=d.offsetWidth,h=d.offsetHeight;
+    let x=r.right+8,y=r.top; if(x+w>window.innerWidth)x=Math.max(8,r.left-w-8); if(y+h>window.innerHeight)y=Math.max(8,window.innerHeight-h-8);
+    d.style.left=x+'px'; d.style.top=y+'px';
+    d.querySelector('.tfpop-x').onclick=closeKpiPopover;
+    d.querySelector('.b2').onclick=()=>{ const l=d.querySelector('.l2'); l.style.display=l.style.display==='none'?'block':'none'; };
+    d.querySelector('.b3').onclick=()=>{ const l=d.querySelector('.l3'),l2=d.querySelector('.l2'); const show=l.style.display==='none'; l.style.display=show?'block':'none'; if(show)l2.style.display='block'; };
+    if(!openKpiPopover._wired){ document.addEventListener('click',ev=>{ const p=document.getElementById('tfPop'); if(p && !(ev.target.closest&&ev.target.closest('#tfPop')) && !(ev.target.closest&&ev.target.closest('.tfkpi-i'))) closeKpiPopover(); }); openKpiPopover._wired=true; }
+  }
+  function wireKpiInfo(){ document.querySelectorAll('#tarifKpis .tfkpi-i').forEach(el=>{ el.onclick=ev=>{ ev.stopPropagation(); ev.preventDefault(); openKpiPopover(el.getAttribute('data-kpi'),el); }; }); }
   function wire(){
     document.querySelectorAll('#tfMen button').forEach(b=>b.onclick=()=>{st.menage=b.dataset.v;render();});
     const e=document.getElementById('tfExport'); if(e)e.onclick=exportCSV;
@@ -3291,7 +3336,7 @@ const AL_TARIF = (function(){
       else if(act==='toggle'){ const r=st.RULES.find(x=>x.id===id); if(r)await toggleRule(id,!r.actif); }
       await loadRules(); render(); });
     document.querySelectorAll('#tarifCal .tfd[data-d]').forEach(el=>el.onclick=()=>openRuleModal('manuel',el.dataset.d));
-    wireOcc();
+    wireOcc(); wireKpiInfo();
     document.querySelectorAll('#tarifCal .tfd[data-tip]').forEach(el=>{ el.onmousemove=ev=>{const parts=(el.dataset.tip||'').split('|');tip('<div class="ttl">'+parts[0]+'</div>'+parts.slice(1).filter(Boolean).map(p=>'<div>'+p+'</div>').join(''),ev.clientX,ev.clientY);}; el.onmouseleave=()=>{const t=document.getElementById('tarifTip');if(t)t.style.display='none';}; });
   }
   async function init(){ if(typeof AL_HOL!=='undefined' && !AL_TARIF._hr){ const t=new Date().getUTCFullYear(); try{ await AL_HOL.load([t-2,t-1,t,t+1],{fallback:(typeof AL_HOL_FALLBACK!=='undefined'?AL_HOL_FALLBACK:null)}); }catch(e){} AL_TARIF._hr=true; }
