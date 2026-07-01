@@ -961,7 +961,7 @@ const eur=(n)=>(n==null?'—':Math.round(n).toLocaleString('fr-FR')+' €');
 const pct=(n)=>(n==null?'—':(n*100).toFixed(0)+' %');
 const n0=(v)=>(typeof v==='number'?v:0);
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260630-172555';
+const APP_BUILD='20260701-170910';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
     const d=document.createElement('div'); d.id='newVerBar';
@@ -1550,6 +1550,9 @@ function applySort(pairs,mode){ const [by,dir]=mode.split('-'); const s=dir==='a
 
 // ---------- Justificatif Taxe de séjour (format SCI M&M) ----------
 const TAXE_TAUX=2; // € / adulte / nuit (enfants -18 ans exonérés)
+const OTA_CANAUX=['airbnb','booking','abritel','vrbo','expedia']; // plateformes qui collectent & reversent la taxe de séjour
+function _normOTA(s){ return (''+(s||'')).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
+function isOTA(d){ const s=_normOTA(d&&d.origine)+' '+_normOTA(d&&d.plateforme); return OTA_CANAUX.some(o=>s.includes(o)); }
 function genTaxeJustificatif(){
   const numv=(v)=>(typeof v==='number'&&!isNaN(v))?v:(parseFloat(v)||0);
   const fdate=s=>{ if(!s)return '—'; const a=(''+s).split('-'); return a.length>=3?(a[2].slice(0,2)+'/'+a[1]):s; };
@@ -1559,8 +1562,11 @@ function genTaxeJustificatif(){
       && (state.chan==='all'||d.origine===state.chan)
       && (state.month==='all'||d.mois===+state.month) )
       .slice().sort((a,b)=>(a.entree||'').localeCompare(b.entree||''));
+  const _chanOTA = state.chan!=='all' && OTA_CANAUX.some(o=>_normOTA(state.chan).includes(o));
+  const rsOTA=rs.filter(isOTA), rsSCI=rs.filter(d=>!isOTA(d));
+  const taxeOTA=rsOTA.reduce((s,d)=>s+numv(d.taxe),0);
   let tN=0,tA=0,tE=0,tDue=0,tColl=0;
-  const body=rs.map(d=>{ const nuits=numv(d.nuitees);
+  const body=rsSCI.map(d=>{ const nuits=numv(d.nuitees);
     const adultes=(d.nb_adultes!=null&&d.nb_adultes!=='')?numv(d.nb_adultes):numv(d.nb_pers);
     const enfants=Math.max(0,numv(d.nb_pers)-adultes);
     const due=adultes*nuits*TAXE_TAUX, coll=numv(d.taxe);
@@ -1579,11 +1585,11 @@ function genTaxeJustificatif(){
    +'td.c{text-align:center}td.r{text-align:right}tfoot td{padding:10px 11px;background:#eef1f6;font-weight:700;border-top:2px solid #2b3445}tfoot td.c{text-align:center}tfoot td.r{text-align:right}'
    +'.note{color:#5a6573;font-size:11.5px;font-style:italic;margin-top:12px;line-height:1.5}@media print{body{margin:12mm}}</style></head><body>'
    +'<h1>Taxe de séjour — '+periode+'</h1>'
-   +'<div class="sub">SCI M&amp;M · '+bienLbl+' · Canal : '+canalLbl+' · Taux '+eur2(TAXE_TAUX)+' / adulte / nuit · Enfants (−18 ans) exonérés</div>'
+   +'<div class="sub">SCI M&amp;M · '+bienLbl+' · Canal : '+canalLbl+' · Taux '+eur2(TAXE_TAUX)+' / adulte / nuit · Enfants (−18 ans) exonérés · Hors plateformes OTA (Airbnb, Booking, Abritel/VRBO, Expedia) — taxe reversée par la plateforme</div>'
    +'<table><thead><tr><th>Client</th><th>Bien</th><th>Canal</th><th>Dates de séjour</th><th class="c">Nuits</th><th class="c">Adultes</th><th class="c">Enfants</th><th class="r">Taxe due</th></tr></thead>'
-   +'<tbody>'+(body||'<tr><td colspan="8" style="text-align:center;color:#5a6573;padding:16px">Aucun séjour sur la période sélectionnée.</td></tr>')+'</tbody>'
-   +'<tfoot><tr><td colspan="4">TOTAL — '+rs.length+' séjour(s)</td><td class="c">'+tN+'</td><td class="c">'+tA+'</td><td class="c">'+tE+'</td><td class="r">'+eur2(tDue)+'</td></tr></tfoot></table>'
-   +'<div class="note">Taxe due (calcul SCI) = adultes × nuits × taux. Taxe déjà collectée (référence, info) : '+eur2(tColl)+'.<br>Document généré le '+today+' — à transmettre comme justificatif comptable.</div>'
+   +'<tbody>'+(body||'<tr><td colspan="8" style="text-align:center;color:#5a6573;padding:16px">'+(_chanOTA?'Canal OTA sélectionné : taxe reversée par la plateforme, aucun justificatif SCI à produire.':'Aucun séjour (hors OTA) sur la période sélectionnée.')+'</td></tr>')+'</tbody>'
+   +'<tfoot><tr><td colspan="4">TOTAL — '+rsSCI.length+' séjour(s)</td><td class="c">'+tN+'</td><td class="c">'+tA+'</td><td class="c">'+tE+'</td><td class="r">'+eur2(tDue)+'</td></tr></tfoot></table>'
+   +'<div class="note">Taxe due (calcul SCI) = adultes × nuits × taux. Taxe déjà collectée (référence, info) : '+eur2(tColl)+'.'+(taxeOTA>0?' Taxe OTA exclue (reversée par la plateforme) : '+eur2(taxeOTA)+'.':'')+'<br>Document généré le '+today+' — à transmettre comme justificatif comptable.</div>'
    +'<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},300);};</scr'+'ipt></body></html>';
   const w=window.open('','_blank'); if(!w){ alert('Autorisez les pop-ups pour générer le justificatif.'); return; }
   w.document.open(); w.document.write(html); w.document.close();
@@ -1595,7 +1601,7 @@ function render(){
   document.getElementById('subtitle').textContent=`Source ${state.dataSource==='superhote'?'Superhote (CSV)':'Saisies'} · Exercice ${state.year} · ${state.log==='all'?(visBiens().join(' + ')||'tous biens'):state.log} · ${state.chan==='all'?'tous canaux':state.chan}${state.month!=='all'?' · '+MONTHS[state.month-1]:''} · ${nResa} réservations`;
   const ca=rows.reduce((s,d)=>s+(d.montant||0),0), benef=rows.reduce((s,d)=>s+(d.benefice||0),0), comm=rows.reduce((s,d)=>s+(d.commission||0),0);
   const cImmo=rows.reduce((s,d)=>s+(d.comm_immo||0),0), cBibN=rows.reduce((s,d)=>s+(d.comm_bibiz_new||0),0), cBibR=rows.reduce((s,d)=>s+(d.comm_bibiz_runoff||0),0); const cBibT=cBibN+cBibR;
-  const nuit=rows.reduce((s,d)=>s+(d.nuitees||0),0), taxe=rows.reduce((s,d)=>s+(d.taxe||0),0), reste=rows.reduce((s,d)=>s+(d.reste_a_payer||0),0);
+  const nuit=rows.reduce((s,d)=>s+(d.nuitees||0),0), taxe=rows.reduce((s,d)=>s+(d.taxe||0),0), reste=rows.reduce((s,d)=>s+(d.reste_a_payer||0),0); const taxeOTA=rows.filter(isOTA).reduce((s,d)=>s+(d.taxe||0),0), taxeSCI=taxe-taxeOTA;
   const prix=nuit?ca/nuit:null; const occR=rows.filter(d=>d.tx_rempl!=null); const occ=occR.length?occR.reduce((s,d)=>s+d.tx_rempl,0)/occR.length:null;
   const ob=activeObj(), objAnnual=ob.obj*12;
   const isSH=state.dataSource==='superhote';
@@ -1613,7 +1619,7 @@ function render(){
       isSH?`Commissions (estimées)|Barème apporteur appliqué au CA Superhote|Ambassador 25 % · Lodge 13 % · Immosphera 13 % · autres 20 % (dès 01/02/2026)|≠ frais de plateforme (≈6,9 %, déjà dans le CA « Net plateforme »)`
           :`Commissions = commission apporteur|Barème avant 01/02/2026 : Lodge 13 % · autres 20 %|Dès 01/02/2026 : Ambassador 25 %, Lodge 13 %, Immosphera 13 %, autres 20 %`),
     kpiCard('Prix moyen / nuit',eur(prix),`occupation moy. ${pct(occ)}`,'b4',`Prix moyen / nuit|Formule : CA ÷ nuitées = ${eur(ca)} ÷ ${nuit}|Nuitées = Σ (sortie − entrée)|Occupation = moyenne du taux de remplissage (nuitées ÷ jours du mois)|${srcTag}`),
-    kpiCard('Taxes de séjour',eur(taxe),'collectées · <button id="taxExtractBtn" class="kbtn" title="Justificatif détaillé de la période sélectionnée">⤓ justificatif</button>','b2',`Taxes de séjour|Σ du champ « taxe » des réservations|${isSH?'Taxe réellement collectée (export Superhote)':'Saisie manuelle'}|N'entre pas dans le CA ni le bénéfice`),
+    kpiCard('Taxes de séjour',eur(taxeSCI),'à reverser (SCI) · dont OTA '+eur(taxeOTA)+' · <button id="taxExtractBtn" class="kbtn" title="Justificatif détaillé de la période sélectionnée">⤓ justificatif</button>','b2',`Taxes de séjour — à reverser par la SCI|Σ taxe des séjours HORS OTA = ${eur(taxeSCI)}|OTA (Airbnb, Booking, Abritel/VRBO, Expedia) : ${eur(taxeOTA)} collecté & reversé directement par la plateforme (exclu)|Total collecté SCI+OTA : ${eur(taxe)}|N'entre pas dans le CA ni le bénéfice`),
     kpiCard('Reste à encaisser',eur(reste),isSH?'⚠ acomptes absents du CSV':'soldes clients ouverts','b5',
       isSH?`Reste à encaisser|Par résa : montant + taxe − acomptes − ménage|⚠ ${srcTag} : le CSV ne contient PAS les acomptes → reste ≈ montant total|Non comparable aux saisies`
           :`Reste à encaisser|Par résa : montant + taxe − acomptes (1+2+3) − ménage|Somme des soldes clients encore ouverts|Source : saisies`),
@@ -1648,10 +1654,15 @@ function render(){
   const caM=monthly(rows,'montant'),nuitM=monthly(rows,'nuitees'); const prixM=caM.map((v,i)=>nuitM[i]?v/nuitM[i]:0);
   mk('cPrix',{type:'line',data:{labels:MONTHS,datasets:[{label:'Prix/nuit',data:prixM,borderColor:css('--blue'),backgroundColor:'rgba(88,166,255,.12)',fill:true,tension:.3,pointRadius:3,pointBackgroundColor:css('--blue'),datalabels:DL(eur,css('--blue'))}]},options:baseOpt({money:true,legend:false})});
   renderCommission(rows);
-  const taxeM=monthly(rows,'taxe');
-  const taxeDS=[{label:'Taxes séjour',data:taxeM,backgroundColor:css('--violet'),borderRadius:5,datalabels:DL(eur,css('--violet'))}];
-  let taxeOpt=baseOpt({money:true,legend:state.cumul});
-  if(state.cumul){ taxeDS.push(cumulDS('Taxes cumulées',taxeM,css('--green'))); addY1(taxeOpt,css('--green')); }
+  const _rowsSCI=rows.filter(d=>!isOTA(d)), _rowsOTA=rows.filter(isOTA);
+  const taxeM=monthly(_rowsSCI,'taxe'), taxeOTAM=monthly(_rowsOTA,'taxe');
+  const taxeDS=[
+    {label:'À reverser (SCI)',data:taxeM,backgroundColor:css('--violet'),borderRadius:5,stack:'t',datalabels:DL(eur,css('--violet'))},
+    {label:'OTA — reversé plateforme',data:taxeOTAM,backgroundColor:css('--orange'),borderRadius:5,stack:'t',datalabels:{display:false}}
+  ];
+  let taxeOpt=baseOpt({money:true,legend:true});
+  taxeOpt.scales=taxeOpt.scales||{}; taxeOpt.scales.x=Object.assign({},taxeOpt.scales.x,{stacked:true}); taxeOpt.scales.y=Object.assign({},taxeOpt.scales.y,{stacked:true});
+  if(state.cumul){ taxeDS.push(cumulDS('Cumul SCI',taxeM,css('--green'))); addY1(taxeOpt,css('--green')); }
   mk('cTaxe',{type:'bar',data:{labels:MONTHS,datasets:taxeDS},options:taxeOpt});
   renderObjectives(rows,benefM,ob,benef,objAnnual); renderReservs(rows); renderExplorer(); renderRecon();
   renderBreakdownTable({ id:'brkBenef', host:'brkBenef', rows:rows, title:'Benefice_net_mensuel', detail:true, columns:[
@@ -1691,9 +1702,15 @@ function render(){
     {key:'ctot', label:'Total', kind:'calc', calc:(S,m)=>(S.cimmo[m]||0)+(S.cbibiz[m]||0), total:(T)=>(T.cimmo||0)+(T.cbibiz||0), fmt:eur, tip:()=>'Immosphéra + Bibizfamily'},
     {key:'ccum', label:'Cumul', kind:'calc', calc:(S,m)=>{let x=0;for(let i=0;i<=m;i++)x+=(S.cimmo[i]||0)+(S.cbibiz[i]||0);return x;}, total:(T)=>(T.cimmo||0)+(T.cbibiz||0), fmt:eur, color:'--green', tip:()=>'Commission cumulée à fin de mois'}
   ]});
+  const _tMsci=monthly(rows.filter(d=>!isOTA(d)),'taxe'), _tMota=monthly(rows.filter(isOTA),'taxe');
+  const _tMall=MONTHS.map((_,i)=>(_tMsci[i]||0)+(_tMota[i]||0));
+  let _tacc=0; const _tMcum=_tMsci.map(v=>_tacc+=(v||0));
+  const _tsum=a=>a.reduce((s,v)=>s+(v||0),0);
   renderBreakdownTable({ id:'brkTaxe', host:'brkTaxe', rows:rows, title:'Taxes_sejour', detail:true, columns:[
-    {key:'tax', label:'Taxe collectée', field:'taxe', fmt:eur, color:'--violet', tip:()=>'Σ taxe de séjour du mois'},
-    {key:'taxcum', label:'Cumul', kind:'calc', calc:(S,m)=>{let x=0;for(let i=0;i<=m;i++)x+=(S.taxe[i]||0);return x;}, total:(T)=>T.taxe, fmt:eur, color:'--green', tip:()=>'Taxe cumulée à fin de mois'}
+    {key:'tsci', label:'À reverser (SCI)', series:_tMsci, totalVal:_tsum(_tMsci), fmt:eur, color:'--violet', tip:()=>'Σ taxe des séjours hors OTA (à reverser par la SCI)'},
+    {key:'tota', label:'OTA (reversé plateforme)', series:_tMota, totalVal:_tsum(_tMota), fmt:eur, color:'--orange', tip:()=>'Taxe collectée & reversée par la plateforme (Airbnb, Booking, Abritel/VRBO, Expedia)'},
+    {key:'tall', label:'Total collecté', series:_tMall, totalVal:_tsum(_tMall), fmt:eur, tip:()=>'SCI + OTA'},
+    {key:'tcum', label:'Cumul SCI', series:_tMcum, totalVal:_tsum(_tMsci), fmt:eur, color:'--green', tip:()=>'Taxe SCI (à reverser) cumulée à fin de mois'}
   ]});
 }
 
