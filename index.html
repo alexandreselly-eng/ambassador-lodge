@@ -286,7 +286,7 @@ td.actions{white-space:nowrap}
   </div>
   <div class="card" id="brkBenefCard"><h3>Bénéfice net mensuel — tableau mensuel <span class="hint">cliquez un mois pour le détail des réservations · survolez un chiffre pour le calcul</span></h3><div id="brkBenef"></div></div><div class="card" id="brkChanCard"><h3>CA par canal — tableau mensuel <span class="hint">cliquez un mois pour le détail · survolez pour le calcul</span></h3><div id="brkChan"></div></div><div class="card" id="brkLogCard"><h3>Répartition par bien — tableau mensuel <span class="hint">CA par bien · cliquez un mois pour le détail</span></h3><div id="brkLog"></div></div>
   <div class="grid g2">
-    <div class="card"><h3>Taux d'occupation <span class="hint">nuitées / jours du mois</span></h3><div class="desc">Moyenne des taux de remplissage.</div><div class="chartbox sm"><canvas id="cOcc"></canvas></div></div>
+    <div class="card"><h3>Taux d'occupation <span class="hint">nuitées ÷ (jours × biens)</span></h3><div class="desc">Σ nuitées du mois ÷ (jours du mois × nombre de biens du périmètre).</div><div class="chartbox sm"><canvas id="cOcc"></canvas></div></div>
     <div class="card"><h3>Prix moyen / nuit <span class="hint">€</span></h3><div class="desc">CA du mois / nuitées du mois.</div><div class="chartbox sm"><canvas id="cPrix"></canvas></div></div>
   </div>
   <div class="card" id="brkOccCard"><h3>Taux d'occupation — tableau mensuel <span class="hint">nuitées & taux par mois · cliquez un mois pour le détail</span></h3><div id="brkOcc"></div></div>
@@ -985,7 +985,7 @@ const eur=(n)=>(n==null?'—':Math.round(n).toLocaleString('fr-FR')+' €');
 const pct=(n)=>(n==null?'—':(n*100).toFixed(0)+' %');
 const n0=(v)=>(typeof v==='number'?v:0);
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260701-183906';
+const APP_BUILD='20260712-221022';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
     const d=document.createElement('div'); d.id='newVerBar';
@@ -1565,6 +1565,28 @@ function currentRows(){ const out=[];
     monthSlices(d,state.year).forEach(sl=>{ if(state.month==='all'||sl.mois===+state.month) out.push(sl); }); });
   return out; }
 function monthly(rows,f){ const a=Array(12).fill(0); rows.forEach(d=>{ if(d.mois&&d[f]) a[d.mois-1]+=d[f]; }); return a; }
+// ---- Taux d'occupation = Σ nuitées ÷ (jours du mois × nombre de biens du périmètre) ----
+// Chaque bien = 1 logement. Périmètre « tous » → dénominateur multiplié par le nb de biens visibles.
+function occUnits(){ return Math.max(1, state.log==='all' ? (typeof visBiens==='function'?visBiens().length:1) : 1); }
+function occStats(rows){
+  const nU=occUnits();
+  const occM=Array(12).fill(0);
+  for(let m=1;m<=12;m++){
+    const dim=daysInMonth(state.year,m);
+    const nights=rows.reduce((s,d)=>s+((d.mois===m)?(d.nuitees||0):0),0);
+    occM[m-1]= dim? nights/(dim*nU)*100 : 0;
+  }
+  let occ=null;
+  const nightsTot=rows.reduce((s,d)=>s+(d.nuitees||0),0);
+  if(state.month!=='all'){
+    const dim=daysInMonth(state.year,+state.month);
+    occ= dim? nightsTot/(dim*nU) : null;
+  } else {
+    let yDays=0; for(let m=1;m<=12;m++) yDays+=daysInMonth(state.year,m);
+    occ= yDays? nightsTot/(yDays*nU) : null;
+  }
+  return {occM, occ, nU};
+}
 function cumul(a){ let s=0; return a.map(v=>s+=v); }
 function activeObj(){ let o=0,c=0,pm=0; (state.log==='all'?visBiens():[state.log]).forEach(b=>{const x=objFor(state.year,b)||{obj:0,comm:0,pm:0}; o+=x.obj;c+=x.comm;pm+=x.pm;}); return {obj:o,comm:c,pm}; }
 function destroy(id){ if(charts[id]){charts[id].destroy(); delete charts[id];} }
@@ -1626,7 +1648,7 @@ function render(){
   const ca=rows.reduce((s,d)=>s+(d.montant||0),0), benef=rows.reduce((s,d)=>s+(d.benefice||0),0), comm=rows.reduce((s,d)=>s+(d.commission||0),0);
   const cImmo=rows.reduce((s,d)=>s+(d.comm_immo||0),0), cBibN=rows.reduce((s,d)=>s+(d.comm_bibiz_new||0),0), cBibR=rows.reduce((s,d)=>s+(d.comm_bibiz_runoff||0),0); const cBibT=cBibN+cBibR;
   const nuit=rows.reduce((s,d)=>s+(d.nuitees||0),0), taxe=rows.reduce((s,d)=>s+(d.taxe||0),0), reste=rows.reduce((s,d)=>s+(d.reste_a_payer||0),0); const taxeOTA=rows.filter(isOTA).reduce((s,d)=>s+(d.taxe||0),0), taxeSCI=taxe-taxeOTA;
-  const prix=nuit?ca/nuit:null; const occR=rows.filter(d=>d.tx_rempl!=null); const occ=occR.length?occR.reduce((s,d)=>s+d.tx_rempl,0)/occR.length:null;
+  const prix=nuit?ca/nuit:null; const _occS=occStats(rows); const occ=_occS.occ;
   const ob=activeObj(), objAnnual=ob.obj*12;
   const isSH=state.dataSource==='superhote';
   const _net=state.shMontantConv==='net_plateforme';
@@ -1653,7 +1675,7 @@ function render(){
   window.__xiRich.prix={title:'Prix moyen / nuit',result:eur(prix),
     n1:'CA ÷ nuitées',
     n2:[eur(ca)+' ÷ '+nuit+' nuitées','= '+eur(prix)],
-    n3:['Nuitées = Σ (sortie − entrée).','Occupation moyenne = '+pct(occ)+' (nuitées ÷ jours du mois).',srcTag+'.'],
+    n3:['Nuitées = Σ (sortie − entrée).','Occupation = '+pct(occ)+' (Σ nuitées ÷ (jours × '+_occS.nU+' bien'+(_occS.nU>1?'s':'')+')).',srcTag+'.'],
     meta:_mdD};
   window.__xiRich.taxe={title:'Taxes de séjour — à reverser (SCI)',result:eur(taxeSCI),
     n1:'Σ taxe des séjours hors OTA (à reverser par la SCI)',
@@ -1700,8 +1722,7 @@ function render(){
   const lgTot=lgP.reduce((s,p)=>s+p[1],0);
   mk('cLog',{type:'doughnut',data:{labels:lgP.map(p=>p[0]),datasets:[{data:lgP.map(p=>p[1]),backgroundColor:lgP.map(p=>bienColor(p[0])),borderColor:css('--panel'),borderWidth:2,datalabels:state.labels?{display:true,color:'#0d1117',font:{size:11,weight:'700'},formatter:v=>PCT?(lgTot?(v/lgTot*100).toFixed(1)+' %':''):eur(v)}:{display:false}}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'bottom',labels:{boxWidth:11,padding:10}},datalabels:state.labels?{display:true}:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${eur(c.parsed)} (${lgTot?(c.parsed/lgTot*100).toFixed(1):0} %)`}}}}});
-  const occM=Array(12).fill(0);
-  for(let m=1;m<=12;m++){const r=rows.filter(d=>d.mois===m&&d.tx_rempl!=null); if(r.length) occM[m-1]=r.reduce((s,d)=>s+d.tx_rempl,0)/r.length*100;}
+  const occM=_occS.occM;
   mk('cOcc',{type:'bar',data:{labels:MONTHS,datasets:[{label:'Occupation',data:occM,backgroundColor:css('--lodge'),borderRadius:5,datalabels:DL(v=>Math.round(v)+'%')}]},options:baseOpt({suffix:' %',legend:false,max:110})});
   const caM=monthly(rows,'montant'),nuitM=monthly(rows,'nuitees'); const prixM=caM.map((v,i)=>nuitM[i]?v/nuitM[i]:0);
   mk('cPrix',{type:'line',data:{labels:MONTHS,datasets:[{label:'Prix/nuit',data:prixM,borderColor:css('--blue'),backgroundColor:'rgba(88,166,255,.12)',fill:true,tension:.3,pointRadius:3,pointBackgroundColor:css('--blue'),datalabels:DL(eur,css('--blue'))}]},options:baseOpt({money:true,legend:false})});
@@ -1741,7 +1762,7 @@ function render(){
   const _intf=v=>v==null?'—':Math.round(v).toLocaleString('fr-FR');
   renderBreakdownTable({ id:'brkOcc', host:'brkOcc', rows:rows, title:'Taux_occupation', detail:true, columns:[
     {key:'nuit', label:'Nuitées', field:'nuitees', fmt:_intf, tip:()=>'Σ nuitées du mois'},
-    {key:'occ', label:"Taux d'occupation", series:occM, totalVal:(occ!=null?occ*100:null), fmt:v=>v==null?'—':v.toFixed(0)+' %', color:'--lodge', tip:()=>'Moyenne des taux de remplissage (nuitées ÷ jours du mois)'}
+    {key:'occ', label:"Taux d'occupation", series:occM, totalVal:(occ!=null?occ*100:null), fmt:v=>v==null?'—':v.toFixed(0)+' %', color:'--lodge', tip:()=>'Σ nuitées du mois ÷ (jours du mois × '+_occS.nU+' bien'+(_occS.nU>1?'s':'')+')'}
   ]});
   renderBreakdownTable({ id:'brkPrix', host:'brkPrix', rows:rows, title:'Prix_moyen_nuit', detail:true, columns:[
     {key:'caP', label:'CA', field:'montant', fmt:eur, tip:()=>'Σ CA du mois'},
