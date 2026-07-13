@@ -948,6 +948,7 @@ let PROPERTIES = [ {nom:'Ambassador',superhote_labels:['Ambassador'],couleur:'#d
 let MY_BIENS = null;   // null = tous ; sinon liste des biens visibles par l'utilisateur
 function allBiens(){ return PROPERTIES.filter(p=>p.actif!==false).sort((a,b)=>(a.ordre||99)-(b.ordre||99)).map(p=>p.nom); }
 function visBiens(){ const all=allBiens(); return MY_BIENS? all.filter(b=>MY_BIENS.includes(b)) : all; }
+function bienVisible(b){ return MY_BIENS ? MY_BIENS.includes(b) : true; }
 function propOf(b){ return PROPERTIES.find(p=>p.nom===b) || {nom:b,couleur:'#888',obj_mois_defaut:0,superhote_labels:[b]}; }
 function bienColor(b){ return propOf(b).couleur || '#888'; }
 async function loadProperties(){
@@ -1278,7 +1279,7 @@ function rebuildSH(){ SH_ROWS = SH_RAW.map(shToReservation).map(compute); }
 // Rapprochement Excel ↔ Superhote (CA net de commission plateforme) sur le périmètre courant
 function renderRecon(){ const card=document.getElementById('reconCard'); if(!card)return;
   const scope=r=>r.annee===state.year && (state.log==='all'||r.logement===state.log);
-  const xl=SAISIES_ROWS.filter(scope); const sh=SH_RAW.filter(r=>r.annee===state.year && (state.log==='all'||r.logement===state.log));
+  const xl=SAISIES_ROWS.filter(r=>bienVisible(r.logement)&&scope(r)); const sh=SH_RAW.filter(r=>bienVisible(r.logement)&&r.annee===state.year && (state.log==='all'||r.logement===state.log));
   if(!xl.length && !sh.length){ card.style.display='none'; return; }
   const xlCA=xl.reduce((s,r)=>s+n0s(r.montant),0);
   const shNet=sh.reduce((s,r)=>s+(n0s(r.montant_paye)-n0s(r.taxe)-n0s(r.commission)),0);
@@ -1310,7 +1311,7 @@ async function loadSuperhoteRows(){ SH_RAW=[]; if(!SUPA){ SH_ROWS=[]; return; }
         _seen.set(k,s.bien); SH_RAW.push(r); }); });
     if(SH_DIAG.dupCount) console.warn('[Intégrité] '+SH_DIAG.dupCount+' réservation(s) Superhote en double ignorée(s) :',SH_DIAG.dupPairs);
   }catch(e){ SH_RAW=[]; } rebuildSH(); }
-function applyDataSource(){ ROWS = (state.dataSource==='superhote')? SH_ROWS : SAISIES_ROWS; }
+function applyDataSource(){ const base=(state.dataSource==='superhote')? SH_ROWS : SAISIES_ROWS; ROWS = MY_BIENS ? base.filter(d=>bienVisible(d.logement)) : base; }
 function setDataSource(src){ state.dataSource=src; try{localStorage.setItem('al_src',src);}catch(e){} applyDataSource();
   document.querySelectorAll('#fSource button').forEach(x=>x.classList.toggle('on',x.dataset.v===src));
   const sb=document.getElementById('shInfo'); if(sb) sb.style.display=(src==='superhote')?'inline-flex':'none';
@@ -1561,7 +1562,7 @@ function monthSlices(d, year){
   });
 }
 function currentRows(){ const out=[];
-  ROWS.forEach(d=>{ if(!(state.log==='all'||d.logement===state.log))return; if(!(state.chan==='all'||d.origine===state.chan))return;
+  ROWS.forEach(d=>{ if(!bienVisible(d.logement))return; if(!(state.log==='all'||d.logement===state.log))return; if(!(state.chan==='all'||d.origine===state.chan))return;
     monthSlices(d,state.year).forEach(sl=>{ if(state.month==='all'||sl.mois===+state.month) out.push(sl); }); });
   return out; }
 function monthly(rows,f){ const a=Array(12).fill(0); rows.forEach(d=>{ if(d.mois&&d[f]) a[d.mois-1]+=d[f]; }); return a; }
