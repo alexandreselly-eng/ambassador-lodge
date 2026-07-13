@@ -1439,6 +1439,7 @@ function exitEditMode(){
   document.getElementById('editBanner').style.display='none';
 }
 async function saveForm(){
+  if(PREVIEW.active){ toast('Lecture seule en mode aperçu.'); return; }
   const r={ logement:val('inLogement'), origine:val('inOrigine'),
     date_resa:val('inDateResa')||null, entree:val('inEntree'), sortie:val('inSortie'),
     nom:val('inNom')||null, prenom:val('inPrenom')||null,
@@ -1468,14 +1469,16 @@ async function saveForm(){
 function numOrNull(id){ const v=val(id); if(v==='')return null; const n=parseFloat(v.replace(',','.')); return isNaN(n)?null:n; }
 
 // --- actions réservations: éditer / supprimer / historique ---
-async function actEdit(id){ const r=ROWS.find(x=>x.id===id); if(r) enterEditMode(r); }
+async function actEdit(id){ if(PREVIEW.active){ toast('Lecture seule en mode aperçu.'); return; } const r=ROWS.find(x=>x.id===id); if(r) enterEditMode(r); }
 async function actDelete(id){
+  if(PREVIEW.active){ toast('Lecture seule en mode aperçu.'); return; }
   const r=ROWS.find(x=>x.id===id); if(!r) return;
   if(!confirm(`Mettre à la corbeille la réservation de ${(r.nom||'')} (${fmtDate(r.entree)}) ?\nElle sera conservée 6 mois et restaurable.`)) return;
   try{ await Store.softDelete(id); await reload(); buildFilters(); render(); toast('Réservation mise à la corbeille.'); }
   catch(e){ alert('Erreur : '+e.message); }
 }
 async function actRestore(id){
+  if(PREVIEW.active){ toast('Lecture seule en mode aperçu.'); return; }
   try{ await Store.restore(id); await reload(); buildFilters(); render(); renderTrash(); toast('Réservation restaurée.'); }
   catch(e){ alert('Erreur : '+e.message); }
 }
@@ -2080,6 +2083,7 @@ function renderObjEditor(){
   if(dEl) dEl.textContent='('+biens.map(bn=>{const d=_objDef(bn); return `${bn} ${d.obj} / ${d.comm} / ${d.pm}`;}).join(' · ')+')';
 }
 async function saveObjectives(){
+  if(PREVIEW.active){ toast('Lecture seule en mode aperçu.'); return; }
   const m=document.getElementById('objMsg'); const y=state.year;
   const recs=[]; let bad=false;
   _objBiens.forEach(({bien,i})=>{ const obj=numOrNull('obj_'+i+'_obj'), comm=numOrNull('obj_'+i+'_comm'), pm=numOrNull('obj_'+i+'_pm');
