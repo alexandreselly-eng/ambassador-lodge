@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ambassador & Lodge — Outil de pilotage</title>
+<title>BnB pilot</title>
 <script>(function(){try{if(localStorage.getItem('al_theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
@@ -141,7 +141,7 @@ td.actions{white-space:nowrap}
 <!-- ÉCRAN D'AUTHENTIFICATION -->
 <div id="authOverlay">
   <div class="authcard">
-    <h2>Ambassador <span class="acc">&amp;</span> Lodge</h2>
+    <h2>BnB <span class="acc">pilot</span></h2>
     <p>Connectez-vous pour accéder à l'outil de pilotage et de saisie.</p>
     <input id="authEmail" type="email" placeholder="Adresse e-mail" autocomplete="username">
     <input id="authPwd" type="password" placeholder="Mot de passe" autocomplete="current-password">
@@ -167,7 +167,7 @@ td.actions{white-space:nowrap}
 <div id="pwdOverlay" style="display:none">
   <div class="authcard">
     <h2>Bienvenue <span class="acc">!</span></h2>
-    <p>Définissez votre mot de passe pour accéder à l'outil Ambassador &amp; Lodge.</p>
+    <p>Définissez votre mot de passe pour accéder à l'outil BnB pilot.</p>
     <input id="newPwd" type="password" placeholder="Nouveau mot de passe" autocomplete="new-password">
     <input id="newPwd2" type="password" placeholder="Confirmer le mot de passe" autocomplete="new-password">
     <button class="btn" id="btnSetPwd" style="width:100%;margin-top:4px">Définir mon mot de passe</button>
@@ -180,7 +180,7 @@ td.actions{white-space:nowrap}
 <div class="wrap">
 <header class="top">
   <div class="brand">
-    <h1>Ambassador <span class="acc">&amp;</span> Lodge — <span class="acc">Outil</span></h1>
+    <h1>BnB <span class="acc">pilot</span></h1>
     <p id="subtitle">Saisie &amp; pilotage · valeurs recalculées</p>
     <div id="syncBadge" class="syncbadge" style="display:none"></div>
     <div class="usr"><button id="btnExpert" title="Affiche les analyses avancées (calendrier, prix conseillés)" style="display:none">☆ Mode Expert</button><button id="btnTheme" class="btn sec" title="Basculer clair / sombre" style="padding:4px 10px;font-size:11px">☾ Sombre</button><span class="modebadge" id="modeBadge">—</span><span id="userBadge"></span><button class="btn sec" id="btnLogout" style="display:none;padding:4px 10px;font-size:11px">Déconnexion</button></div>
@@ -928,7 +928,7 @@ const AL_HOL_FALLBACK = {
 <script>
 
 // =====================================================================
-// Ambassador & Lodge — Outil fusionné (saisie + pilotage)
+// BnB pilot — Outil fusionné (saisie + pilotage)
 // Recalcul intégral côté client · Supabase (online) ou mode local
 // =====================================================================
 
@@ -1181,7 +1181,7 @@ function drillFromChart(id,i,chart){
 function download(name,type,content){ const b=new Blob([content],{type}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(u),1500); }
 function chartTitle(id){ const cv=document.getElementById(id); const card=cv&&cv.closest('.card'); const h=card&&card.querySelector('h3'); return h? h.childNodes[0].textContent.trim() : id; }
 function exportCSV(id){ const c=charts[id]; if(!c)return; const labs=c.data.labels||[]; const ds=c.data.datasets.filter(d=>d.data&&d.data.length); const header=['Catégorie',...ds.map(d=>d.label||'Série')]; const lines=[header.join(';')]; labs.forEach((lab,i)=>{ lines.push([lab,...ds.map(d=>{const v=d.data[i]; return v==null?'':String(v).replace('.',',');})].join(';')); }); download(chartTitle(id).replace(/[^\w]+/g,'_')+'.csv','text/csv;charset=utf-8','﻿'+lines.join('\n')); }
-function exportPDF(id){ const cv=document.getElementById(id); if(!cv||!window.jspdf)return; const img=cv.toDataURL('image/png',1.0); const {jsPDF}=window.jspdf; const pdf=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'}); pdf.setFontSize(15); pdf.setTextColor(30); pdf.text('Ambassador & Lodge — '+chartTitle(id),14,16); pdf.setFontSize(9); pdf.setTextColor(120); pdf.text('Exercice '+state.year+' · '+(state.log==='all'?'Ambassador + Lodge':state.log)+' · '+new Date().toLocaleDateString('fr-FR'),14,22); const W=270,H=Math.min(W*cv.height/cv.width,165); pdf.setFillColor(13,17,23); pdf.rect(12,26,W+4,H+6,'F'); pdf.addImage(img,'PNG',14,29,W,H); pdf.save(chartTitle(id).replace(/[^\w]+/g,'_')+'.pdf'); }
+function exportPDF(id){ const cv=document.getElementById(id); if(!cv||!window.jspdf)return; const img=cv.toDataURL('image/png',1.0); const {jsPDF}=window.jspdf; const pdf=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'}); pdf.setFontSize(15); pdf.setTextColor(30); pdf.text('BnB pilot — '+chartTitle(id),14,16); pdf.setFontSize(9); pdf.setTextColor(120); pdf.text('Exercice '+state.year+' · '+(state.log==='all'?'Ambassador + Lodge':state.log)+' · '+new Date().toLocaleDateString('fr-FR'),14,22); const W=270,H=Math.min(W*cv.height/cv.width,165); pdf.setFillColor(13,17,23); pdf.rect(12,26,W+4,H+6,'F'); pdf.addImage(img,'PNG',14,29,W,H); pdf.save(chartTitle(id).replace(/[^\w]+/g,'_')+'.pdf'); }
 function toggleFull(card){ if(document.fullscreenElement===card){ document.exitFullscreen(); } else if(card.requestFullscreen){ card.requestFullscreen().catch(()=>{}); } }
 function injectCardTools(){
   document.querySelectorAll('.card').forEach(card=>{
@@ -2222,7 +2222,7 @@ function exportBrkPDF(cfg){
   const foot=[['TOTAL '+state.year,...cols.map((c,i)=>fmtc(c,tv(c,i)))]];
   const {jsPDF}=window.jspdf; const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
   const title=(cfg.title||cfg.id||'tableau').replace(/_/g,' ');
-  doc.setFontSize(14); doc.setTextColor(30); doc.text('Ambassador & Lodge — '+title,14,15);
+  doc.setFontSize(14); doc.setTextColor(30); doc.text('BnB pilot — '+title,14,15);
   doc.setFontSize(9); doc.setTextColor(120); doc.text('Exercice '+state.year+' · '+(state.log==='all'?'tous biens':state.log)+(state.month!=='all'?' · '+MONTHS[state.month-1]:'')+' · '+new Date().toLocaleDateString('fr-FR'),14,21);
   if(typeof doc.autoTable!=='function'){ alert('Module PDF (autoTable) non chargé'); return; }
   doc.autoTable({head:head,body:body,foot:foot,startY:25,
