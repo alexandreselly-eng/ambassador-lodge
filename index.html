@@ -773,6 +773,14 @@ td.actions{white-space:nowrap}
 
 <!-- ADMIN -->
 <div class="view" id="v-admin">
+  <div class="card" id="previewAsCard">
+    <h3>Voir en tant que <span class="hint">aperçu du périmètre d'un utilisateur · lecture seule</span></h3>
+    <div class="desc">Visualisez l'outil avec les biens et les onglets d'un utilisateur, sans vous déconnecter et sans son mot de passe. Aucune modification n'est possible pendant l'aperçu.</div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <select id="selPreviewUser" style="flex:1;min-width:240px;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:9px 11px;font-size:13.5px"></select>
+      <button class="btn" id="btnPreviewAs">Activer l'aperçu</button>
+    </div>
+  </div>
   <div class="card">
     <h3>Gestion des accès <span class="hint" id="adminCount"></span></h3>
     <div class="desc">Saisissez l'e-mail d'une personne à autoriser : elle reçoit automatiquement une invitation pour créer son mot de passe et se connecter. Seuls les e-mails listés ici (et vous) peuvent accéder à l'outil.</div>
@@ -1846,6 +1854,10 @@ async function renderAdmin(){
     : '<tr><td colspan="5" style="color:var(--muted)">Aucun accès autorisé pour l\'instant.</td></tr>';
   document.querySelectorAll('#adminBody .mini-act').forEach(b=>b.onclick=()=>removeAuthorized(b.dataset.em));
   document.querySelectorAll('#adminBody .bienchip').forEach(b=>b.onclick=()=>toggleUserBien(b.dataset.em,b.dataset.b,rows));
+  const _sel=document.getElementById('selPreviewUser');
+  if(_sel){ _sel.innerHTML='<option value="">— choisir un utilisateur —</option>'+rows.map(r=>{ const list=Array.isArray(r.biens_autorises)?r.biens_autorises:null; return '<option value="'+r.email+'" data-biens="'+(list?list.join('|'):'')+'">'+r.email+(list?' ('+list.length+' bien'+(list.length>1?'s':'')+')':' (tous les biens)')+'</option>'; }).join(''); }
+  const _bpa=document.getElementById('btnPreviewAs');
+  if(_bpa) _bpa.onclick=function(){ const s=document.getElementById('selPreviewUser'); if(!s||!s.value) return; const opt=s.options[s.selectedIndex]; const bs=(opt.getAttribute('data-biens')||''); enterPreview(s.value, bs? bs.split('|') : null); };
   renderProps();
   renderCommEditor();
   renderConnections();
