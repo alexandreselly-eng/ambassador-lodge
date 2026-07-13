@@ -1003,18 +1003,18 @@ function hasUnsavedInput(){
 // ===== Détecteur de nouvelle version (anti-cache) =====
 const APP_BUILD='20260712-221022';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
+  function forceReload(build){ try{ if(sessionStorage.getItem('al_reloaded_build')===build){ showBanner(); return; } sessionStorage.setItem('al_reloaded_build',build); }catch(e){} location.href=location.pathname+'?v='+Date.now(); }
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
     const d=document.createElement('div'); d.id='newVerBar';
     d.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#1d9e75;color:#04221a;padding:10px 16px;font:600 13px/1.35 -apple-system,Segoe UI,Roboto,sans-serif;display:flex;align-items:center;justify-content:center;gap:12px;box-shadow:0 -4px 16px rgba(0,0,0,.35)';
-    d.innerHTML='\uD83D\uDD04 Une nouvelle version de l\u2019outil est disponible.&nbsp;<button id="newVerReload" style="background:#04221a;color:#fff;border:none;border-radius:7px;padding:6px 14px;font-weight:700;cursor:pointer">Recharger</button>&nbsp;<span id="newVerClose" title="Ignorer" style="cursor:pointer;opacity:.7;font-size:16px">\u2715</span>';
+    d.innerHTML='\uD83D\uDD04 Une nouvelle version de l\u2019outil est disponible. Enregistrez votre saisie puis rechargez.&nbsp;<button id="newVerReload" style="background:#04221a;color:#fff;border:none;border-radius:7px;padding:6px 14px;font-weight:700;cursor:pointer">Recharger</button>';
     document.body.appendChild(d);
     document.getElementById('newVerReload').onclick=function(){ location.href=location.pathname+'?v='+Date.now(); };
-    document.getElementById('newVerClose').onclick=function(){ d.remove(); };
   }
   async function check(){ if(done)return; try{
       const r=await fetch(location.pathname+'?cb='+Date.now(),{cache:'no-store'}); if(!r.ok)return;
       const txt=await r.text(); const m=txt.match(/APP_BUILD='([^']+)'/);
-      if(m&&m[1]&&m[1]!==APP_BUILD) showBanner();
+      if(m&&m[1]&&m[1]!==APP_BUILD){ if(hasUnsavedInput()) showBanner(); else forceReload(m[1]); }
     }catch(e){} }
   setTimeout(check, 8000); setInterval(check, 300000);
   document.addEventListener('visibilitychange',function(){ if(!document.hidden) check(); });
