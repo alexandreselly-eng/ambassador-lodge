@@ -2353,7 +2353,7 @@ function dataHealthCheck(){
   const SRh=SH_RAW.filter(r=>inScope(r.logement));
   // 1) Doublons Superhote neutralisés au chargement
   if(typeof SH_DIAG!=='undefined'&&SH_DIAG.dupCount){
-    const pairs=Object.entries(SH_DIAG.dupPairs||{}).filter(([k])=>L==='all'||k.includes(L)); const nd=pairs.reduce((x,[,n])=>x+n,0);
+    const pairs=Object.entries(SH_DIAG.dupPairs||{}).filter(([k])=>{ const _p=(''+k).split(' ↔ '); return _p.every(x=>bienVisible(x)) && (L==='all'||k.includes(L)); }); const nd=pairs.reduce((x,[,n])=>x+n,0);
     if(nd) issues.push({sev:'Majeur',cat:'Doublon Superhote',detail:`${nd} réservation(s) en double détectée(s) et ignorée(s) automatiquement (${pairs.map(([k,n])=>k+' ×'+n).join(' · ')}). La base contient des snapshots redondants → nettoyer.`});
     else if(SRh.length) ok.push(`Superhote : ${SRh.length} ligne(s)${L==='all'?'':' ('+L+')'}, aucun doublon.`);
   } else if(typeof SH_DIAG!=='undefined'&&SRh.length){ ok.push(`Superhote : ${SRh.length} ligne(s)${L==='all'?'':' ('+L+')'}, aucun doublon.`); }
