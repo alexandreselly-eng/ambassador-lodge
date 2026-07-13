@@ -1090,6 +1090,7 @@ if(SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase){ SUPA=window.supabase.c
 const ONLINE=!!SUPA;
 const EDGE_URL = SUPABASE_URL ? SUPABASE_URL.replace(/\/$/,'')+'/functions/v1/invite' : '';
 let IS_ADMIN=false, NEEDS_PASSWORD=false;
+let PREVIEW={active:false,email:null,savedMyBiens:undefined,savedIsAdmin:undefined};
 let SESSION_ID=null, HEARTBEAT=null, SESS_WIRED=false;
 async function startSession(){
   if(!SUPA||!CURRENT_USER||!CURRENT_USER.email) return;
@@ -1225,6 +1226,18 @@ async function checkAccess(email){
     return {admin:false, authorized:!!au};
   }catch(e){ return {admin:false, authorized:false}; }
 }
+function applyTabVisibility(){
+  const at=document.querySelector('.tabs button[data-t="admin"]'); if(at) at.style.display=IS_ADMIN?'inline-block':'none';
+  const st=document.querySelector('.tabs button[data-t="saisie"]');
+  if(PREVIEW.active){
+    document.querySelectorAll('.tabs button.exp-tab').forEach(t=>t.style.display='none');
+    const be=document.getElementById('btnExpert'); if(be) be.style.display='none';
+    if(st) st.style.display='none';
+  } else {
+    if(st) st.style.display='';
+    if(typeof AL_EXPERT!=='undefined') AL_EXPERT.apply();
+  }
+}
 async function enterApp(user){
   CURRENT_USER=user;
   if(NEEDS_PASSWORD){ showSetPassword(); return; }
@@ -1233,7 +1246,7 @@ async function enterApp(user){
   hideAll(); document.getElementById('app').style.display='block';
   document.getElementById('userBadge').textContent=(user.email||'connecté')+(IS_ADMIN?' · admin':'');
   document.getElementById('btnLogout').style.display = ONLINE?'inline-block':'none';
-  const at=document.querySelector('.tabs button[data-t="admin"]'); if(at) at.style.display=IS_ADMIN?'inline-block':'none';
+  applyTabVisibility();
   try{ const s=localStorage.getItem('al_src'); if(s)state.dataSource=s; const c=localStorage.getItem('al_shconv'); if(c)state.shMontantConv=c; }catch(e){}
   await reload(); initUI(); startSession();
   applyTheme(curTheme()); renderSyncBadge();
@@ -1243,6 +1256,36 @@ async function enterApp(user){
   const _sb=document.getElementById('shInfo'); if(_sb)_sb.style.display=(state.dataSource==='superhote')?'inline-flex':'none';
   const _cw=document.getElementById('shConvWrap'); if(_cw)_cw.style.display=(state.dataSource==='superhote')?'flex':'none';
 }
+function enterPreview(email,biens){
+  if(!IS_ADMIN && !PREVIEW.active) return;
+  if(PREVIEW.active){ MY_BIENS=PREVIEW.savedMyBiens; IS_ADMIN=PREVIEW.savedIsAdmin; }
+  PREVIEW.savedMyBiens=MY_BIENS; PREVIEW.savedIsAdmin=IS_ADMIN;
+  PREVIEW.active=true; PREVIEW.email=email;
+  MY_BIENS = Array.isArray(biens)? biens.slice() : null;
+  IS_ADMIN=false;
+  applyTabVisibility(); applyDataSource();
+  showPreviewBanner();
+  const d=document.querySelector('.tabs button[data-t="dash"]'); if(d) d.click();
+  buildFilters(); render();
+}
+function exitPreview(){
+  if(!PREVIEW.active) return;
+  MY_BIENS=PREVIEW.savedMyBiens; IS_ADMIN=PREVIEW.savedIsAdmin;
+  PREVIEW.active=false; PREVIEW.email=null;
+  applyTabVisibility(); applyDataSource();
+  hidePreviewBanner();
+  buildFilters(); render();
+}
+function showPreviewBanner(){
+  let b=document.getElementById('previewBar');
+  if(!b){ b=document.createElement('div'); b.id='previewBar';
+    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99998;background:linear-gradient(90deg,#8957e5,#6f42c1);color:#fff;padding:8px 16px;font:600 13px/1.35 -apple-system,Segoe UI,Roboto,sans-serif;display:flex;align-items:center;justify-content:center;gap:12px;box-shadow:0 2px 12px rgba(0,0,0,.35)';
+    document.body.appendChild(b); }
+  b.innerHTML='👁 Aperçu en tant que <strong style="margin:0 4px">'+(PREVIEW.email||'')+'</strong> — lecture seule <button id="btnExitPreview" style="margin-left:8px;background:#fff;color:#4b2e83;border:none;border-radius:6px;padding:4px 12px;font-weight:700;cursor:pointer">Quitter l’aperçu</button>';
+  document.getElementById('btnExitPreview').onclick=exitPreview;
+  b.style.display='flex'; document.body.style.paddingTop='40px';
+}
+function hidePreviewBanner(){ const b=document.getElementById('previewBar'); if(b) b.style.display='none'; document.body.style.paddingTop=''; }
 function showDenied(email){
   hideAll(); const o=document.getElementById('deniedOverlay'); o.style.display='flex';
   document.getElementById('deniedMsg').textContent=`L'accès n'est pas (ou plus) autorisé pour ${email}. Contactez l'administrateur pour être ajouté.`;
