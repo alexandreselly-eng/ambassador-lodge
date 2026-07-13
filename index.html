@@ -1001,7 +1001,7 @@ function hasUnsavedInput(){
   return false;
 }
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260712-221022';
+const APP_BUILD='20260713-190000';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function forceReload(build){ try{ if(sessionStorage.getItem('al_reloaded_build')===build){ showBanner(); return; } sessionStorage.setItem('al_reloaded_build',build); }catch(e){} location.href=location.pathname+'?v='+Date.now(); }
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
