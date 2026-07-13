@@ -993,6 +993,13 @@ const css=(v)=>getComputedStyle(document.documentElement).getPropertyValue(v).tr
 const eur=(n)=>(n==null?'—':Math.round(n).toLocaleString('fr-FR')+' €');
 const pct=(n)=>(n==null?'—':(n*100).toFixed(0)+' %');
 const n0=(v)=>(typeof v==='number'?v:0);
+function hasUnsavedInput(){
+  try{ if(typeof state!=='undefined' && state.editId!=null) return true; }catch(e){}
+  const ids=['inLogement','inEntree','inSortie','inNom','inMontant'];
+  for(const id of ids){ const el=document.getElementById(id); if(el && (''+el.value).trim()!=='') return true; }
+  const vm=document.getElementById('valModal'); if(vm && vm.style.display && vm.style.display!=='none') return true;
+  return false;
+}
 // ===== Détecteur de nouvelle version (anti-cache) =====
 const APP_BUILD='20260712-221022';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
