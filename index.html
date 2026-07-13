@@ -1855,9 +1855,9 @@ async function renderAdmin(){
   document.querySelectorAll('#adminBody .mini-act').forEach(b=>b.onclick=()=>removeAuthorized(b.dataset.em));
   document.querySelectorAll('#adminBody .bienchip').forEach(b=>b.onclick=()=>toggleUserBien(b.dataset.em,b.dataset.b,rows));
   const _sel=document.getElementById('selPreviewUser');
-  if(_sel){ _sel.innerHTML='<option value="">— choisir un utilisateur —</option>'+rows.map(r=>{ const list=Array.isArray(r.biens_autorises)?r.biens_autorises:null; return '<option value="'+r.email+'" data-biens="'+(list?list.join('|'):'')+'">'+r.email+(list?' ('+list.length+' bien'+(list.length>1?'s':'')+')':' (tous les biens)')+'</option>'; }).join(''); }
+  if(_sel){ _sel.innerHTML='<option value="">— choisir un utilisateur —</option>'+rows.map(r=>{ const list=Array.isArray(r.biens_autorises)?r.biens_autorises:null; const attr=(list===null)?'data-all="1"':'data-biens="'+encodeURIComponent(JSON.stringify(list))+'"'; return '<option value="'+r.email+'" '+attr+'>'+r.email+(list?' ('+list.length+' bien'+(list.length>1?'s':'')+')':' (tous les biens)')+'</option>'; }).join(''); }
   const _bpa=document.getElementById('btnPreviewAs');
-  if(_bpa) _bpa.onclick=function(){ const s=document.getElementById('selPreviewUser'); if(!s||!s.value) return; const opt=s.options[s.selectedIndex]; const bs=(opt.getAttribute('data-biens')||''); enterPreview(s.value, bs? bs.split('|') : null); };
+  if(_bpa) _bpa.onclick=function(){ const s=document.getElementById('selPreviewUser'); if(!s||!s.value) return; const opt=s.options[s.selectedIndex]; if(opt.getAttribute('data-all')==='1'){ enterPreview(s.value, null); return; } let biens=[]; try{ biens=JSON.parse(decodeURIComponent(opt.getAttribute('data-biens')||'[]')); }catch(e){ biens=[]; } enterPreview(s.value, biens); };
   renderProps();
   renderCommEditor();
   renderConnections();
