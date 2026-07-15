@@ -1694,6 +1694,34 @@ function n1Compare(){ // comparaison exercice courant vs précédent, ou null si
   const N1 = n1AggMetrics(n1RowsForYear(state.year-1));
   return { year:state.year, prevYear:state.year-1, N, N1 };
 }
+// --- Affichage N-1 (lot 3) : décoration ADDITIVE des tuiles KPI du tableau de bord ---
+function n1SignedFmt(v, fmt){ if(v==null||!isFinite(v)) return '—'; return (v>0?'+':(v<0?'−':''))+fmt(Math.abs(v)); }
+function n1PctFmt(v){ return (v>0?'+':(v<0?'−':''))+Math.abs(v).toFixed(1).replace('.',',')+' %'; }
+function n1LineInner(prevYear, nVal, n1Val, fmt, noData){
+  if(noData) return `<span class="n1lab">N-1 (${prevYear})</span> <span class="n1na">aucune donnée</span>`;
+  const e=n1Ecart(nVal, n1Val);
+  const arrow = (e.abs>0?'▲':(e.abs<0?'▼':'▬'));
+  const col = (e.abs>0?'var(--green)':(e.abs<0?'var(--red)':'var(--muted)'));
+  let rel='';
+  if(e.relState==='ok') rel=' ('+n1PctFmt(e.rel)+')';
+  else if(e.relState==='undef') rel=' (—)';
+  const absTxt = (e.abs==null)?'—':n1SignedFmt(e.abs, fmt);
+  return `<span class="n1lab">N-1 (${prevYear})</span> <span class="n1val">${fmt(n1Val)}</span> `
+       + `<span class="n1delta" style="color:${col};font-weight:600">${arrow} ${absTxt}${rel}</span>`;
+}
+function n1DecorateDashTiles(N){
+  const cmp=n1Compare(); if(!cmp) return;
+  const host=document.getElementById('kpis'); if(!host) return;
+  const cards=host.querySelectorAll(':scope > .kpi'); if(cards.length<6) return;
+  const noData = cmp.N1.nResa===0;
+  const map=[ ['ca',N.ca], ['benef',N.benef], ['comm',N.comm], ['prix',N.prix], ['taxeSCI',N.taxeSCI], ['reste',N.reste] ];
+  map.forEach((m,i)=>{ const card=cards[i]; if(!card) return;
+    const div=document.createElement('div'); div.className='n1line';
+    div.setAttribute('style','margin-top:6px;padding-top:5px;border-top:1px solid var(--grid);font-size:11px;color:var(--muted);line-height:1.35');
+    div.innerHTML=n1LineInner(cmp.prevYear, m[1], cmp.N1[m[0]], eur, noData);
+    card.appendChild(div);
+  });
+}
 // =================================================================================================
 function cumul(a){ let s=0; return a.map(v=>s+=v); }
 function activeObj(){ let o=0,c=0,pm=0; (state.log==='all'?visBiens():[state.log]).forEach(b=>{const x=objFor(state.year,b)||{obj:0,comm:0,pm:0}; o+=x.obj;c+=x.comm;pm+=x.pm;}); return {obj:o,comm:c,pm}; }
@@ -1806,6 +1834,7 @@ function render(){
     kpiCard('Taxes de séjour',eur(taxeSCI),'à reverser (SCI) · dont OTA '+eur(taxeOTA)+' · <button id="taxExtractBtn" class="kbtn" title="Justificatif détaillé de la période sélectionnée">⤓ justificatif</button>','b2',{rich:'taxe', txt:`Taxes de séjour|À reverser (SCI) ${eur(taxeSCI)} · dont OTA ${eur(taxeOTA)}`}),
     kpiCard('Reste à encaisser',eur(reste),isSH?'⚠ acomptes absents du CSV':'soldes clients ouverts','b5',{rich:'reste', txt:`Reste à encaisser|Soldes clients ouverts${isSH?' · ⚠ acomptes absents du CSV':''}`}),
   ].join('');
+  if(typeof n1Applicable==='function' && n1Applicable()){ try{ n1DecorateDashTiles({ca,benef,comm,prix,taxeSCI,reste}); }catch(e){} }
   const _teb=document.getElementById('taxExtractBtn'); if(_teb)_teb.onclick=genTaxeJustificatif;
   const _cb=document.getElementById('commBanner');
   if(_cb){ _cb.innerHTML = ((cImmo+cBibT)>0.005)? `<div class="commb"><div class="commb-h">Détail commissions prestataires${state.month!=='all'?' · '+MONTHS[state.month-1]:''} <span style="font-weight:400;text-transform:none">· base CA net · janvier 2026 exclu</span></div><div class="commb-row"><div class="commb-c"><div class="commb-l">Comm. Immosphera</div><div class="commb-v" style="color:var(--gold)">${eur(cImmo)}</div></div><div class="commb-c"><div class="commb-l">Bibiz · Aff. nouvelles</div><div class="commb-v" style="color:var(--violet)">${eur(cBibN)}</div></div><div class="commb-c"><div class="commb-l">Bibiz · Run Off</div><div class="commb-v" style="color:var(--violet)">${eur(cBibR)}</div></div><div class="commb-c" style="border:1px solid var(--violet)"><div class="commb-l">Total Bibizfamily</div><div class="commb-v" style="color:var(--violet)">${eur(cBibT)}</div></div></div></div>` : ''; }
