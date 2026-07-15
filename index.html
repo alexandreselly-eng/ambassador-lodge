@@ -1650,6 +1650,48 @@ function occStats(rows){
   }
   return {occM, occ, nU};
 }
+// ===================== N-1 (année précédente) · source Superhôte uniquement =====================
+// Lot 1 — code ADDITIF et ISOLÉ. Aucune fonction existante n'appelle ce bloc tant que le toggle (lot 2)
+// est OFF, donc toggle OFF ⇒ comportement strictement inchangé. Règle métier stricte : on ne compte QUE
+// les réservations source==="Superhote" (les données Excel/saisies ne sont jamais touchées).
+let N1_ENABLED = false; // flag global piloté par le toggle (lot 2). OFF par défaut.
+function n1Applicable(){ return N1_ENABLED && state.dataSource==='superhote'; }
+function n1RowsForYear(y){ // miroir de currentRows() pour une année donnée, Superhôte only
+  const out=[];
+  ROWS.forEach(d=>{
+    if(!d || d.source!=='Superhote') return;                    // règle stricte Superhôte
+    if(!bienVisible(d.logement)) return;
+    if(!(state.log==='all'||d.logement===state.log)) return;
+    if(!(state.chan==='all'||d.origine===state.chan)) return;
+    monthSlices(d,y).forEach(sl=>{ if(state.month==='all'||sl.mois===+state.month) out.push(sl); });
+  });
+  return out;
+}
+function n1AggMetrics(rows){ // mêmes formules que render() (dupliquées volontairement, sans refactor de l'existant)
+  const sum=(f)=>rows.reduce((s,d)=>s+(d[f]||0),0);
+  const ca=sum('montant'), nuit=sum('nuitees'), taxe=sum('taxe');
+  const taxeOTA=rows.filter(isOTA).reduce((s,d)=>s+(d.taxe||0),0);
+  return { ca, benef:sum('benefice'), comm:sum('commission'),
+           nuit, taxe, taxeOTA, taxeSCI:taxe-taxeOTA,
+           reste:sum('reste_a_payer'), prix: nuit? ca/nuit : null, nResa: rows.length };
+}
+// Écart N vs N-1 d'une mesure scalaire. relState: 'ok'|'undef'(N-1=0)|'neg'(N-1<0)|'na'(donnée absente)
+function n1Ecart(nVal, n1Val){
+  const has=(v)=> typeof v==='number' && isFinite(v);
+  if(!has(nVal) || !has(n1Val)) return { abs:null, rel:null, relState:'na' };
+  const abs=nVal-n1Val; let rel=null, relState='ok';
+  if(n1Val===0) relState='undef';              // division impossible → afficher "—"
+  else if(n1Val<0) relState='neg';             // dénominateur négatif → % trompeur, masqué
+  else rel=abs/n1Val*100;
+  return { abs, rel, relState };
+}
+function n1Compare(){ // comparaison exercice courant vs précédent, ou null si non applicable
+  if(state.dataSource!=='superhote') return null;   // feature Superhôte only (défensif)
+  const N  = n1AggMetrics(n1RowsForYear(state.year));
+  const N1 = n1AggMetrics(n1RowsForYear(state.year-1));
+  return { year:state.year, prevYear:state.year-1, N, N1 };
+}
+// =================================================================================================
 function cumul(a){ let s=0; return a.map(v=>s+=v); }
 function activeObj(){ let o=0,c=0,pm=0; (state.log==='all'?visBiens():[state.log]).forEach(b=>{const x=objFor(state.year,b)||{obj:0,comm:0,pm:0}; o+=x.obj;c+=x.comm;pm+=x.pm;}); return {obj:o,comm:c,pm}; }
 function destroy(id){ if(charts[id]){charts[id].destroy(); delete charts[id];} }
