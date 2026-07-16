@@ -1697,6 +1697,7 @@ function n1Compare(){ // comparaison exercice courant vs précédent, ou null si
 // --- Affichage N-1 (lot 3) : décoration ADDITIVE des tuiles KPI du tableau de bord ---
 function n1SignedFmt(v, fmt){ if(v==null||!isFinite(v)) return '—'; return (v>0?'+':(v<0?'−':''))+fmt(Math.abs(v)); }
 function n1PctFmt(v){ return (v>0?'+':(v<0?'−':''))+Math.abs(v).toFixed(1).replace('.',',')+' %'; }
+function n1LineDS(label, data, color){ return { label:label, type:'line', data:data, borderColor:color||'rgba(150,160,180,.95)', borderWidth:2, borderDash:[5,4], pointRadius:0, tension:.25, fill:false, order:0, datalabels:{display:false} }; }
 function n1LineInner(prevYear, nVal, n1Val, fmt, noData){
   if(noData) return `<span class="n1lab">N-1 (${prevYear})</span> <span class="n1na">aucune donnée</span>`;
   const e=n1Ecart(nVal, n1Val);
@@ -1839,12 +1840,14 @@ function render(){
   const _cb=document.getElementById('commBanner');
   if(_cb){ _cb.innerHTML = ((cImmo+cBibT)>0.005)? `<div class="commb"><div class="commb-h">Détail commissions prestataires${state.month!=='all'?' · '+MONTHS[state.month-1]:''} <span style="font-weight:400;text-transform:none">· base CA net · janvier 2026 exclu</span></div><div class="commb-row"><div class="commb-c"><div class="commb-l">Comm. Immosphera</div><div class="commb-v" style="color:var(--gold)">${eur(cImmo)}</div></div><div class="commb-c"><div class="commb-l">Bibiz · Aff. nouvelles</div><div class="commb-v" style="color:var(--violet)">${eur(cBibN)}</div></div><div class="commb-c"><div class="commb-l">Bibiz · Run Off</div><div class="commb-v" style="color:var(--violet)">${eur(cBibR)}</div></div><div class="commb-c" style="border:1px solid var(--violet)"><div class="commb-l">Total Bibizfamily</div><div class="commb-v" style="color:var(--violet)">${eur(cBibT)}</div></div></div></div>` : ''; }
   const _teb2=document.getElementById('taxExtractBtn2'); if(_teb2)_teb2.onclick=genTaxeJustificatif;
+  const _n1rows=(typeof n1Applicable==='function'&&n1Applicable())? n1RowsForYear(state.year-1): null;
   const benefM=monthly(rows,'benefice');
   const benefDS=[
     {label:'Bénéfice net',data:benefM,backgroundColor:css('--gold'),borderRadius:5,order:2,datalabels:DL(eur,css('--gold2'))},
     {label:'Objectif',type:'line',data:Array(12).fill(ob.obj),borderColor:css('--red'),borderWidth:2,borderDash:[6,4],pointRadius:0,order:1,datalabels:{display:false}}];
   let benefOpt=baseOpt({money:true,legend:true});
   if(state.cumul){ benefDS.push(cumulDS('Bénéfice cumulé',benefM,css('--green'))); addY1(benefOpt,css('--green')); }
+  if(_n1rows) benefDS.push(n1LineDS('Bénéfice '+(state.year-1), monthly(_n1rows,'benefice')));
   mk('cBenef',{type:'bar',data:{labels:MONTHS,datasets:benefDS},options:benefOpt});
   const PCT=state.unit==='pct';
   const byChan={}; rows.forEach(d=>{byChan[d.origine]=(byChan[d.origine]||0)+(d.montant||0);});
@@ -1862,7 +1865,9 @@ function render(){
   const occM=_occS.occM;
   mk('cOcc',{type:'bar',data:{labels:MONTHS,datasets:[{label:'Occupation',data:occM,backgroundColor:css('--lodge'),borderRadius:5,datalabels:DL(v=>Math.round(v)+'%')}]},options:baseOpt({suffix:' %',legend:false,max:110})});
   const caM=monthly(rows,'montant'),nuitM=monthly(rows,'nuitees'); const prixM=caM.map((v,i)=>nuitM[i]?v/nuitM[i]:0);
-  mk('cPrix',{type:'line',data:{labels:MONTHS,datasets:[{label:'Prix/nuit',data:prixM,borderColor:css('--blue'),backgroundColor:'rgba(88,166,255,.12)',fill:true,tension:.3,pointRadius:3,pointBackgroundColor:css('--blue'),datalabels:DL(eur,css('--blue'))}]},options:baseOpt({money:true,legend:false})});
+  const prixDS=[{label:'Prix/nuit',data:prixM,borderColor:css('--blue'),backgroundColor:'rgba(88,166,255,.12)',fill:true,tension:.3,pointRadius:3,pointBackgroundColor:css('--blue'),datalabels:DL(eur,css('--blue'))}];
+  if(_n1rows){ const _c=monthly(_n1rows,'montant'),_n=monthly(_n1rows,'nuitees'); prixDS.push(n1LineDS('Prix/nuit '+(state.year-1), _c.map((v,i)=>_n[i]?v/_n[i]:0))); }
+  mk('cPrix',{type:'line',data:{labels:MONTHS,datasets:prixDS},options:baseOpt({money:true,legend:_n1rows?true:false})});
   renderCommission(rows);
   const _rowsSCI=rows.filter(d=>!isOTA(d)), _rowsOTA=rows.filter(isOTA);
   const taxeM=monthly(_rowsSCI,'taxe'), taxeOTAM=monthly(_rowsOTA,'taxe');
@@ -1873,6 +1878,7 @@ function render(){
   let taxeOpt=baseOpt({money:true,legend:true});
   taxeOpt.scales=taxeOpt.scales||{}; taxeOpt.scales.x=Object.assign({},taxeOpt.scales.x,{stacked:true}); taxeOpt.scales.y=Object.assign({},taxeOpt.scales.y,{stacked:true});
   if(state.cumul){ taxeDS.push(cumulDS('Cumul SCI',taxeM,css('--green'))); addY1(taxeOpt,css('--green')); }
+  if(_n1rows){ const _sci=_n1rows.filter(d=>!isOTA(d)); taxeDS.push(n1LineDS('À reverser SCI '+(state.year-1), monthly(_sci,'taxe'))); }
   mk('cTaxe',{type:'bar',data:{labels:MONTHS,datasets:taxeDS},options:taxeOpt});
   renderObjectives(rows,benefM,ob,benef,objAnnual); renderReservs(rows); renderExplorer(); renderRecon();
   renderBreakdownTable({ id:'brkBenef', host:'brkBenef', rows:rows, title:'Benefice_net_mensuel', detail:true, columns:[
