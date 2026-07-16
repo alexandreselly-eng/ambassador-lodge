@@ -2336,6 +2336,25 @@ function renderBreakdownTable(cfg){
     }
   }
   h+=`<tr class="brk-total"><td>TOTAL ${state.year}</td>`+cols.map((c,i)=>{ const v=totVal(c,i); return `<td class="num"${cstyle(c)}>${fmtc(c,v)}</td>`; }).join('')+`</tr>`;
+  // --- Lot 4 : comparaison N-1 (année précédente), source Superhôte only, additif et gated ---
+  if(typeof n1Applicable==='function' && n1Applicable()){
+    try{
+      const s1=_brkSeries(Object.assign({}, cfg, {rows: n1RowsForYear(state.year-1)}));
+      const totN1=(c,i)=>{ if(c.kind==='calc') return c.total(s1.T);
+        if(c.series!=null || c.totalVal!=null) return null;   // colonne pré-calculée pour N → non recomputable ici (occupation, taxe)
+        return s1.ser[i].reduce((a,b)=>a+b,0); };
+      h+=`<tr class="brk-total brk-n1" style="font-weight:400;opacity:.92"><td>TOTAL ${state.year-1} (N-1)</td>`
+        + cols.map((c,i)=>{ const v=totN1(c,i); return `<td class="num"${cstyle(c)}>${v==null?'—':fmtc(c,v)}</td>`; }).join('')+`</tr>`;
+      h+=`<tr class="brk-total brk-n1" style="font-weight:400;opacity:.92"><td>Écart N vs N-1</td>`
+        + cols.map((c,i)=>{ const vN=totVal(c,i), v1=totN1(c,i);
+            if(v1==null||vN==null||!isFinite(vN)||!isFinite(v1)) return `<td class="num">—</td>`;
+            const e=n1Ecart(vN,v1); const col=(e.abs>0?'var(--green)':(e.abs<0?'var(--red)':'var(--muted)'));
+            const rel = e.relState==='ok'? ' ('+n1PctFmt(e.rel)+')' : (e.relState==='undef'?' (—)':'');
+            const abs = n1SignedFmt(e.abs, (x)=> c.fmt?c.fmt(x):eur(x));
+            return `<td class="num" style="color:${col}">${abs}${rel}</td>`;
+          }).join('')+`</tr>`;
+    }catch(e){}
+  }
   h+=`</tbody></table></div>`;
   host.innerHTML=h;
   const cb=host.querySelector('[data-brk-csv]'); if(cb) cb.onclick=()=>exportBrkCSV(cfg);
