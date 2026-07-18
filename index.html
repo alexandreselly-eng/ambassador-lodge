@@ -392,6 +392,9 @@ td.actions{white-space:nowrap}
   </div>
   <div class="objsection">Atteinte de l'objectif de CA <span class="hint">objectif de CA brut (hors ménage &amp; taxe de séjour) · réalisé + réservé</span></div>
   <div class="kpis k4" id="kpisAtteinte"></div>
+  <div class="objsection">Atterrissage sur objectif <span class="hint">réalisé + projection sur les nuits libres à venir, vs objectif de CA brut</span></div>
+  <div class="card"><h3>Atterrissage annuel projeté <span class="hint">barres = réalisé + projection · ligne = objectif de CA brut mensuel</span></h3><div class="desc" id="landingDesc"></div><div class="chartbox"><canvas id="cLanding"></canvas></div></div>
+  <div class="card" id="brkLandingCard"><h3>Atterrissage mensuel <span class="hint">les 12 mois · réalisé, projection sur nuits libres, écart à l'objectif</span></h3><div id="brkLanding"></div></div>
   <div class="objsection">Suivi du bénéfice <span class="hint">vs objectif de bénéfice &amp; point mort (charges)</span></div>
   <div class="kpis" id="kpisObj"></div>
   <div class="card"><h3>Cumul bénéfice net vs objectif de bénéfice <span class="hint">€ cumulés</span></h3><div class="desc" id="cCumulDesc"></div><div class="chartbox"><canvas id="cCumul"></canvas></div></div>
@@ -1002,7 +1005,7 @@ function hasUnsavedInput(){
   return false;
 }
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260713-190000';
+const APP_BUILD='20260718-231500';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function forceReload(build){ try{ if(sessionStorage.getItem('al_reloaded_build')===build){ showBanner(); return; } sessionStorage.setItem('al_reloaded_build',build); }catch(e){} location.href=location.pathname+'?v='+Date.now(); }
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
@@ -2198,6 +2201,74 @@ function resetObjectives(){
   }catch(e){ document.getElementById('objMsg').textContent='Erreur : '+e.message; } })();
 }
 
+// ===== MANQUE 1 — Atterrissage sur objectif (réalisé + projection sur nuits libres à venir vs objectif de CA brut) =====
+// Additif, lecture seule sur ROWS/OBJECTIVES. Indépendant du filtre mois (toujours 12 mois affichés).
+// Choix assumé (plus honnête que l'Excel) : on ne projette QUE les nuits libres à venir. Les nuits déjà
+// écoulées et invendues sont perdues (facteur 0), le mois en cours est prorata des jours restants.
+function landingData(){
+  const biens = state.log==='all' ? visBiens() : [state.log].filter(bienVisible);
+  const nU = Math.max(1, biens.length);
+  const ob = activeObj(); // {obj,comm,pm,ca} sommés sur le périmètre visible
+  const yr=[]; ROWS.forEach(d=>{ if(!bienVisible(d.logement))return; if(!biens.includes(d.logement))return; monthSlices(d,state.year).forEach(sl=>yr.push(sl)); });
+  const caY=yr.reduce((s,d)=>s+(d.montant||0),0), nuitY=yr.reduce((s,d)=>s+(d.nuitees||0),0);
+  const prixEst = nuitY? caY/nuitY : 0;   // ADR estimé (périmètre, exercice) = Σ CA ÷ Σ nuitées
+  const COEF=0.7;                          // coef de chute (D115 de l'Excel : on ne remplit pas 100 % des nuits libres)
+  const _t=new Date(), _ty=_t.getUTCFullYear(), _tm=_t.getUTCMonth()+1, _td=_t.getUTCDate();
+  const curMonth = state.year<_ty?13:(state.year>_ty?1:_tm);
+  const fracEcoule = (state.year===_ty)? Math.min(1,Math.max(0,_td/daysInMonth(_ty,_tm))) : 0;
+  const months=[];
+  for(let m=1;m<=12;m++){
+    const rowsM=yr.filter(d=>d.mois===m);
+    const reaBrut=rowsM.reduce((s,d)=>s+(d.montant||0),0);
+    const reaNet=rowsM.reduce((s,d)=>s+(d.benefice||0),0);
+    const nights=rowsM.reduce((s,d)=>s+(d.nuitees||0),0);
+    const nl=Math.max(0, daysInMonth(state.year,m)*nU - nights);
+    const pf = m<curMonth?0:(m===curMonth?(1-fracEcoule):1);   // part projetable des nuits libres (à venir uniquement)
+    const proj = nl*prixEst*pf;                                  // potentiel projetable, avant chute
+    const reaProj = reaBrut + proj*COEF;
+    months.push({m,objBrut:ob.ca,objNet:ob.obj,reaBrut,reaNet,nl,proj,projApplied:proj*COEF,reaProj,deltaRea:reaBrut-ob.ca,deltaRP:reaProj-ob.ca});
+  }
+  return {months,prixEst,COEF,nU,ob,curMonth};
+}
+function renderLanding(){
+  const host=document.getElementById('brkLanding'); if(!host) return;
+  const L=landingData(), M=L.months;
+  const cumObj=L.ob.ca*12, cumReaBrut=M.reduce((s,r)=>s+r.reaBrut,0), cumProj=M.reduce((s,r)=>s+r.projApplied,0),
+        cumReaProj=M.reduce((s,r)=>s+r.reaProj,0), cumReaNet=M.reduce((s,r)=>s+r.reaNet,0), cumNL=M.reduce((s,r)=>s+r.nl,0);
+  const _d=document.getElementById('landingDesc');
+  if(_d) _d.textContent=`Objectif CA brut ${eur(L.ob.ca)}/mois (${eur(cumObj)}/an) · ADR estimé ${eur(L.prixEst)}/nuit · projection = nuits libres à venir × ADR × ${Math.round(L.COEF*100)} % (coef de chute) ; les nuits déjà écoulées ne sont pas projetées.`;
+  const sgn=v=>(v>=0?'+':'')+eur(v);
+  const body=M.map(r=>`<tr>
+      <td>${MONTHS[r.m-1]}</td>
+      <td class="num">${eur(r.objBrut)}</td>
+      <td class="num">${eur(r.reaBrut)}</td>
+      <td class="num" style="color:${r.deltaRea>=0?'var(--green)':'var(--orange)'}">${sgn(r.deltaRea)}</td>
+      <td class="num">${Math.round(r.nl)}</td>
+      <td class="num" style="color:var(--muted)">${r.projApplied>0?eur(r.projApplied):'—'}</td>
+      <td class="num">${eur(r.reaProj)}</td>
+      <td class="num" style="color:${r.deltaRP>=0?'var(--green)':'var(--red)'}">${sgn(r.deltaRP)}</td>
+      <td class="num">${eur(r.reaNet)}</td>
+    </tr>`).join('');
+  const foot=`<tr class="brk-total">
+      <td>Cumul</td>
+      <td class="num">${eur(cumObj)}</td>
+      <td class="num">${eur(cumReaBrut)}</td>
+      <td class="num" style="color:${cumReaBrut-cumObj>=0?'var(--green)':'var(--orange)'}">${sgn(cumReaBrut-cumObj)}</td>
+      <td class="num">${Math.round(cumNL)}</td>
+      <td class="num" style="color:var(--muted)">${eur(cumProj)}</td>
+      <td class="num">${eur(cumReaProj)}</td>
+      <td class="num" style="color:${cumReaProj-cumObj>=0?'var(--green)':'var(--red)'}">${sgn(cumReaProj-cumObj)}</td>
+      <td class="num">${eur(cumReaNet)}</td>
+    </tr>`;
+  host.innerHTML=`<div style="overflow-x:auto"><table class="tbl brk"><thead><tr>
+      <th>Mois</th><th class="num">Obj. brut</th><th class="num">Réa. brut</th><th class="num">Δ brut</th><th class="num">Nuits libres</th><th class="num">Projection</th><th class="num">Réa+proj</th><th class="num">Δ / obj</th><th class="num">Réa. net</th>
+    </tr></thead><tbody>${body}${foot}</tbody></table></div>`;
+  const reaProjM=M.map(r=>Math.round(r.reaProj)), objM=M.map(r=>r.objBrut);
+  mk('cLanding',{type:'bar',data:{labels:MONTHS,datasets:[
+    {label:'Réalisé + projection',data:reaProjM,backgroundColor:M.map(r=>r.deltaRP>=0?css('--green'):css('--gold')),borderRadius:5,order:2,datalabels:DL(eur,css('--gold2'))},
+    {label:'Objectif CA brut',type:'line',data:objM,borderColor:css('--red'),borderWidth:2,borderDash:[6,4],pointRadius:0,order:1,datalabels:{display:false}}
+  ]},options:baseOpt({money:true,legend:true})});
+}
 function renderObjectives(rows,benefM,ob,benef,objAnnual){
   renderObjEditor();
   // ===== Section 1 : Atteinte de l'objectif de CA brut (base obj_ca) =====
@@ -2228,6 +2299,7 @@ function renderObjectives(rows,benefM,ob,benef,objAnnual){
     kpiCard('Reste à réaliser',resteCA>0?eur(resteCA):'objectif atteint',resteCA>0?`${eur(resteMois)} / mois · ${monthsRem} mois`:`dépassé de ${eur(-resteCA)}`,resteCA>0?'b6':'b3',{rich:'reste_ar', txt:`Reste à réaliser|Objectif CA annuel − déjà acquis`},objAnCA?acquis/objAnCA:0),
     kpiCard('Taux d\'atteinte',_pa,`${(ecart>=0?'+':'')+eur(ecart)} vs objectif CA`,ecart>=0?'b3':'b6',{rich:'taux', txt:`Taux d'atteinte|Acquis ÷ objectif CA`},taux||0),
   ].join('');
+  try{ renderLanding(); }catch(e){ console.warn('renderLanding',e); }
   renderCommByApporteur();
   // ===== Section 2 : Suivi du bénéfice (objectif de bénéfice + point mort) =====
   const commM=monthly(rows,'commission');
@@ -3394,6 +3466,17 @@ const AL_TARIF = (function(){
     const cmpYr=(o,yr)=> (o&&o.nights)? `${yr} : ${_eur(o.ca)} · ${Math.round(o.nights/diy(yr)*100)}%` : `${yr} : —`;
     st._ex['cmp']={title:'Comparaison N-1 / N-2',result:'historique',n1:'CA réalisé et occupation des deux exercices précédents',n2:[`${st.year-1} : ${prev1.nights?_eur(prev1.ca)+' · '+Math.round(prev1.nights/diy(st.year-1)*100)+' %':'—'}`,`${st.year-2} : ${prev2.nights?_eur(prev2.ca)+' · '+Math.round(prev2.nights/diy(st.year-2)*100)+' %':'—'}`],n3:['Occupation = nuits réservées ÷ jours de l’année.',`Convention : ${conv}.`],meta:META};
     const cmpCard=`<div class="kpi kpiclk" data-kpi="cmp"><div class="lab">Comparaison N-1 / N-2<span class="xi" data-kpi="cmp" data-explain="Comparaison N-1/N-2|CA réalisé + occupation des 2 années précédentes|Cliquez pour le détail" tabindex="0" role="button" aria-label="Détail du calcul">ⓘ</span></div><div class="val" style="font-size:13px;line-height:1.5">${cmpYr(prev1,st.year-1)}<br>${cmpYr(prev2,st.year-2)}</div><div class="sub">historique réalisé</div></div>`;
+    // ===== MANQUE 2 — Prix de rattrapage & CA réalisable =====
+    const _ob = objFor(st.year, st.bien) || {ca:0,obj:0};
+    const objAnBrut = (_ob.ca||0)*12;
+    const retard = Math.round(objAnBrut - P.A2.ca);   // CA manquant vs objectif brut annuel, vu les résas engagées
+    const nRest = P.avail;                             // nuitées libres futures (aujourd'hui → 31/12)
+    const prixRatt = (retard>0 && nRest>0) ? retard/nRest : (retard<=0 ? 0 : null);
+    const coefCh = P.occS;                             // coef de chute = occupation simulée (curseur)
+    const caReal = Math.round((P.pm||0) * nRest * coefCh);
+    const resultProj = P.A2.ca + caReal;
+    const rattVal = (prixRatt==null) ? '—' : (retard<=0 ? 'objectif atteint' : _eur(Math.round(prixRatt))+' /nuit');
+    const rattSub = (retard<=0) ? 'objectif brut annuel déjà couvert' : (nRest>0 ? 'retard '+_eur(retard)+' sur '+nRest+' nuits libres' : 'aucune nuit libre restante');
     return [
       KX('a1','CA réalisé à date',_eur(P.A1.ca),P.A1.nights+' nuits passées/en cours','b3','CA réalisé à date|Nuits déjà passées ou en cours|Cliquez pour le détail',
         {n1:'Σ (montant ÷ nuitées) des nuits dont la date ≤ aujourd’hui',n2:[`${P.A1.nights} nuits passées/en cours`,`= ${_eur(P.A1.ca)}`],n3:[`Périmètre : nuits ≤ aujourd’hui, exercice ${st.year}.`,'Prorata à la nuit (séjour à cheval scindé jour par jour).',`Convention : ${conv}.`]}),
@@ -3414,6 +3497,10 @@ const AL_TARIF = (function(){
         {n1:'Nuits réservées passées/en cours ÷ jours écoulés de l’exercice',n2:[`${P.A1.nights} ÷ ${P.daysElapsed} = ${Math.round(P.occDate*100)} %`],n3:['Reflète le remplissage réel jusqu’à aujourd’hui.','Jours écoulés = 1ᵉʳ janv. → aujourd’hui (0 si exercice futur, année entière si passé).']}),
       KX('pm','Panier moyen / nuitée',_eur(P.pm),'CA engagé ÷ nuits réservées','','Panier moyen par nuitée|CA engagé ÷ nuits réservées|Cliquez pour le détail',
         {n1:'CA engagé annuel ÷ nuits réservées',n2:[`${_eur(P.A2.ca)} ÷ ${P.A2.nights||0} = ${_eur(P.pm)}`],n3:[`Convention : ${conv}.`]}),
+      KX('ratt','Prix de rattrapage',rattVal,rattSub,retard<=0?'b3':'b6','Prix de rattrapage|Prix moyen/nuit à appliquer sur les nuits libres pour combler le retard sur l\'objectif brut annuel|Cliquez pour le détail',
+        {n1:'(Objectif brut annuel − CA engagé) ÷ nuitées libres restantes',n2:[`${_eur(objAnBrut)} − ${_eur(P.A2.ca)} = ${_eur(retard)}`, (retard>0&&nRest>0)?`${_eur(retard)} ÷ ${nRest} nuits = ${_eur(Math.round(prixRatt))}/nuit`:'—'],n3:['Objectif brut annuel = obj_ca × 12.','Retard ≤ 0 ⇒ objectif déjà couvert par les réservations engagées.','Prix cible : ne dépend pas du curseur d\'occupation (≠ hypothèse de remplissage).']}),
+      KX('realis','CA réalisable',_eur(caReal),`à ${Math.round(coefCh*100)} % · projeté ${_eur(resultProj)} vs obj ${_eur(objAnBrut)}`,resultProj>=objAnBrut?'b3':'b5','CA réalisable|Panier moyen × nuits libres × occupation simulée|Cliquez pour le détail',
+        {n1:'Panier moyen/nuit × nuitées libres × coef de chute (occupation simulée)',n2:[`${_eur(P.pm)} × ${nRest} × ${Math.round(coefCh*100)} % = ${_eur(caReal)}`,`Projeté = engagé + réalisable = ${_eur(P.A2.ca)} + ${_eur(caReal)} = ${_eur(resultProj)}`],n3:['Coef de chute = curseur d\'occupation simulée (hypothèse de remplissage).','Réplique « Réalisable » de l\'Excel (prix × jours restants × chute).',`Projeté vs objectif brut annuel : ${resultProj-objAnBrut>=0?'+':''}${_eur(resultProj-objAnBrut)}.`]}),
       cmpCard,
     ].join('');
   }
