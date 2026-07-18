@@ -394,7 +394,7 @@ td.actions{white-space:nowrap}
   <div class="kpis k4" id="kpisAtteinte"></div>
   <div class="objsection">Atterrissage sur objectif <span class="hint">réalisé + projection sur les nuits libres à venir, vs objectif de CA brut</span></div>
   <div class="card"><h3>Atterrissage annuel projeté <span class="hint">barres = réalisé + projection · ligne = objectif de CA brut mensuel</span></h3><div class="desc" id="landingDesc"></div><div class="chartbox"><canvas id="cLanding"></canvas></div></div>
-  <div class="card" id="brkLandingCard"><h3>Atterrissage mensuel <span class="hint">les 12 mois · réalisé, projection sur nuits libres, écart à l'objectif</span></h3><div id="brkLanding"></div></div>
+  <div class="card" id="brkLandingCard"><h3>Atterrissage mensuel <span class="hint">les 12 mois · réalisé, projection sur nuits libres, écart à l'objectif</span></h3><div id="chuteCtrls"></div><div id="brkLanding"></div></div>
   <div class="objsection">Suivi du bénéfice <span class="hint">vs objectif de bénéfice &amp; point mort (charges)</span></div>
   <div class="kpis" id="kpisObj"></div>
   <div class="card"><h3>Cumul bénéfice net vs objectif de bénéfice <span class="hint">€ cumulés</span></h3><div class="desc" id="cCumulDesc"></div><div class="chartbox"><canvas id="cCumul"></canvas></div></div>
@@ -1005,7 +1005,7 @@ function hasUnsavedInput(){
   return false;
 }
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260718-231500';
+const APP_BUILD='20260719-011500';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function forceReload(build){ try{ if(sessionStorage.getItem('al_reloaded_build')===build){ showBanner(); return; } sessionStorage.setItem('al_reloaded_build',build); }catch(e){} location.href=location.pathname+'?v='+Date.now(); }
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
@@ -1031,7 +1031,8 @@ const state={ year:null, log:'all', chan:'all', month:'all', labels:true, commCh
   sortChan:'val-desc', sortLog:'val-desc', expDim:'mois', expMes:'montant', expSort:'val-desc',
   rsort:{key:'entree',dir:-1}, editId:null, unit:'eur', cumul:true,
   commAnaPeriod:'annee', commAnaMonth:null, commAnaSort:{key:'comm',dir:-1},
-  dataSource:'saisies', shMontantConv:'paye_taxe', appFilter:'all' };
+  dataSource:'saisies', shMontantConv:'paye_taxe', appFilter:'all',
+  chuteM:(function(){ try{ const a=JSON.parse(localStorage.getItem('al_chuteM')||'null'); if(Array.isArray(a)&&a.length===12) return a.map(v=>{const n=+v; return (isFinite(n)&&n>=0&&n<=1)?n:0.7;}); }catch(e){} return Array(12).fill(0.7); })() };
 let SAISIES_ROWS=[], SH_ROWS=[], SH_RAW=[], SH_DIAG={};   // caches : saisies vs données Superhote (CSV validé) + diagnostic d'intégrité
 function cumulDS(label,arr,color,fmt){ fmt=fmt||eur; return {label, type:'line', data:cumul(arr), borderColor:color, borderWidth:2, pointRadius:2, pointBackgroundColor:color, tension:.25, yAxisID:'y1', order:0, datalabels: state.labels?{display:true,align:'top',color, font:{size:9,weight:'600'}, formatter:v=>fmt(v)}:{display:false}}; }
 function addY1(opts,color,fmt){ fmt=fmt||eur; opts.scales=opts.scales||{}; opts.scales.y1={position:'right',beginAtZero:true,grid:{display:false},ticks:{callback:v=>fmt(v),font:{size:9},color}}; return opts; }
@@ -2212,7 +2213,7 @@ function landingData(){
   const yr=[]; ROWS.forEach(d=>{ if(!bienVisible(d.logement))return; if(!biens.includes(d.logement))return; monthSlices(d,state.year).forEach(sl=>yr.push(sl)); });
   const caY=yr.reduce((s,d)=>s+(d.montant||0),0), nuitY=yr.reduce((s,d)=>s+(d.nuitees||0),0);
   const prixEst = nuitY? caY/nuitY : 0;   // ADR estimé (périmètre, exercice) = Σ CA ÷ Σ nuitées
-  const COEF=0.7;                          // coef de chute (D115 de l'Excel : on ne remplit pas 100 % des nuits libres)
+  const chuteAt=i=>{ const v=state.chuteM&&state.chuteM[i]; return (typeof v==='number'&&isFinite(v)&&v>=0)?v:0.7; }; // taux de chute réglable par mois (défaut 0,7)
   const _t=new Date(), _ty=_t.getUTCFullYear(), _tm=_t.getUTCMonth()+1, _td=_t.getUTCDate();
   const curMonth = state.year<_ty?13:(state.year>_ty?1:_tm);
   const fracEcoule = (state.year===_ty)? Math.min(1,Math.max(0,_td/daysInMonth(_ty,_tm))) : 0;
@@ -2224,11 +2225,13 @@ function landingData(){
     const nights=rowsM.reduce((s,d)=>s+(d.nuitees||0),0);
     const nl=Math.max(0, daysInMonth(state.year,m)*nU - nights);
     const pf = m<curMonth?0:(m===curMonth?(1-fracEcoule):1);   // part projetable des nuits libres (à venir uniquement)
+    const chute=chuteAt(m-1);                                    // taux de chute du mois
     const proj = nl*prixEst*pf;                                  // potentiel projetable, avant chute
-    const reaProj = reaBrut + proj*COEF;
-    months.push({m,objBrut:ob.ca,objNet:ob.obj,reaBrut,reaNet,nl,proj,projApplied:proj*COEF,reaProj,deltaRea:reaBrut-ob.ca,deltaRP:reaProj-ob.ca});
+    const projApplied = proj*chute;
+    const reaProj = reaBrut + projApplied;
+    months.push({m,objBrut:ob.ca,objNet:ob.obj,reaBrut,reaNet,nl,proj,chute,projApplied,reaProj,deltaRea:reaBrut-ob.ca,deltaRP:reaProj-ob.ca});
   }
-  return {months,prixEst,COEF,nU,ob,curMonth,rows:yr};
+  return {months,prixEst,nU,ob,curMonth,rows:yr};
 }
 function renderLanding(){
   const host=document.getElementById('brkLanding'); if(!host) return;
@@ -2238,9 +2241,19 @@ function renderLanding(){
   const eurs=v=>(v>=0?'+':'')+eur(v);
   const _d=document.getElementById('landingDesc');
   if(_d) _d.innerHTML=`Objectif de CA brut <b>${eur(L.ob.ca)}/mois</b> (${eur(cumObj)}/an) · prix moyen/nuit estimé <b>${eur(L.prixEst)}</b>.<br>`
-    +`<b>Projection</b> = nuits encore libres <b>à venir</b> × prix moyen/nuit × ${Math.round(L.COEF*100)} % (coef de chute : on ne remplit pas 100 % des nuits libres). Les nuits déjà écoulées et invendues sont perdues → projection = 0 sur les mois passés. `
+    +`<b>Projection</b> = nuits encore libres <b>à venir</b> × prix moyen/nuit × <b>taux de chute du mois</b> (réglable ci-dessous, défaut 70 %). Les nuits déjà écoulées et invendues sont perdues → projection = 0 sur les mois passés. `
     +`<b>Réa+proj</b> = réalisé du mois + projection = ce que le mois devrait atteindre. `
     +`<span style="color:var(--gold2)">Cliquez un mois pour voir ses réservations · survolez un chiffre pour son calcul.</span>`;
+  // --- Réglage du taux de chute par mois (défaut 70 %) ---
+  const cc=document.getElementById('chuteCtrls');
+  if(cc){
+    cc.innerHTML=`<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:2px 0 12px;padding:9px 11px;background:var(--panel2);border:1px solid var(--line);border-radius:10px">`
+      +`<b style="font-size:12px">Taux de chute mensuel</b><span class="hint" style="font-size:11px;margin-right:4px">part des nuits libres supposée vendue · défaut 70 %</span>`
+      +M.map((r,i)=>`<label style="display:flex;flex-direction:column;align-items:center;font-size:10px;color:var(--muted);gap:2px">${MONTHS[i]}<span style="display:flex;align-items:center;gap:1px"><input type="number" min="0" max="100" step="5" data-chm="${i}" value="${Math.round(r.chute*100)}" style="width:44px;background:var(--input-bg);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:3px 4px;font-size:11px;text-align:right">%</span></label>`).join('')
+      +`<button class="kbtn" id="chuteReset" title="Réinitialiser les 12 mois à 70 %">↺ tout à 70 %</button></div>`;
+    cc.querySelectorAll('input[data-chm]').forEach(inp=>{ inp.onchange=()=>{ const v=Math.max(0,Math.min(100,+inp.value||0)); const i=+inp.dataset.chm; state.chuteM[i]=v/100; try{localStorage.setItem('al_chuteM',JSON.stringify(state.chuteM));}catch(e){} renderLanding(); }; });
+    const rb=document.getElementById('chuteReset'); if(rb) rb.onclick=()=>{ state.chuteM=Array(12).fill(0.7); try{localStorage.setItem('al_chuteM',JSON.stringify(state.chuteM));}catch(e){} renderLanding(); };
+  }
   // Reconstruit via renderBreakdownTable : hérite du breakdown cliquable, des tooltips (title) et de l'export PDF/CSV.
   // noN1 : l'atterrissage projeté (année en cours) ne se compare pas au réalisé N-1.
   renderBreakdownTable({ id:'brkLanding', host:'brkLanding', rows:L.rows, title:'Atterrissage_sur_objectif', detail:true, noN1:true, columns:[
@@ -2252,9 +2265,11 @@ function renderLanding(){
       tip:()=>'Réa. brut − Obj. brut (retard ou avance du réalisé seul, sans projection)'},
     {label:'Nuits libres', kind:'calc', calc:(S,m)=>M[m].nl, total:()=>sum('nl'), fmt:v=>Math.round(v),
       tip:()=>'Nuits non réservées du mois'+(L.nU>1?' (× '+L.nU+' biens)':'')+' = capacité − nuitées réservées'},
+    {label:'Chute', kind:'calc', calc:(S,m)=>M[m].chute*100, total:()=>null, fmt:v=>v==null?'—':Math.round(v)+' %',
+      tip:()=>'Taux de chute du mois (réglable au-dessus) : part des nuits libres supposée vendue'},
     {label:'Projection', kind:'calc', calc:(S,m)=>M[m].projApplied, total:()=>sum('projApplied'), fmt:v=>v>0?eur(v):'—',
       tip:(S,m)=>M[m].projApplied>0
-        ? ('Nuits libres à venir × prix moyen/nuit '+eur(L.prixEst)+' × '+Math.round(L.COEF*100)+' % = '+eur(M[m].projApplied))
+        ? ('Nuits libres à venir × prix moyen/nuit '+eur(L.prixEst)+' × '+Math.round(M[m].chute*100)+' % = '+eur(M[m].projApplied))
         : 'Mois passé : nuits libres invendues perdues, aucune projection'},
     {label:'Réa+proj', kind:'calc', calc:(S,m)=>M[m].reaProj, total:()=>sum('reaProj'), fmt:eur, color:'--gold2',
       tip:()=>'Réa. brut + Projection = CA que le mois devrait atteindre'},
