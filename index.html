@@ -1005,7 +1005,7 @@ function hasUnsavedInput(){
   return false;
 }
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260719-011500';
+const APP_BUILD='20260719-013000';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function forceReload(build){ try{ if(sessionStorage.getItem('al_reloaded_build')===build){ showBanner(); return; } sessionStorage.setItem('al_reloaded_build',build); }catch(e){} location.href=location.pathname+'?v='+Date.now(); }
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
@@ -1093,6 +1093,12 @@ function compute(r){
     for(let _i=0;_i<nuit;_i++){ const _y=_cur.getFullYear(),_m=_cur.getMonth()+1,_k=_y+'-'+_m;
       if(_ix[_k]==null){ _ix[_k]=_alloc.length; _alloc.push({y:_y,m:_m,nights:0}); }
       _alloc[_ix[_k]].nights++; _cur.setDate(_cur.getDate()+1); } }
+  // Reste à payer avec tolérance d'arrondi : un solde inférieur à max(2 €, 1 % du montant+taxe)
+  // est considéré soldé (0). Évite d'afficher un « reste » sur des séjours passés/payés dont
+  // les acomptes saisis ne tombent pas au centime près. Les vrais soldes plus importants restent visibles.
+  const _rrRaw = (r.montant!=null)? (n0(r.montant)+n0(r.taxe)-n0(r.ac1)-n0(r.ac2)-n0(r.ac3)-n0(r.frais_menage)) : null;
+  const _rTol = Math.max(2, 0.01*(Math.abs(n0(r.montant))+Math.abs(n0(r.taxe))));
+  const _reste = (_rrRaw==null)? null : (Math.abs(_rrRaw)<=_rTol ? 0 : Math.round(_rrRaw*100)/100);
   return Object.assign({},r,{
     annee:c?c.getFullYear():null, mois:c?c.getMonth()+1:null,
     nuitees:nuit, jours_mois:H, tx_rempl:(nuit!=null&&H)?nuit/H:null, monthsAlloc:_alloc, apporteur:apporteur,
@@ -1100,7 +1106,7 @@ function compute(r){
     comm_immo:Math.round(_cp.immo*100)/100, comm_bibiz_new:Math.round(_cp.bibizNew*100)/100, comm_bibiz_runoff:Math.round(_cp.bibizRunoff*100)/100,
     benefice:(r.montant!=null)?Math.round((r.montant-_cp.total)*100)/100:null,
     cout_nuit:(r.montant!=null&&nuit)?r.montant/nuit:null,
-    reste_a_payer:(r.montant!=null)?Math.round((n0(r.montant)+n0(r.taxe)-n0(r.ac1)-n0(r.ac2)-n0(r.ac3)-n0(r.frais_menage))*100)/100:null
+    reste_a_payer:_reste
   });
 }
 
