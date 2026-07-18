@@ -2228,41 +2228,41 @@ function landingData(){
     const reaProj = reaBrut + proj*COEF;
     months.push({m,objBrut:ob.ca,objNet:ob.obj,reaBrut,reaNet,nl,proj,projApplied:proj*COEF,reaProj,deltaRea:reaBrut-ob.ca,deltaRP:reaProj-ob.ca});
   }
-  return {months,prixEst,COEF,nU,ob,curMonth};
+  return {months,prixEst,COEF,nU,ob,curMonth,rows:yr};
 }
 function renderLanding(){
   const host=document.getElementById('brkLanding'); if(!host) return;
   const L=landingData(), M=L.months;
-  const cumObj=L.ob.ca*12, cumReaBrut=M.reduce((s,r)=>s+r.reaBrut,0), cumProj=M.reduce((s,r)=>s+r.projApplied,0),
-        cumReaProj=M.reduce((s,r)=>s+r.reaProj,0), cumReaNet=M.reduce((s,r)=>s+r.reaNet,0), cumNL=M.reduce((s,r)=>s+r.nl,0);
+  const sum=f=>M.reduce((s,r)=>s+(r[f]||0),0);
+  const cumObj=L.ob.ca*12;
+  const eurs=v=>(v>=0?'+':'')+eur(v);
   const _d=document.getElementById('landingDesc');
-  if(_d) _d.textContent=`Objectif CA brut ${eur(L.ob.ca)}/mois (${eur(cumObj)}/an) · ADR estimé ${eur(L.prixEst)}/nuit · projection = nuits libres à venir × ADR × ${Math.round(L.COEF*100)} % (coef de chute) ; les nuits déjà écoulées ne sont pas projetées.`;
-  const sgn=v=>(v>=0?'+':'')+eur(v);
-  const body=M.map(r=>`<tr>
-      <td>${MONTHS[r.m-1]}</td>
-      <td class="num">${eur(r.objBrut)}</td>
-      <td class="num">${eur(r.reaBrut)}</td>
-      <td class="num" style="color:${r.deltaRea>=0?'var(--green)':'var(--orange)'}">${sgn(r.deltaRea)}</td>
-      <td class="num">${Math.round(r.nl)}</td>
-      <td class="num" style="color:var(--muted)">${r.projApplied>0?eur(r.projApplied):'—'}</td>
-      <td class="num">${eur(r.reaProj)}</td>
-      <td class="num" style="color:${r.deltaRP>=0?'var(--green)':'var(--red)'}">${sgn(r.deltaRP)}</td>
-      <td class="num">${eur(r.reaNet)}</td>
-    </tr>`).join('');
-  const foot=`<tr class="brk-total">
-      <td>Cumul</td>
-      <td class="num">${eur(cumObj)}</td>
-      <td class="num">${eur(cumReaBrut)}</td>
-      <td class="num" style="color:${cumReaBrut-cumObj>=0?'var(--green)':'var(--orange)'}">${sgn(cumReaBrut-cumObj)}</td>
-      <td class="num">${Math.round(cumNL)}</td>
-      <td class="num" style="color:var(--muted)">${eur(cumProj)}</td>
-      <td class="num">${eur(cumReaProj)}</td>
-      <td class="num" style="color:${cumReaProj-cumObj>=0?'var(--green)':'var(--red)'}">${sgn(cumReaProj-cumObj)}</td>
-      <td class="num">${eur(cumReaNet)}</td>
-    </tr>`;
-  host.innerHTML=`<div style="overflow-x:auto"><table class="tbl brk"><thead><tr>
-      <th>Mois</th><th class="num">Obj. brut</th><th class="num">Réa. brut</th><th class="num">Δ brut</th><th class="num">Nuits libres</th><th class="num">Projection</th><th class="num">Réa+proj</th><th class="num">Δ / obj</th><th class="num">Réa. net</th>
-    </tr></thead><tbody>${body}${foot}</tbody></table></div>`;
+  if(_d) _d.innerHTML=`Objectif de CA brut <b>${eur(L.ob.ca)}/mois</b> (${eur(cumObj)}/an) · prix moyen/nuit estimé <b>${eur(L.prixEst)}</b>.<br>`
+    +`<b>Projection</b> = nuits encore libres <b>à venir</b> × prix moyen/nuit × ${Math.round(L.COEF*100)} % (coef de chute : on ne remplit pas 100 % des nuits libres). Les nuits déjà écoulées et invendues sont perdues → projection = 0 sur les mois passés. `
+    +`<b>Réa+proj</b> = réalisé du mois + projection = ce que le mois devrait atteindre. `
+    +`<span style="color:var(--gold2)">Cliquez un mois pour voir ses réservations · survolez un chiffre pour son calcul.</span>`;
+  // Reconstruit via renderBreakdownTable : hérite du breakdown cliquable, des tooltips (title) et de l'export PDF/CSV.
+  // noN1 : l'atterrissage projeté (année en cours) ne se compare pas au réalisé N-1.
+  renderBreakdownTable({ id:'brkLanding', host:'brkLanding', rows:L.rows, title:'Atterrissage_sur_objectif', detail:true, noN1:true, columns:[
+    {label:'Obj. brut', kind:'calc', calc:(S,m)=>M[m].objBrut, total:()=>cumObj, fmt:eur,
+      tip:()=>'Objectif de CA brut mensuel (obj_ca), constant sur l\'année'},
+    {label:'Réa. brut', kind:'calc', calc:(S,m)=>M[m].reaBrut, total:()=>sum('reaBrut'), fmt:eur, color:'--gold',
+      tip:()=>'CA réellement réservé ce mois (Σ des montants des réservations)'},
+    {label:'Δ brut', kind:'calc', calc:(S,m)=>M[m].deltaRea, total:()=>sum('reaBrut')-cumObj, fmt:eurs,
+      tip:()=>'Réa. brut − Obj. brut (retard ou avance du réalisé seul, sans projection)'},
+    {label:'Nuits libres', kind:'calc', calc:(S,m)=>M[m].nl, total:()=>sum('nl'), fmt:v=>Math.round(v),
+      tip:()=>'Nuits non réservées du mois'+(L.nU>1?' (× '+L.nU+' biens)':'')+' = capacité − nuitées réservées'},
+    {label:'Projection', kind:'calc', calc:(S,m)=>M[m].projApplied, total:()=>sum('projApplied'), fmt:v=>v>0?eur(v):'—',
+      tip:(S,m)=>M[m].projApplied>0
+        ? ('Nuits libres à venir × prix moyen/nuit '+eur(L.prixEst)+' × '+Math.round(L.COEF*100)+' % = '+eur(M[m].projApplied))
+        : 'Mois passé : nuits libres invendues perdues, aucune projection'},
+    {label:'Réa+proj', kind:'calc', calc:(S,m)=>M[m].reaProj, total:()=>sum('reaProj'), fmt:eur, color:'--gold2',
+      tip:()=>'Réa. brut + Projection = CA que le mois devrait atteindre'},
+    {label:'Δ / obj', kind:'calc', calc:(S,m)=>M[m].deltaRP, total:()=>sum('reaProj')-cumObj, fmt:eurs,
+      tip:()=>'Réa+proj − Obj. brut (≥ 0 = objectif du mois atteignable)'},
+    {label:'Réa. net', kind:'calc', calc:(S,m)=>M[m].reaNet, total:()=>sum('reaNet'), fmt:eur, color:'--green',
+      tip:()=>'Bénéfice net réel du mois (CA − commission apporteur)'},
+  ]});
   const reaProjM=M.map(r=>Math.round(r.reaProj)), objM=M.map(r=>r.objBrut);
   mk('cLanding',{type:'bar',data:{labels:MONTHS,datasets:[
     {label:'Réalisé + projection',data:reaProjM,backgroundColor:M.map(r=>r.deltaRP>=0?css('--green'):css('--gold')),borderRadius:5,order:2,datalabels:DL(eur,css('--gold2'))},
@@ -2428,7 +2428,7 @@ function renderBreakdownTable(cfg){
   }
   h+=`<tr class="brk-total"><td>TOTAL ${state.year}</td>`+cols.map((c,i)=>{ const v=totVal(c,i); return `<td class="num"${cstyle(c)}>${fmtc(c,v)}</td>`; }).join('')+`</tr>`;
   // --- Lot 4 : comparaison N-1 (année précédente), source Superhôte only, additif et gated ---
-  if(typeof n1Applicable==='function' && n1Applicable()){
+  if(!cfg.noN1 && typeof n1Applicable==='function' && n1Applicable()){
     try{
       const s1=_brkSeries(Object.assign({}, cfg, {rows: n1RowsForYear(state.year-1)}));
       const totN1=(c,i)=>{ if(c.kind==='calc') return c.total(s1.T);
