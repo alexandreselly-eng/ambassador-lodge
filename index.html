@@ -390,13 +390,13 @@ td.actions{white-space:nowrap}
     </div>
     </details>
   </div>
-  <div class="objsection">Atteinte de l'objectif <span class="hint">base CA brut (hors ménage &amp; taxe de séjour) · réalisé + réservé</span></div>
+  <div class="objsection">Atteinte de l'objectif de CA <span class="hint">objectif de CA brut (hors ménage &amp; taxe de séjour) · réalisé + réservé</span></div>
   <div class="kpis k4" id="kpisAtteinte"></div>
-  <div class="objsection">Suivi du bénéfice <span class="hint">vs objectif &amp; point mort</span></div>
+  <div class="objsection">Suivi du bénéfice <span class="hint">vs objectif de bénéfice &amp; point mort (charges)</span></div>
   <div class="kpis" id="kpisObj"></div>
-  <div class="card"><h3>Cumul bénéfice net vs objectif <span class="hint">€ cumulés</span></h3><div class="desc">Objectif Ambassador 9 125 €/mois · Lodge 4 000 €/mois. Point mort Ambassador 6 416 € · Lodge 2 000 €/mois.</div><div class="chartbox"><canvas id="cCumul"></canvas></div></div>
+  <div class="card"><h3>Cumul bénéfice net vs objectif de bénéfice <span class="hint">€ cumulés</span></h3><div class="desc" id="cCumulDesc"></div><div class="chartbox"><canvas id="cCumul"></canvas></div></div>
   <div class="grid g2">
-    <div class="card"><h3>Delta sur objectif <span class="hint">réalisé − objectif</span></h3><div class="desc">Recalculé live.</div><div class="chartbox sm"><canvas id="cDelta"></canvas></div></div>
+    <div class="card"><h3>Delta sur objectif de bénéfice <span class="hint">bénéfice − objectif</span></h3><div class="desc">Recalculé live.</div><div class="chartbox sm"><canvas id="cDelta"></canvas></div></div>
     <div class="card"><h3>Delta sur point mort <span class="hint">réalisé − seuil</span></h3><div class="desc">Au-dessus de 0 = rentable.</div><div class="chartbox sm"><canvas id="cPM"></canvas></div></div>
   </div>
   <div class="card"><h3>Suivi des encaissements <span class="hint">€</span></h3><div class="desc">Acomptes perçus vs reste à payer.</div><div class="chartbox sm"><canvas id="cSolde"></canvas></div></div>
@@ -946,9 +946,10 @@ const SUPABASE_URL = 'https://okehchypcrhpkcptnyxq.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_2hvzAvSDxckuY80zHHVdYg_he3n2E9f';
 
 // --------------------------------------------------------------------
-const OBJ_DEFAULTS = { Ambassador:{obj:9125,comm:1825,pm:6416}, Lodge:{obj:4000,comm:1825,pm:2000} };
-let OBJECTIVES = {}; // `${annee}|${logement}` -> {obj,comm,pm}
-function objFor(year,bien){ return OBJECTIVES[year+'|'+bien] || OBJ_DEFAULTS[bien] || {obj:(propOf(bien).obj_mois_defaut||0),comm:0,pm:0}; }
+// obj = objectif de BÉNÉFICE mensuel ; ca = objectif de CA brut mensuel (défaut = bénéfice ×1,2, comme l'Excel, mais éditable) ; pm = point mort (charges) ; comm = objectif de commission
+const OBJ_DEFAULTS = { Ambassador:{obj:9125,comm:1825,pm:6416,ca:10950}, Lodge:{obj:4000,comm:1825,pm:2000,ca:4800} };
+let OBJECTIVES = {}; // `${annee}|${logement}` -> {obj,comm,pm,ca}
+function objFor(year,bien){ return OBJECTIVES[year+'|'+bien] || OBJ_DEFAULTS[bien] || {obj:(propOf(bien).obj_mois_defaut||0),comm:0,pm:0,ca:0}; }
 
 // ---- Référentiel des biens (multi-biens) ----
 let PROPERTIES = [ {nom:'Ambassador',superhote_labels:['Ambassador'],couleur:'#d4af37',ordre:1,actif:true},
@@ -967,7 +968,7 @@ async function loadProperties(){
 }
 async function loadObjectives(){
   OBJECTIVES={};
-  if(SUPA){ try{ const {data}=await SUPA.from('objectives').select('*'); (data||[]).forEach(r=>OBJECTIVES[r.annee+'|'+r.logement]={obj:+r.obj_mois,comm:+r.obj_comm,pm:+r.point_mort}); }catch(e){} }
+  if(SUPA){ try{ const {data}=await SUPA.from('objectives').select('*'); (data||[]).forEach(r=>OBJECTIVES[r.annee+'|'+r.logement]={obj:+r.obj_mois,comm:+r.obj_comm,pm:+r.point_mort,ca:(r.obj_ca!=null?+r.obj_ca:((OBJ_DEFAULTS[r.logement]||{}).ca||0))}); }catch(e){} }
   else { try{ OBJECTIVES=JSON.parse(localStorage.getItem('al_obj')||'{}'); }catch(e){} }
 }
 const MONTHS = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'];
@@ -1725,7 +1726,7 @@ function n1DecorateDashTiles(N){
 }
 // =================================================================================================
 function cumul(a){ let s=0; return a.map(v=>s+=v); }
-function activeObj(){ let o=0,c=0,pm=0; (state.log==='all'?visBiens():[state.log]).forEach(b=>{const x=objFor(state.year,b)||{obj:0,comm:0,pm:0}; o+=x.obj;c+=x.comm;pm+=x.pm;}); return {obj:o,comm:c,pm}; }
+function activeObj(){ let o=0,c=0,pm=0,ca=0; (state.log==='all'?visBiens():[state.log]).forEach(b=>{const x=objFor(state.year,b)||{obj:0,comm:0,pm:0,ca:0}; o+=x.obj;c+=x.comm;pm+=x.pm;ca+=(x.ca||0);}); return {obj:o,comm:c,pm,ca}; }
 function destroy(id){ if(charts[id]){charts[id].destroy(); delete charts[id];} }
 function mk(id,cfg){ destroy(id); const el=document.getElementById(id); if(el) charts[id]=new Chart(el,cfg); }
 function DL(fmt,color){ return state.labels?{display:true,anchor:'end',align:'end',clamp:true,color:color||css('--txt'),font:{size:10,weight:'600'},formatter:v=>{ if(v==null||v===0)return ''; return fmt?fmt(v):v; }}:{display:false}; }
@@ -2149,7 +2150,7 @@ function renderCommByApporteur(){ const host=document.getElementById('commAnalys
 }
 
 let _objBiens=[];
-function _objDef(b){ return OBJ_DEFAULTS[b]||{obj:(propOf(b).obj_mois_defaut||0),comm:0,pm:0}; }
+function _objDef(b){ return OBJ_DEFAULTS[b]||{obj:(propOf(b).obj_mois_defaut||0),comm:0,pm:0,ca:0}; }
 function renderObjEditor(){
   const box=document.getElementById('objEditor'); if(!box) return;
   if(!IS_ADMIN){ box.style.display='none'; return; }
@@ -2163,25 +2164,26 @@ function renderObjEditor(){
   if(grid) grid.innerHTML = _objBiens.map(({bien,i})=>{ const o=objFor(state.year,bien);
     const cls = bien==='Ambassador'?'amb':bien==='Lodge'?'lodge':'';
     return `<div class="objcol"><div class="objhead ${cls}" style="color:${(typeof bienColor==='function'?bienColor(bien):'var(--txt)')}">${bien}</div>`
-      +`<label>Objectif mensuel (€)</label><input id="obj_${i}_obj" type="number" step="1" value="${o.obj}">`
+      +`<label>Objectif mensuel de bénéfice (€)</label><input id="obj_${i}_obj" type="number" step="1" value="${o.obj}">`
+      +`<label>Objectif mensuel de CA brut (€)</label><input id="obj_${i}_ca" type="number" step="1" value="${o.ca}">`
       +`<label>Objectif commission (€)</label><input id="obj_${i}_comm" type="number" step="1" value="${o.comm}">`
       +`<label>Point mort mensuel (€)</label><input id="obj_${i}_pm" type="number" step="1" value="${o.pm}">`
       +`</div>`; }).join('');
   const dEl=document.getElementById('objDefaults');
-  if(dEl) dEl.textContent='('+biens.map(bn=>{const d=_objDef(bn); return `${bn} ${d.obj} / ${d.comm} / ${d.pm}`;}).join(' · ')+')';
+  if(dEl) dEl.textContent='('+biens.map(bn=>{const d=_objDef(bn); return `${bn} bénéf ${d.obj} / CA ${d.ca} / comm ${d.comm} / PM ${d.pm}`;}).join(' · ')+')';
 }
 async function saveObjectives(){
   if(PREVIEW.active){ toast('Lecture seule en mode aperçu.'); return; }
   const m=document.getElementById('objMsg'); const y=state.year;
   const recs=[]; let bad=false;
-  _objBiens.forEach(({bien,i})=>{ const obj=numOrNull('obj_'+i+'_obj'), comm=numOrNull('obj_'+i+'_comm'), pm=numOrNull('obj_'+i+'_pm');
-    if([obj,comm,pm].some(v=>v==null||v<0)) bad=true;
-    recs.push({annee:y,logement:bien,obj_mois:obj,obj_comm:comm,point_mort:pm,updated_by:(CURRENT_USER&&CURRENT_USER.email)}); });
+  _objBiens.forEach(({bien,i})=>{ const obj=numOrNull('obj_'+i+'_obj'), ca=numOrNull('obj_'+i+'_ca'), comm=numOrNull('obj_'+i+'_comm'), pm=numOrNull('obj_'+i+'_pm');
+    if([obj,ca,comm,pm].some(v=>v==null||v<0)) bad=true;
+    recs.push({annee:y,logement:bien,obj_mois:obj,obj_ca:ca,obj_comm:comm,point_mort:pm,updated_by:(CURRENT_USER&&CURRENT_USER.email)}); });
   if(bad||!recs.length){ m.textContent='Toutes les valeurs doivent être des nombres ≥ 0.'; m.className='formmsg err'; return; }
   m.textContent='Enregistrement…'; m.className='formmsg';
   try{
     if(SUPA){ const {error}=await SUPA.from('objectives').upsert(recs); if(error)throw error; }
-    else { recs.forEach(r=>OBJECTIVES[y+'|'+r.logement]={obj:r.obj_mois,comm:r.obj_comm,pm:r.point_mort}); localStorage.setItem('al_obj',JSON.stringify(OBJECTIVES)); }
+    else { recs.forEach(r=>OBJECTIVES[y+'|'+r.logement]={obj:r.obj_mois,comm:r.obj_comm,pm:r.point_mort,ca:r.obj_ca}); localStorage.setItem('al_obj',JSON.stringify(OBJECTIVES)); }
     await reload(); render(); m.textContent='✓ Objectifs enregistrés pour '+y+' ('+_objBiens.map(x=>x.bien).join(', ')+').'; m.className='formmsg ok';
   }catch(e){ m.textContent='Erreur : '+e.message; m.className='formmsg err'; }
 }
@@ -2198,51 +2200,62 @@ function resetObjectives(){
 
 function renderObjectives(rows,benefM,ob,benef,objAnnual){
   renderObjEditor();
-  // --- Atteinte de l'objectif (base CA : réalisé + réservé) ---
+  // ===== Section 1 : Atteinte de l'objectif de CA brut (base obj_ca) =====
   const _yr=[]; ROWS.forEach(d=>{ if(!(state.log==='all'||d.logement===state.log))return; monthSlices(d,state.year).forEach(sl=>_yr.push(sl)); });
-  const _t=new Date(), _ty=_t.getUTCFullYear(), _tm=_t.getUTCMonth()+1;
+  const _t=new Date(), _ty=_t.getUTCFullYear(), _tm=_t.getUTCMonth()+1, _td=_t.getUTCDate();
   const curMonth = state.year<_ty?13:(state.year>_ty?1:_tm);   // 1er mois "à venir"
   const monthsRem = Math.max(0,12-curMonth+1);
-  const caReal=_yr.filter(d=>d.mois&&d.mois<curMonth).reduce((s,d)=>s+(d.montant||0),0);
-  const caResv=_yr.filter(d=>d.mois&&d.mois>=curMonth).reduce((s,d)=>s+(d.montant||0),0);
-  const acquis=caReal+caResv, objAn=ob.obj*12, objRest=ob.obj*monthsRem;
-  const resteAR=Math.max(0,objRest-caResv), resteMois=monthsRem?resteAR/monthsRem:0;
-  const taux=objAn?acquis/objAn:null, ecart=acquis-objAn;
+  // Mois en cours ventilé au prorata des jours écoulés (réalisé vs réservé) au lieu d'être compté entièrement en "réservé".
+  const _fracEcoule = (state.year===_ty)? Math.min(1,Math.max(0,_td/daysInMonth(_ty,_tm))) : 0;
+  const _caCur=_yr.filter(d=>d.mois===curMonth).reduce((s,d)=>s+(d.montant||0),0);
+  const caReal=_yr.filter(d=>d.mois&&d.mois<curMonth).reduce((s,d)=>s+(d.montant||0),0) + _caCur*_fracEcoule;
+  const caResv=_yr.filter(d=>d.mois&&d.mois>curMonth).reduce((s,d)=>s+(d.montant||0),0) + _caCur*(1-_fracEcoule);
+  const acquis=caReal+caResv, objAnCA=ob.ca*12;
+  // Reste à réaliser (CA) = objectif de CA annuel − déjà acquis (réalisé + réservé). Négatif = objectif dépassé.
+  const resteCA=objAnCA-acquis, resteMois=(monthsRem&&resteCA>0)?resteCA/monthsRem:0;
+  const taux=objAnCA?acquis/objAnCA:null, ecart=acquis-objAnCA;
   const _pa=taux!=null?(taux*100).toFixed(1).replace('.',',')+' %':'—';
   const _bl=state.log==='all'?'Ambassador + Lodge':state.log;
   window.__xiRich=window.__xiRich||{}; const _mdO='Exercice '+state.year+' · '+_bl;
-  window.__xiRich.objan={title:'Objectif annuel brut',result:eur(objAn),n1:'Objectif mensuel × 12',n2:[eur(ob.obj)+' × 12','= '+eur(objAn)],n3:['Base : CA brut (hors ménage & taxe de séjour).'],meta:_mdO};
-  window.__xiRich.acquis={title:'Déjà acquis (CA)',result:eur(acquis),n1:'Réalisé (mois échus) + Réservé (mois à venir)',n2:[eur(caReal)+' (réalisé) + '+eur(caResv)+' (réservé)','= '+eur(acquis),Math.round((objAn?acquis/objAn:0)*100)+' % de l\'objectif'],n3:['Toutes les réservations '+state.year+'.'],meta:_mdO};
-  window.__xiRich.reste_ar={title:'Reste à réaliser (CA)',result:eur(resteAR),n1:'Objectif des mois restants − réservé sur ces mois',n2:[eur(ob.obj)+' × '+monthsRem+' − '+eur(caResv),'= '+eur(resteAR),eur(resteMois)+' / mois'],n3:['À vendre en plus des réservations déjà prises.','Mois restants : '+monthsRem+'.'],meta:_mdO};
-  window.__xiRich.taux={title:'Taux d\'atteinte',result:_pa,n1:'Déjà acquis ÷ objectif annuel',n2:[eur(acquis)+' ÷ '+eur(objAn),'= '+_pa,'Écart = '+(ecart>=0?'+':'')+eur(ecart)],n3:['Écart = acquis − objectif.'],meta:_mdO};
+  window.__xiRich.objan={title:'Objectif annuel de CA brut',result:eur(objAnCA),n1:'Objectif mensuel de CA × 12',n2:[eur(ob.ca)+' × 12','= '+eur(objAnCA)],n3:['Base : CA brut (hors ménage & taxe de séjour).'],meta:_mdO};
+  window.__xiRich.acquis={title:'Déjà acquis (CA)',result:eur(acquis),n1:'Réalisé (mois échus) + Réservé (mois à venir)',n2:[eur(caReal)+' (réalisé) + '+eur(caResv)+' (réservé)','= '+eur(acquis),Math.round((objAnCA?acquis/objAnCA:0)*100)+' % de l\'objectif de CA'],n3:['Toutes les réservations '+state.year+'. Mois en cours au prorata des jours.'],meta:_mdO};
+  window.__xiRich.reste_ar={title:'Reste à réaliser (CA)',result:resteCA>0?eur(resteCA):'objectif atteint (dépassé de '+eur(-resteCA)+')',n1:'Objectif annuel de CA − déjà acquis (réalisé + réservé)',n2:[eur(objAnCA)+' − '+eur(acquis),'= '+eur(resteCA)].concat((resteCA>0&&monthsRem)?[eur(resteMois)+' / mois sur '+monthsRem+' mois restants']:[]),n3:['Ce qu\'il reste à vendre pour atteindre l\'objectif de CA annuel.','Acquis + reste = objectif de CA annuel.'],meta:_mdO};
+  window.__xiRich.taux={title:'Taux d\'atteinte (CA)',result:_pa,n1:'Déjà acquis ÷ objectif de CA annuel',n2:[eur(acquis)+' ÷ '+eur(objAnCA),'= '+_pa,'Écart = '+(ecart>=0?'+':'')+eur(ecart)],n3:['Écart = acquis − objectif de CA.'],meta:_mdO};
   const aEl=document.getElementById('kpisAtteinte');
   if(aEl) aEl.innerHTML=[
-    kpiCard('Objectif annuel brut',eur(objAn),`${eur(ob.obj)} / mois · base CA brut`,'',{rich:'objan', txt:`Objectif annuel brut|Objectif mensuel × 12`}),
-    kpiCard('Déjà acquis',eur(acquis),`${Math.round((objAn?acquis/objAn:0)*100)} % de l'objectif`,'b3',{rich:'acquis', txt:`Déjà acquis|Réalisé + réservé`},objAn?acquis/objAn:0),
-    kpiCard('Reste à réaliser',eur(resteAR),`${eur(resteMois)} / mois · ${monthsRem} mois`,'b6',{rich:'reste_ar', txt:`Reste à réaliser|Objectif restant − réservé`},objRest?caResv/objRest:0),
-    kpiCard('Taux d\'atteinte',_pa,`${(ecart>=0?'+':'')+eur(ecart)} vs objectif`,ecart>=0?'b3':'b6',{rich:'taux', txt:`Taux d'atteinte|Acquis ÷ objectif`},taux||0),
+    kpiCard('Objectif annuel CA',eur(objAnCA),`${eur(ob.ca)} / mois · CA brut`,'',{rich:'objan', txt:`Objectif annuel de CA|Objectif mensuel de CA × 12`}),
+    kpiCard('Déjà acquis',eur(acquis),`${Math.round((objAnCA?acquis/objAnCA:0)*100)} % de l'objectif CA`,'b3',{rich:'acquis', txt:`Déjà acquis|Réalisé + réservé`},objAnCA?acquis/objAnCA:0),
+    kpiCard('Reste à réaliser',resteCA>0?eur(resteCA):'objectif atteint',resteCA>0?`${eur(resteMois)} / mois · ${monthsRem} mois`:`dépassé de ${eur(-resteCA)}`,resteCA>0?'b6':'b3',{rich:'reste_ar', txt:`Reste à réaliser|Objectif CA annuel − déjà acquis`},objAnCA?acquis/objAnCA:0),
+    kpiCard('Taux d\'atteinte',_pa,`${(ecart>=0?'+':'')+eur(ecart)} vs objectif CA`,ecart>=0?'b3':'b6',{rich:'taux', txt:`Taux d'atteinte|Acquis ÷ objectif CA`},taux||0),
   ].join('');
   renderCommByApporteur();
-  const commM=monthly(rows,'commission'); const objAcum=cumul(Array(12).fill(ob.obj)),benefAcum=cumul(benefM);
-  const deltaM=benefM.map(v=>v-ob.obj),pmM=benefM.map(v=>v-ob.pm);
-  const lastMonth=Math.max(0,...rows.filter(d=>d.mois).map(d=>d.mois)); const objNow=objAcum[Math.max(0,lastMonth-1)]||0;
-  window.__xiRich.benefreal={title:'Bénéfice réalisé',result:eur(benef),n1:'Σ des bénéfices nets de l\'exercice (montant − commission)',n2:['= '+eur(benef),pct(objAnnual?benef/objAnnual:null)+' de l\'objectif ('+eur(objAnnual)+')'],n3:['% = réalisé ÷ objectif annuel.'],meta:_mdO};
-  window.__xiRich.ecartcum={title:'Écart cumulé à date',result:(benef-objNow>=0?'+':'')+eur(benef-objNow),n1:'Bénéfice réalisé − objectif cumulé (mois échus)',n2:['Objectif cumulé = '+eur(ob.obj)+' × '+lastMonth+' = '+eur(objNow),eur(benef)+' − '+eur(objNow),'= '+(benef-objNow>=0?'+':'')+eur(benef-objNow)],n3:['Jusqu\'au dernier mois échu ('+(MONTHS[Math.max(0,lastMonth-1)]||'—')+').'],meta:_mdO};
+  // ===== Section 2 : Suivi du bénéfice (objectif de bénéfice + point mort) =====
+  const commM=monthly(rows,'commission');
+  const objBenAcum=cumul(Array(12).fill(ob.obj)), benefAcum=cumul(benefM), pmAcum=cumul(Array(12).fill(ob.pm));
+  const deltaM=benefM.map(v=>v-ob.obj), pmM=benefM.map(v=>v-ob.pm);
+  const objBenAnnuel=ob.obj*12;
+  const lastMonth=Math.max(0,...rows.filter(d=>d.mois).map(d=>d.mois));
+  const objBenNow=objBenAcum[Math.max(0,lastMonth-1)]||0;
+  // « reste à Réa » de l'Excel = cumul (objectif de bénéfice − bénéfice) jusqu'au dernier mois avec données.
+  const resteBenCum=deltaM.slice(0,Math.max(0,lastMonth)).reduce((s,v)=>s-v,0);
+  window.__xiRich.benefreal={title:'Bénéfice réalisé',result:eur(benef),n1:'CA brut − commissions',n2:['= '+eur(benef),pct(objBenAnnuel?benef/objBenAnnuel:null)+' de l\'objectif de bénéfice ('+eur(objBenAnnuel)+')'],n3:['Comparé à l\'objectif de BÉNÉFICE (≠ objectif de CA).'],meta:_mdO};
+  window.__xiRich.resteben={title:'Reste à réaliser (bénéfice)',result:eur(resteBenCum),n1:'Cumul (objectif de bénéfice − bénéfice) à date',n2:['Σ sur '+Math.max(0,lastMonth)+' mois','= '+eur(resteBenCum)],n3:['> 0 = retard de bénéfice cumulé sur l\'objectif.','Réplique le « reste à Réa » de l\'Excel.'],meta:_mdO};
   window.__xiRich.pmannuel={title:'Point mort annuel',result:eur(ob.pm*12),n1:'Point mort mensuel × 12',n2:[eur(ob.pm)+' × 12','= '+eur(ob.pm*12)],n3:['Charges à couvrir avant de dégager un bénéfice.','Paramétrable par exercice.'],meta:_mdO};
   window.__xiRich.margepm={title:'Marge sur point mort',result:(benef-ob.pm*12>=0?'+':'')+eur(benef-ob.pm*12),n1:'Bénéfice réalisé − point mort annuel',n2:[eur(benef)+' − '+eur(ob.pm*12),'= '+(benef-ob.pm*12>=0?'+':'')+eur(benef-ob.pm*12)],n3:['> 0 = rentable · < 0 = sous le seuil.'],meta:_mdO};
   window.__xiRich.commcum={title:'Commissions cumulées',result:eur(commM.reduce((a,b)=>a+b,0)),n1:'Σ des commissions de l\'exercice',n2:['= '+eur(commM.reduce((a,b)=>a+b,0)),'Objectif = '+eur(ob.comm*12)],n3:['Objectif = commission mensuelle cible × 12.'],meta:_mdO};
   document.getElementById('kpisObj').innerHTML=[
-    kpiCard('Bénéfice réalisé',eur(benef),`${pct(objAnnual?benef/objAnnual:null)} de l'objectif (${eur(objAnnual)})`,'b3',{rich:'benefreal', txt:`Bénéfice réalisé|Σ montant − commission`},objAnnual?benef/objAnnual:0),
-    kpiCard('Écart cumulé à date',(benef-objNow>=0?'+':'')+eur(benef-objNow),`vs objectif fin ${MONTHS[Math.max(0,lastMonth-1)]||'—'}`,benef-objNow>=0?'b3':'b6',{rich:'ecartcum', txt:`Écart cumulé à date|Réalisé − objectif cumulé`}),
-    kpiCard('Point mort annuel',eur(ob.pm*12),'seuil de rentabilité','b2',{rich:'pmannuel', txt:`Point mort annuel|Point mort mensuel × 12`}),
+    kpiCard('Bénéfice réalisé',eur(benef),`${pct(objBenAnnuel?benef/objBenAnnuel:null)} de l'objectif de bénéfice`,'b3',{rich:'benefreal', txt:`Bénéfice réalisé|CA brut − commissions`},objBenAnnuel?benef/objBenAnnuel:0),
+    kpiCard('Reste à réaliser bénéf.',eur(resteBenCum),'cumul objectif − bénéfice',resteBenCum<=0?'b3':'b6',{rich:'resteben', txt:`Reste à réaliser bénéfice|Cumul (objectif − bénéfice)`}),
     kpiCard('Marge sur point mort',(benef-ob.pm*12>=0?'+':'')+eur(benef-ob.pm*12),benef-ob.pm*12>=0?'rentable':'sous le seuil',benef-ob.pm*12>=0?'b3':'b6',{rich:'margepm', txt:`Marge sur point mort|Bénéfice − point mort`}),
+    kpiCard('Point mort annuel',eur(ob.pm*12),'seuil de charges à couvrir','b2',{rich:'pmannuel', txt:`Point mort annuel|Point mort mensuel × 12`}),
     kpiCard('Commissions cumulées',eur(commM.reduce((a,b)=>a+b,0)),`objectif ${eur(ob.comm*12)}`,'b4',{rich:'commcum', txt:`Commissions cumulées|Σ commissions vs objectif`}),
   ].join('');
+  const _cd=document.getElementById('cCumulDesc'); if(_cd) _cd.textContent=(typeof visBiens==='function'?visBiens():[]).map(bn=>{const o=objFor(state.year,bn); return bn+' : obj. bénéfice '+eur(o.obj)+'/mois · obj. CA '+eur(o.ca)+'/mois · point mort '+eur(o.pm)+'/mois';}).join('   ·   ');
   mk('cCumul',{type:'line',data:{labels:MONTHS,datasets:[
     {label:'Bénéfice cumulé',data:benefAcum,borderColor:css('--gold'),backgroundColor:'rgba(212,175,55,.12)',fill:true,tension:.25,pointRadius:3,pointBackgroundColor:css('--gold'),datalabels:DL(eur,css('--gold2'))},
-    {label:'Objectif cumulé',data:objAcum,borderColor:css('--red'),borderWidth:2,borderDash:[6,4],pointRadius:0,datalabels:{display:false}},
-    {label:'Point mort cumulé',data:cumul(Array(12).fill(ob.pm)),borderColor:css('--muted'),borderWidth:1.5,borderDash:[3,3],pointRadius:0,datalabels:{display:false}}]},options:baseOpt({money:true,legend:true})});
-  const deltaDS=[{label:'Δ objectif',data:deltaM,backgroundColor:deltaM.map(v=>v>=0?css('--green'):css('--red')),borderRadius:4,datalabels:DL(eur)}];
+    {label:'Objectif bénéfice cumulé',data:objBenAcum,borderColor:css('--red'),borderWidth:2,borderDash:[6,4],pointRadius:0,datalabels:{display:false}},
+    {label:'Point mort cumulé',data:pmAcum,borderColor:css('--muted'),borderWidth:1.5,borderDash:[3,3],pointRadius:0,datalabels:{display:false}}]},options:baseOpt({money:true,legend:true})});
+  const deltaDS=[{label:'Δ objectif bénéfice',data:deltaM,backgroundColor:deltaM.map(v=>v>=0?css('--green'):css('--red')),borderRadius:4,datalabels:DL(eur)}];
   let deltaOpt=baseOpt({money:true,legend:state.cumul});
   if(state.cumul){ deltaDS.push(cumulDS('Écart cumulé',deltaM,css('--blue'))); addY1(deltaOpt,css('--blue')); }
   mk('cDelta',{type:'bar',data:{labels:MONTHS,datasets:deltaDS},options:deltaOpt});
