@@ -1662,7 +1662,7 @@ function n1Applicable(){ return N1_ENABLED && state.dataSource==='superhote'; }
 function n1RowsForYear(y){ // miroir de currentRows() pour une année donnée, Superhôte only
   const out=[];
   ROWS.forEach(d=>{
-    if(!d || d.source!=='Superhote') return;                    // règle stricte Superhôte
+    if(!d) return;                                              // ROWS est déjà Superhôte-only ici (n1Applicable() ⇒ dataSource==='superhote') ; les lignes SH_ROWS ne portent pas de champ `source` (shToReservation ne le recopie pas)
     if(!bienVisible(d.logement)) return;
     if(!(state.log==='all'||d.logement===state.log)) return;
     if(!(state.chan==='all'||d.origine===state.chan)) return;
