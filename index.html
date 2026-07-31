@@ -1370,16 +1370,25 @@ function renderRecon(){ const card=document.getElementById('reconCard'); if(!car
        ${(gp!=null&&Math.abs(gp)>15)?`<div class="desc" style="margin-top:6px;color:var(--orange);font-weight:600">⚠ Écart de rapprochement anormal (${(gp>=0?'+':'')+gp.toFixed(1)} %, seuil ±15 %). Causes probables : doublons en base, périmètre (résa directes) ou import incomplet — à investiguer.</div>`:''}`
     : `<div class="desc">Rapprochement indisponible pour ce périmètre : ${xl.length?'pas de données Superhote validées pour '+(state.log==='all'?'ces biens':state.log)+' (importez le CSV dans Validation des données).':'pas de saisies Excel pour ce périmètre.'} (Excel : ${xl.length} résa · Superhote : ${sh.length} résa)</div>`;
 }
+// Statut d'une réservation Superhote : l'export V1 livrait « Annulée » et « Annulée par le
+// voyageur », la V2 livre « Cancelled » (normalisé à l'import). On teste la racine des trois.
+function shAnnulee(r){ const s=((r&&r.statut)||'').toString().toLowerCase(); return s.indexOf('annul')===0||s.indexOf('cancel')===0; }
 async function loadSuperhoteRows(){ SH_RAW=[]; if(!SUPA){ SH_ROWS=[]; return; }
   try{ const {data}=await SUPA.from('data_snapshots').select('bien,rows').eq('source','superhote_csv');
     // Dédup anti-doublon + diagnostic d'intégrité : un même snapshot peut exister sous 2 clés `bien` (mapping renommé entre 2 imports) → ne compter chaque réservation qu'une fois, et tracer ce qui a été dédupliqué.
-    const _seen=new Map(); SH_DIAG={raw:0,dupCount:0,dupPairs:{},biensSeen:{},at:new Date().toISOString()};
+    const _seen=new Map(); SH_DIAG={raw:0,dupCount:0,dupPairs:{},biensSeen:{},annulCount:0,annulMontant:0,at:new Date().toISOString()};
     const _keyOf=r=>(r.id!=null&&r.id!=='')?('id:'+r.id):[r.logement,r.entree,r.sortie,(r.nom||'').toString().toLowerCase(),r.montant_paye].join('|');
     (data||[]).forEach(s=>{ if(s.bien==='(historique)')return; SH_DIAG.biensSeen[s.bien]=(SH_DIAG.biensSeen[s.bien]||0)+((s.rows||[]).length);
       (s.rows||[]).forEach(r=>{ SH_DIAG.raw++; const k=_keyOf(r); const prev=_seen.get(k);
         if(prev!==undefined){ SH_DIAG.dupCount++; const pair=prev+' ↔ '+s.bien; SH_DIAG.dupPairs[pair]=(SH_DIAG.dupPairs[pair]||0)+1; return; }
+        // Une réservation annulée n'a produit aucun revenu : elle reste dans le snapshot pour la
+        // traçabilité et pour que la modale de validation signale un passage en annulation, mais
+        // elle ne doit alimenter aucun calcul. Sans ce filtre les 19 annulées gonflaient le CA de
+        // 10,6 % et la commission de 18,4 %.
+        if(shAnnulee(r)){ SH_DIAG.annulCount++; SH_DIAG.annulMontant+=(+r.montant||0); return; }
         _seen.set(k,s.bien); SH_RAW.push(r); }); });
     if(SH_DIAG.dupCount) console.warn('[Intégrité] '+SH_DIAG.dupCount+' réservation(s) Superhote en double ignorée(s) :',SH_DIAG.dupPairs);
+    if(SH_DIAG.annulCount) console.info('[Superhote] '+SH_DIAG.annulCount+' réservation(s) annulée(s) exclue(s) des calculs ('+Math.round(SH_DIAG.annulMontant).toLocaleString('fr-FR')+' €).');
   }catch(e){ SH_RAW=[]; } rebuildSH(); }
 function applyDataSource(){ const base=(state.dataSource==='superhote')? SH_ROWS : SAISIES_ROWS; ROWS = MY_BIENS ? base.filter(d=>bienVisible(d.logement)) : base; }
 function setDataSource(src){ state.dataSource=src; try{localStorage.setItem('al_src',src);}catch(e){} applyDataSource();
@@ -2870,7 +2879,8 @@ function _shBuildBienFilter(){ const el=document.getElementById('shSrcBien'); if
 function _shUpdateScope(){
   const biens=[...new Set(SH_DATA.map(s=>s.logement))], yrs=[...new Set(SH_DATA.map(s=>s.annee).filter(Boolean))].sort();
   const el=document.getElementById('shScope');
-  if(el) el.innerHTML = SH_DATA.length? `Validées : <b style="color:var(--lodge)">${SH_DATA.length} réservations</b> · ${biens.join(' + ')} · ${yrs.join(', ')}${state.log!=='all'?` · <b style="color:var(--gold)">filtre : ${state.log}</b>`:''}` : 'Aucune donnée Superhote validée — importez un CSV via « Validation des données ».';
+  const _ann=(typeof SH_DIAG!=='undefined'&&SH_DIAG&&SH_DIAG.annulCount)?` · <b style="color:var(--muted)">${SH_DIAG.annulCount} annulée(s) exclue(s) des calculs</b>`:'';
+  if(el) el.innerHTML = SH_DATA.length? `Validées : <b style="color:var(--lodge)">${SH_DATA.length} réservations</b> · ${biens.join(' + ')} · ${yrs.join(', ')}${state.log!=='all'?` · <b style="color:var(--gold)">filtre : ${state.log}</b>`:''}${_ann}` : 'Aucune donnée Superhote validée — importez un CSV via « Validation des données ».';
 }
 
 // ---------- ÉCARTS LIGNE À LIGNE ----------
