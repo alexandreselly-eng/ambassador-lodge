@@ -2729,19 +2729,49 @@ const SHmatch=(function(){
     const ex=keys.find(k=>k.toLowerCase().trim()===frag); if(ex)return o[ex];
     const cand=keys.filter(k=>k.toLowerCase().includes(frag)); if(!cand.length)return '';
     cand.sort((a,b)=>a.length-b.length); return o[cand[0]];}  // en-tête le plus court (évite les en-têtes composites)
+  function statutSh(s){ const l=(s||'').trim().toLowerCase();
+    if(l==='confirmed')return 'Confirmée'; if(l==='cancelled'||l==='canceled')return 'Annulée'; return (s||'').trim(); }
+  // Superhote produit deux formats d'export. L'historique, en français, livre les colonnes
+  // comptables déjà calculées (« Montant versé », « Revenu brut », « Montant payé »). Le nouveau,
+  // en anglais, ne livre que les composants bruts et il faut les recomposer. Les formules ci-dessous
+  // ont été validées à 176/176 sur les réservations communes aux deux formats (Ambassador, Lodge,
+  // Villa Métis). Nuance métier : la taxe de séjour est encaissée et reversée par la plateforme sur
+  // Airbnb et Booking, alors qu'en direct et via le site c'est nous qui l'encaissons.
   function buildSH(objs){
     return objs.map(r=>{
-      const voy=(col(r,'voyageur')||'').trim().split(/\s+/);const prenom=voy.length>1?voy.slice(0,-1).join(' '):'';const nom=voy[voy.length-1]||'';
-      const entree=col(r,'date de début')||col(r,'date de debut');
-      const dres=(col(r,'date de réservation')||col(r,'date de reservation')||'').slice(0,10)||null;
-      return {id:col(r,'identifiant'),plateforme:col(r,'plateforme'),origine:origineSh(col(r,'plateforme')),date_resa:dres,
-        entree:entree,sortie:col(r,'date de fin'),nuits:num(col(r,'nuits')),nom:nom,prenom:prenom,
-        logement_label:(col(r,'logement')||col(r,'property')||'').trim(),
-        logement:bienOf(col(r,'logement')||col(r,'property')),
-        montant_paye:num(col(r,'montant payé')||col(r,'montant paye')),revenu_brut:num(col(r,'revenu brut')),
-        commission:num(col(r,'commission')),taxe:num(col(r,'taxe de séjour')||col(r,'taxe de sejour')),
-        frais_menage:num(col(r,'frais de ménage')||col(r,'frais de menage')),
-        montant:num(col(r,'montant versé')||col(r,'montant verse')),nb_pers:num(col(r,'nombre de personnes')),statut:col(r,'statut'),
+      const en=!!col(r,'checkin');   // seul le format anglais a une colonne « checkin »
+      const entree=en?col(r,'checkin'):(col(r,'date de début')||col(r,'date de debut'));
+      let nom,prenom;
+      if(en){ nom=(col(r,'guest last name')||'').trim(); prenom=(col(r,'guest first name')||'').trim(); }
+      else { const voy=(col(r,'voyageur')||'').trim().split(/\s+/); prenom=voy.length>1?voy.slice(0,-1).join(' '):''; nom=voy[voy.length-1]||''; }
+      const dres=((en?col(r,'booking date'):(col(r,'date de réservation')||col(r,'date de reservation')))||'').slice(0,10)||null;
+      const plateforme=en?col(r,'channel'):col(r,'plateforme');
+      const label=((en?col(r,'rental'):(col(r,'logement')||col(r,'property')))||'').trim();
+      const menage=num(en?col(r,'cleaning fees'):(col(r,'frais de ménage')||col(r,'frais de menage')));
+      const taxe=num(en?col(r,'city taxes'):(col(r,'taxe de séjour')||col(r,'taxe de sejour')));
+      const commission=num(col(r,'commission'));
+      let montant,revenu_brut,montant_paye;
+      if(en){
+        const r2=x=>Math.round(x*100)/100;
+        const nuitees=num(col(r,'night price'))||0, t=taxe||0, m=menage||0;
+        const total=num(col(r,'total payments')), frais=num(col(r,'payment charges'))||0, c=commission||0;
+        const surPlateforme=/airbnb|booking/i.test(plateforme||'');
+        revenu_brut=r2(nuitees+m+(/airbnb/i.test(plateforme||'')?0:t));
+        montant=r2((surPlateforme?nuitees+m:(total==null?nuitees+m+t:total))-c-frais);
+        montant_paye=r2(nuitees+t);
+      } else {
+        montant=num(col(r,'montant versé')||col(r,'montant verse'));
+        revenu_brut=num(col(r,'revenu brut'));
+        montant_paye=num(col(r,'montant payé')||col(r,'montant paye'));
+      }
+      return {id:en?col(r,'booking id'):col(r,'identifiant'),plateforme:plateforme,origine:origineSh(plateforme),date_resa:dres,
+        entree:entree,sortie:en?col(r,'checkout'):col(r,'date de fin'),nuits:num(en?col(r,'nights'):col(r,'nuits')),nom:nom,prenom:prenom,
+        logement_label:label,
+        logement:bienOf(label),
+        montant_paye:montant_paye,revenu_brut:revenu_brut,
+        commission:commission,taxe:taxe,
+        frais_menage:menage,
+        montant:montant,nb_pers:num(en?col(r,'people'):col(r,'nombre de personnes')),statut:statutSh(en?col(r,'status'):col(r,'statut')),
         annee:/^\d{4}/.test(entree)?+entree.slice(0,4):null,source:'Superhote'};
     }).filter(s=>s.entree);
   }
@@ -3819,12 +3849,27 @@ const AL_VALID = (function(){
 
   // ---- diff version N vs précédente ----
   const KEY=r=>((r.logement||'')+'|'+(r.entree||'')+'|'+(r.nom||'')).toLowerCase().trim();
+  // L'identifiant Superhote est la clé stable. On ne l'utilise que si les deux versions comparées
+  // le portent partout, sinon on retombe sur bien+date+nom (l'Excel n'a pas d'identifiant). Sans
+  // cela, un simple changement d'orthographe du nom fait apparaître une suppression + un ajout au
+  // lieu d'une modification : c'est le cas de l'export anglais, qui découpe nom et prénom en deux
+  // colonnes distinctes là où le français livrait un seul champ à redécouper à l'aveugle.
+  function keyer(incoming,prev){ const tous=a=>Array.isArray(a)&&a.length>0&&a.every(r=>r&&r.id);
+    return (tous(incoming)&&tous(prev))?(r=>'id:'+r.id):KEY; }
+  // L'export Superhote anglais ne ventile plus la taxe de séjour sur une partie des séjours en
+  // direct : il renvoie 0 là où l'export français donnait un montant. Plutôt que d'écraser par 0
+  // une taxe déjà validée, on reprend la valeur en mémoire. Un séjour réellement sans taxe reste
+  // à 0, il ne peut simplement pas effacer une valeur antérieure non nulle.
+  function repriseTaxe(incoming,prev){ if(!prev||!prev.length)return 0; const K=keyer(incoming,prev); const pm={};
+    prev.forEach(r=>pm[K(r)]=r); let n=0;
+    incoming.forEach(r=>{ if(!r.taxe){ const p=pm[K(r)]; if(p&&p.taxe){ r.taxe=p.taxe; r._taxe_reprise=true; n++; } } });
+    return n; }
   const FIELDS={superhote_csv:['sortie','montant','taxe','frais_menage','plateforme','nb_pers','statut'], excel:['sortie','montant','taxe','frais_menage','origine','nb_pers']};
-  function diff(source, incoming, prev){ const f=FIELDS[source]||FIELDS.excel; const pm={}; (prev||[]).forEach(r=>pm[KEY(r)]=r); const im={}; incoming.forEach(r=>im[KEY(r)]=r);
+  function diff(source, incoming, prev){ const f=FIELDS[source]||FIELDS.excel; const K=keyer(incoming,prev); const pm={}; (prev||[]).forEach(r=>pm[K(r)]=r); const im={}; incoming.forEach(r=>im[K(r)]=r);
     const added=[],removed=[],modified=[],unchanged=[];
-    incoming.forEach(r=>{ const p=pm[KEY(r)]; if(!p){added.push(r);return;} const ch=[]; f.forEach(fl=>{ const a=(p[fl]==null?'':p[fl]), b=(r[fl]==null?'':r[fl]); if(String(a)!==String(b))ch.push({field:fl,before:a,after:b}); });
-      if(ch.length)modified.push({key:KEY(r),logement:r.logement,entree:r.entree,nom:r.nom,changes:ch}); else unchanged.push(r); });
-    (prev||[]).forEach(r=>{ if(!im[KEY(r)])removed.push(r); });
+    incoming.forEach(r=>{ const p=pm[K(r)]; if(!p){added.push(r);return;} const ch=[]; f.forEach(fl=>{ const a=(p[fl]==null?'':p[fl]), b=(r[fl]==null?'':r[fl]); if(String(a)!==String(b))ch.push({field:fl,before:a,after:b}); });
+      if(ch.length)modified.push({key:K(r),logement:r.logement,entree:r.entree,nom:r.nom,changes:ch}); else unchanged.push(r); });
+    (prev||[]).forEach(r=>{ if(!im[K(r)])removed.push(r); });
     return {added,removed,modified,unchanged}; }
 
   // ---- Supabase ----
@@ -3861,13 +3906,16 @@ const AL_VALID = (function(){
     const unk={}; unknownRows.forEach(r=>{ const l=r._label||'(vide)'; unk[l]=(unk[l]||0)+1; }); const unkKeys=Object.keys(unk);
     const biens=[...new Set(known.map(r=>r._bien))];
     const groups=[];
-    for(const b of biens){ const sub=known.filter(r=>r._bien===b); const snap=await loadSnapshot(source,b); const prev=snap?snap.rows:null; const dd=diff(source,sub,prev||[]); groups.push({bien:b,sub,snap,prev,d:dd,version:hash(JSON.stringify(sub))}); }
+    for(const b of biens){ const sub=known.filter(r=>r._bien===b); const snap=await loadSnapshot(source,b); const prev=snap?snap.rows:null;
+      const reprises=(source==='superhote_csv')?repriseTaxe(sub,prev):0;
+      const dd=diff(source,sub,prev||[]); groups.push({bien:b,sub,snap,prev,d:dd,reprises,version:hash(JSON.stringify(sub))}); }
     let html='';
     if(unkKeys.length){ const opts=(typeof allBiens==='function'?allBiens():[]).map(b=>`<option>${b}</option>`).join('');
       html+='<div class="valwarn"><b>⚠ Libellé(s) d\'annonce non reconnu(s)</b><div class="vsub">Ces lignes ne seront pas importées tant qu\'un bien ne leur est pas associé (mapping conservé pour les prochains imports).</div><div class="valunk">'+unkKeys.map(l=>`<div class="vunkrow"><span class="vunkl">${l} <span class="muted">(${unk[l]})</span></span><select class="vunksel" data-l="${encodeURIComponent(l)}"><option value="">— associer à —</option>${opts}</select><button class="btnv sec vunkmap" data-l="${encodeURIComponent(l)}">Mapper</button></div>`).join('')+'</div></div>'; }
     if(groups.length){ html+=groups.map(g=>{ const baseline=!g.prev; const changed=g.d.added.length+g.d.removed.length+g.d.modified.length;
         let h=`<div class="valgrpbien"><div class="vgbh"><span class="pill" style="background:${_bc(g.bien)}22;color:${_bc(g.bien)}">${g.bien}</span> ${g.sub.length} ligne(s) · ${baseline?'<b>première validation</b>':'vs mémoire ('+(g.snap.row_count||0)+' lignes · '+_fd((g.snap.updated_at||'').slice(0,10))+')'}</div>`;
         h+='<div class="valkpis">'+[['Ajouts',g.d.added.length,'add'],['Modifiées',g.d.modified.length,'mod'],['Supprimées',g.d.removed.length,'rem'],['Inchangées',g.d.unchanged.length,'']].map(k=>`<div class="valk ${k[2]}"><div class="vn">${k[1]}</div><div class="vl">${k[0]}</div></div>`).join('')+'</div>';
+        if(g.reprises)h+=`<div class="valnochg" style="border-left:3px solid var(--gold);text-align:left">ⓘ ${g.reprises} taxe(s) de séjour absente(s) de cet export ont été reprises de la dernière version validée. L'export Superhote anglais renvoie 0 sur certains séjours en direct.</div>`;
         if(changed){ h+='<div class="valscroll">';
           if(g.d.added.length)h+='<div class="valgrp add">＋ Ajouts</div>'+g.d.added.slice(0,120).map(r=>`<div class="vli">${_fd(r.entree)} · ${(r.prenom||'')+' '+(r.nom||'')} · ${_eur(r.montant)}</div>`).join('');
           if(g.d.modified.length)h+='<div class="valgrp mod">✎ Modifications</div>'+g.d.modified.slice(0,120).map(m2=>`<div class="vli">${_fd(m2.entree)} · ${m2.nom||''}<div class="vchs">${m2.changes.map(chRow).join('')}</div></div>`).join('');
