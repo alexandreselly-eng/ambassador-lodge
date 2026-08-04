@@ -432,7 +432,7 @@ td.actions{white-space:nowrap}
     <div class="scroll">
       <table class="tbl"><thead id="rthead"><tr>
         <th data-k="logement">Bien</th><th data-k="date_resa">Date résa</th><th data-k="entree">Entrée</th><th data-k="sortie">Sortie</th><th data-k="nuitees">Nuits</th><th data-k="client">Client</th><th data-k="origine">Canal</th>
-        <th class="num" data-k="montant">Montant</th><th class="num" data-k="commission">Commission</th><th class="num" data-k="benefice">Bénéfice net</th><th class="num" data-k="reste_a_payer">Reste à payer</th><th data-k="saisi">Saisi par</th><th>Actions</th>
+        <th class="num" data-k="montant">Montant</th><th class="num" data-k="commission">Commission</th><th class="num" data-k="benefice">Bénéfice net</th><th class="num" data-k="reste_a_payer" title="Ce que le voyageur doit encore">Reste à payer</th><th class="num" data-k="encaissement_attendu" title="Ce que la plateforme doit encore verser : séjour réglé mais pas commencé">Versement attendu</th><th data-k="saisi">Saisi par</th><th>Actions</th>
       </tr></thead><tbody id="rtbody"></tbody></table>
     </div>
   </div>
@@ -1005,7 +1005,7 @@ function hasUnsavedInput(){
   return false;
 }
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260804-141500';
+const APP_BUILD='20260804-150000';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function forceReload(build){ try{ if(sessionStorage.getItem('al_reloaded_build')===build){ showBanner(); return; } sessionStorage.setItem('al_reloaded_build',build); }catch(e){} location.href=location.pathname+'?v='+Date.now(); }
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
@@ -1674,7 +1674,8 @@ function monthSlices(d, year){
       montant:mont, taxe:_pr(d.taxe,f), commission:com, comm_immo:ci, comm_bibiz_new:cbn, comm_bibiz_runoff:cbr,
       benefice:(mont==null?null:Math.round((mont-(com||0))*100)/100),
       frais_menage:_pr(d.frais_menage,f), ac1:_pr(d.ac1,f), ac2:_pr(d.ac2,f), ac3:_pr(d.ac3,f),
-      reste_a_payer:_pr(d.reste_a_payer,f), jours_mois:jm, tx_rempl:jm? a.nights/jm : null });
+      reste_a_payer:_pr(d.reste_a_payer,f), encaissement_attendu:_pr(d.encaissement_attendu,f),
+      jours_mois:jm, tx_rempl:jm? a.nights/jm : null });
   });
 }
 function currentRows(){ const out=[];
@@ -2441,7 +2442,10 @@ function renderExplorer(){
 // ===== Moteur générique : tableau mensuel (mois × mesures) — source UNIQUE = currentRows(), agrégation via monthly() =====
 const pctv=(n)=>(n==null?'—':n.toFixed(1).replace('.',',')+' %');
 function reservHeadHTML(){
-  return `<tr><th>Bien</th><th>Date résa</th><th>Entrée</th><th>Sortie</th><th class="num">Nuits</th><th>Client</th><th>Canal</th><th class="num">Montant</th><th class="num">Commission</th><th class="num">Bénéfice net</th><th class="num">Reste à payer</th><th>Saisi par</th><th>Actions</th></tr>`;
+  // Deux en-têtes existent : celui-ci, pour les tableaux dépliés, et le statique du tableau
+  // principal. Ils doivent lister les mêmes colonnes que reservRowHTML, sinon les cellules
+  // se décalent. Un test le vérifie.
+  return `<tr><th>Bien</th><th>Date résa</th><th>Entrée</th><th>Sortie</th><th class="num">Nuits</th><th>Client</th><th>Canal</th><th class="num">Montant</th><th class="num">Commission</th><th class="num">Bénéfice net</th><th class="num" title="Ce que le voyageur doit encore">Reste à payer</th><th class="num" title="Ce que la plateforme doit encore verser : séjour réglé mais pas commencé">Versement attendu</th><th>Saisi par</th><th>Actions</th></tr>`;
 }
 function reservRowHTML(d){
   const canAct = d.id!=null;
@@ -2454,6 +2458,7 @@ function reservRowHTML(d){
     <td class="num${HILITE==='montant'?' hl':''}">${eur(d.montant)}</td><td class="num${HILITE==='commission'?' hl':''}">${eur(d._appComm!=null?d._appComm:d.commission)}</td>
     <td class="num${HILITE==='benefice'?' hl':''}" style="color:${css('--green')}">${eur(d.benefice)}</td>
     <td class="num${HILITE==='reste_a_payer'?' hl':''}" style="color:${(d.reste_a_payer||0)>1?css('--orange'):'var(--muted)'}">${d.reste_a_payer?eur(d.reste_a_payer):'—'}</td>
+    <td class="num${HILITE==='encaissement_attendu'?' hl':''}" style="color:${(d.encaissement_attendu||0)>1?css('--blue'):'var(--muted)'}" title="${(d.encaissement_attendu||0)>1?'Séjour réglé, non commencé : la plateforme verse après l\'arrivée':''}">${d.encaissement_attendu?eur(d.encaissement_attendu):'—'}</td>
     <td style="color:var(--muted);font-size:11px">${d.created_by_email||'—'}</td>
     <td class="actions">${acts}</td></tr>`;
 }
@@ -2560,7 +2565,7 @@ function renderReservs(rows){
   if(AF&&AF!=='all'){ const _pf=(d)=>AF==='Immosphera'?(d.comm_immo||0):((d.comm_bibiz_new||0)+(d.comm_bibiz_runoff||0)); rows=rows.filter(d=>_pf(d)>0.005).map(d=>Object.assign({},d,{_appComm:Math.round(_pf(d)*100)/100})); }
   const {key,dir}=state.rsort; const v=(d)=>key==='client'?((d.nom||'')+' '+(d.prenom||'')).trim():(key==='saisi'?(d.created_by_email||''):(key==='commission'&&d._appComm!=null?d._appComm:d[key]));
   const sorted=[...rows].sort((a,b)=>{let x=v(a),y=v(b); if(x==null)x=-Infinity; if(y==null)y=-Infinity; if(typeof x==='number'&&typeof y==='number')return (x-y)*dir; return (''+x).localeCompare(''+y)*dir;});
-  const HLABEL={montant:'Montant',commission:'Commission',benefice:'Bénéfice net',reste_a_payer:'Reste à payer',nuitees:'Nuitées'};
+  const HLABEL={montant:'Montant',commission:'Commission',benefice:'Bénéfice net',reste_a_payer:'Reste à payer',encaissement_attendu:'Versement attendu',nuitees:'Nuitées'};
   let _rc=`${sorted.length} lignes`;
   if(AF&&AF!=='all'){ const _tot=sorted.reduce((s,d)=>s+(d._appComm||0),0); _rc+=` · apporteur <b style="color:var(--violet)">« ${AF} »</b> · Σ commission ${eur(_tot)} <button id="clrApp" class="kbtn" title="Retirer le filtre apporteur">✕ retirer</button>`; }
   else if(HILITE&&HLABEL[HILITE]){ _rc+=` · colonne « ${HLABEL[HILITE]} » mise en évidence`; }
