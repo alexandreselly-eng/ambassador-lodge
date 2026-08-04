@@ -36,6 +36,20 @@ Deux choix structurants :
   cela, un import les remplaçait en silence, la modale n'affichant aucune modification alors
   que ces champs alimentent les conventions de montant et le tableau Superhote.
 
+## Faire évoluer le mapping
+
+`mapping.ts` porte une constante `VERSION_MAPPING`. **À incrémenter dès que le module change
+ce qu'il produit**, formule, champ ajouté, règle modifiée.
+
+Sans elle, une ligne déjà validée n'était re-proposée que si la donnée **distante** bougeait,
+jamais si notre propre calcul évoluait. Constaté le 04/08/2026 : les 200 réservations validées
+la veille sont restées figées sur un mapping périmé, et aucune synchronisation ne pouvait les
+rattraper. La version stockée dans `sh_pending.mapping_version` fait repasser ces lignes en
+attente au passage suivant, donc par la modale de validation.
+
+Une ligne `rejete` n'est pas rouverte par un changement de version : un refus délibéré se lève
+à la main.
+
 ## Ce qui reste à faire
 
 - **Lot 4** : cron, alerte e-mail, rapprochement hebdomadaire des suppressions,

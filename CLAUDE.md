@@ -60,6 +60,11 @@ s'exécute qu'à partir de la deuxième fois : curseur, pagination au-delà de l
 reprise après échec, déduplication contre l'existant. Un format de curseur invalide a passé
 28 tests unitaires et un premier passage réel avant d'être découvert au second, le 04/08/2026.
 
+**Incrémenter `VERSION_MAPPING` dès que `mapping.ts` change ce qu'il produit** (formule, champ
+ajouté, règle modifiée). C'est ce qui fait repasser par la modale de validation les lignes déjà
+arbitrées sous un calcul devenu périmé. Sans ça, une correction de formule reste invisible sur
+tout l'historique déjà validé.
+
 **Ne jamais faire `source ~/.superhote.env`.** Le token contient un `|` que le shell
 interprète comme un tube, ce qui l'affiche en clair. Toujours `grep` puis `cut`, valeur
 entre guillemets.

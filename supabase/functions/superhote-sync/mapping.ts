@@ -249,11 +249,27 @@ export function mapper(r: ReservationApi, opts: OptionsMapping): Reservation | n
   };
 }
 
+/**
+ * Version du mapping. À incrémenter dès que ce module change CE QU'IL PRODUIT.
+ *
+ * Sans elle, une ligne déjà validée n'était re-proposée que si la donnée distante bougeait,
+ * jamais si notre propre calcul évoluait : une correction de formule restait alors invisible
+ * sur tout l'historique déjà arbitré. Constaté le 04/08/2026, l'ajout de `paiement` et la
+ * correction de `revenu_brut` n'ayant pas re-proposé les 200 lignes validées la veille.
+ *
+ * Historique :
+ *   2026-08-04.1  mapping initial (Lot 1)
+ *   2026-08-04.2  revenu_brut sur fare_accommodation, montant_paye sur total_price (Lot 2)
+ *   2026-08-04.3  ajout de `paiement`, pour le calcul du reste à payer
+ */
+export const VERSION_MAPPING = '2026-08-04.3';
+
 export type StatutPending = 'en_attente' | 'valide' | 'rejete' | 'supprime';
 
 export interface LignePending {
   statut: StatutPending;
   updated_at: string;
+  mapping_version?: string | null;
 }
 
 /**
@@ -261,18 +277,24 @@ export interface LignePending {
  *
  *  - ligne absente                                  -> ecrire en_attente
  *  - ligne « valide » dont l'updated_at a change    -> repasse en_attente
- *  - ligne « valide » inchangee                     -> ne rien faire
+ *  - ligne « valide » mappee par une version        -> repasse en_attente : notre calcul a
+ *    anterieure du mapping                             change, la valeur validee est perimee
+ *  - ligne « valide » inchangee des deux cotes      -> ne rien faire
  *  - ligne « rejete »                               -> ne JAMAIS rouvrir, sinon un refus
- *                                                      delibere reviendrait a chaque passage
+ *                                                      delibere reviendrait a chaque passage.
+ *                                                      Vaut aussi apres un changement de
+ *                                                      version : le refus se leve a la main.
  *  - ligne « en_attente » ou « supprime »           -> rafraichir le payload
  */
 export function decisionUpsert(
   existant: LignePending | null | undefined,
   updatedAtDistant: string,
+  versionCourante: string = VERSION_MAPPING,
 ): 'ecrire' | 'ignorer' {
   if (!existant) return 'ecrire';
   if (existant.statut === 'rejete') return 'ignorer';
   if (existant.statut === 'valide') {
+    if ((existant.mapping_version ?? null) !== versionCourante) return 'ecrire';
     const a = new Date(existant.updated_at).getTime();
     const b = new Date(updatedAtDistant).getTime();
     return Number.isNaN(a) || Number.isNaN(b) || a !== b ? 'ecrire' : 'ignorer';
