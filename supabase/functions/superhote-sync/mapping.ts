@@ -33,6 +33,7 @@ export interface ReservationApi {
   total_price: number | null;
   fare_accommodation: number | null;
   host_payout: number | null;
+  payment_status: string | null;
   price_details: PriceLine[] | null;
   host_fees: PriceLine[] | null;
   booked_at: string | null;
@@ -59,8 +60,23 @@ export interface Reservation {
   montant: number | null;
   nb_pers: number | null;
   statut: string;
+  paiement: string | null;
   annee: number | null;
   source: string;
+}
+
+// État de paiement, relevé sur les 204 réservations le 04/08/2026. Le CSV ne portait pas
+// cette information : sans elle, le calcul du reste à payer suppose qu'aucun acompte n'a
+// été perçu et affiche un solde sur des séjours entièrement réglés.
+export const PAIEMENTS_SOLDES = new Set([
+  'MANAGED_BY_PLATFORM',  // Airbnb encaisse et reverse : aucun solde possible
+  'PAID',
+  'PAID_MANUALLY',        // encaissé hors plateforme
+]);
+
+/** Le séjour est-il entièrement réglé ? Faux si l'information manque : on ne devine pas. */
+export function estSolde(paiement: string | null | undefined): boolean {
+  return !!paiement && PAIEMENTS_SOLDES.has(paiement);
 }
 
 // La taxe de sejour arrive sous deux types selon le canal : collectee par nous en direct
@@ -225,6 +241,9 @@ export function mapper(r: ReservationApi, opts: OptionsMapping): Reservation | n
     frais_menage: menage,
     nb_pers: r.guests_count ?? null,
     statut,
+    // Code brut, jamais traduit : l'app décide ce qu'elle en fait. Un code inconnu ne sera
+    // pas considéré comme soldé, donc l'ignorer est prudent, pas silencieux.
+    paiement: r.payment_status || null,
     annee: /^\d{4}/.test(entree) ? Number(entree.slice(0, 4)) : null,
     source: 'Superhote',
   };

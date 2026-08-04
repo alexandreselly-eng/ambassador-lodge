@@ -20,8 +20,10 @@ import {
   centimes,
   curseur,
   decisionUpsert,
+  estSolde,
   mapper,
   origineDe,
+  PAIEMENTS_SOLDES,
   StatutInconnuError,
   type Propriete,
   type ReservationApi,
@@ -112,6 +114,24 @@ describe('fonctions pures', () => {
       decisionUpsert({ statut: 'en_attente', updated_at: '2026-01-01T00:00:00Z' }, '2026-08-04T10:00:00Z'),
       'ecrire',
     );
+  });
+
+  test('estSolde ne suppose jamais un encaissement', () => {
+    for (const p of ['MANAGED_BY_PLATFORM', 'PAID', 'PAID_MANUALLY']) assert.ok(estSolde(p), `${p} vaut solde`);
+    for (const p of ['UNPAID', 'PARTIALLY_PAID', 'CANCELED', 'CODE_INEDIT', '', null, undefined]) {
+      assert.equal(estSolde(p as any), false, `${p} ne doit rien solder`);
+    }
+  });
+
+  // La liste est dupliquee : mapping.ts la porte pour la synchro, index.html pour compute().
+  // Une derive entre les deux ferait diverger le reste a payer selon le chemin. Ce test
+  // remplace un commentaire « penser a mettre a jour les deux ».
+  test('la liste des paiements soldes est identique dans index.html', () => {
+    const html = readFileSync(join(RACINE, 'index.html'), 'utf8');
+    const m = html.match(/const PAIEMENTS_SOLDES=\[([^\]]+)\]/);
+    assert.ok(m, 'PAIEMENTS_SOLDES introuvable dans index.html');
+    const cote = m![1].split(',').map((s) => s.trim().replace(/^'|'$/g, ''));
+    assert.deepEqual(cote.sort(), [...PAIEMENTS_SOLDES].sort());
   });
 
   test('un statut inconnu arrete la synchro au lieu de deviner', () => {
@@ -257,6 +277,26 @@ describe('rejeu sur les 204 reservations connues', { skip: fixturesPresentes ? f
       ['Direct', 'Site web'],
       'les pertes ne concernent que les canaux ou nous encaissons la taxe',
     );
+  });
+
+  // L'etat de paiement est ce que le CSV ne portait pas. Sans lui, le reste a payer suppose
+  // qu'aucun euro n'a ete encaisse et affiche un solde sur des sejours entierement regles.
+  test('paiement : etat repris tel quel, et repartition connue', () => {
+    const par: Record<string, number> = {};
+    let solde = 0, ouvert = 0, inconnu = 0;
+    for (const m of mappees.values()) {
+      if (m.statut !== 'Confirmée') continue;
+      const p = m.paiement || '(absent)';
+      par[p] = (par[p] || 0) + 1;
+      if (estSolde(m.paiement)) solde++;
+      else if (p === 'PARTIALLY_PAID' || p === 'UNPAID') ouvert++;
+      else inconnu++;
+    }
+    assert.equal(solde, 141, 'sejours regles : Airbnb gere par la plateforme, payes, payes manuellement');
+    assert.equal(ouvert, 39, 'soldes reellement ouverts : impayes et partiellement payes');
+    assert.equal(inconnu, 1, 'une confirmee porte un paiement CANCELED : jamais supposee reglee');
+    assert.equal(par.MANAGED_BY_PLATFORM, 58);
+    assert.equal(par.PAID, 80);
   });
 
   test('aucun libelle de logement non reconnu', () => {
