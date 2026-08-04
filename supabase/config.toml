@@ -1,0 +1,7 @@
+project_id = "okehchypcrhpkcptnyxq"
+
+# La fonction fait sa propre vérification d'identité (jeton de service pour le cron,
+# JWT utilisateur pour le bouton « synchroniser maintenant »), donc la vérification
+# de plateforme est désactivée. Voir la fonction verifierAppelant() dans index.ts.
+[functions.superhote-sync]
+verify_jwt = false

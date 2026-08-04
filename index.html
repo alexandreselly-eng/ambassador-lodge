@@ -1005,7 +1005,7 @@ function hasUnsavedInput(){
   return false;
 }
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260719-013000';
+const APP_BUILD='20260804-062500';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function forceReload(build){ try{ if(sessionStorage.getItem('al_reloaded_build')===build){ showBanner(); return; } sessionStorage.setItem('al_reloaded_build',build); }catch(e){} location.href=location.pathname+'?v='+Date.now(); }
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
@@ -3975,7 +3975,7 @@ const AL_VALID = (function(){
     el.querySelectorAll('.vdet').forEach(b=>b.onclick=()=>{ const r=document.getElementById('vdet'+b.dataset.i); r.style.display=r.style.display==='none'?'table-row':'none'; });
   }
   let _tt; function toast(msg,err){ let t=document.getElementById('valToast'); if(!t){ t=document.createElement('div'); t.id='valToast'; document.body.appendChild(t);} t.textContent=msg; t.style.background=err?'#f85149':'#3fb950'; t.style.color=err?'#fff':'#04220f'; t.style.display='block'; clearTimeout(_tt); _tt=setTimeout(()=>t.style.display='none',4200); }
-  return {render, openGate, diff, parseFile, toast, _hash:hash, _renderReg:renderReg};
+  return {render, openGate, diff, parseFile, toast, keyer, repriseTaxe, _hash:hash, _renderReg:renderReg};
 })();
 function renderValidation(){ AL_VALID.render(); }
 function valToast(m,e){ AL_VALID.toast(m,e); }
