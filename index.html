@@ -1005,7 +1005,7 @@ function hasUnsavedInput(){
   return false;
 }
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260804-123000';
+const APP_BUILD='20260804-141500';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function forceReload(build){ try{ if(sessionStorage.getItem('al_reloaded_build')===build){ showBanner(); return; } sessionStorage.setItem('al_reloaded_build',build); }catch(e){} location.href=location.pathname+'?v='+Date.now(); }
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
@@ -1087,6 +1087,24 @@ function commCalc(r){ const z={immo:0,bibizNew:0,bibizRunoff:0,total:0};
 // rien : mieux vaut un reste à payer visible et faux qu'un encaissement supposé.
 const PAIEMENTS_SOLDES=['MANAGED_BY_PLATFORM','PAID','PAID_MANUALLY'];
 function SOLDE_REGLE(p){ return !!p && PAIEMENTS_SOLDES.indexOf(p)>=0; }
+// « Réglé » ne veut pas dire « encaissé ». Airbnb et Booking ne reversent qu'après l'arrivée
+// du voyageur, environ 24 h après pour Airbnb. Un séjour de novembre payé aujourd'hui par le
+// voyageur est promis, pas encaissé. Le seuil retenu est le début du séjour : la nuance des
+// 24 h demanderait leur calendrier de versement, que l'API ne livre pas.
+function _aujourdhui(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function SUR_PLATEFORME(r){ return /airbnb|booking/i.test(String(r.plateforme||r.origine||'')); }
+// Ventile un solde brut entre deux questions qu'il ne faut pas confondre :
+//   reste    ce que le VOYAGEUR doit encore
+//   attendu  ce que la PLATEFORME doit encore verser
+// Un état de paiement absent ou inconnu laisse tout en solde client : on ne suppose jamais
+// un encaissement. Les saisies manuelles, sans état de paiement, gardent donc le calcul
+// par acomptes inchangé.
+function VENTILER_SOLDE(r, resteBrut, auj){
+  if(resteBrut==null) return {reste:null, attendu:0};
+  if(!SOLDE_REGLE(r.paiement)) return {reste:resteBrut, attendu:0};
+  const aVenir = !!r.entree && String(r.entree) > (auj||_aujourdhui());
+  return (SUR_PLATEFORME(r)&&aVenir) ? {reste:0, attendu:resteBrut} : {reste:0, attendu:0};
+}
 function compute(r){
   const c=r.entree?new Date(r.entree+'T00:00:00'):null, d=r.sortie?new Date(r.sortie+'T00:00:00'):null;
   const nuit=(c&&d)?Math.round((d-c)/86400000):null;
@@ -1104,11 +1122,10 @@ function compute(r){
   // les acomptes saisis ne tombent pas au centime près. Les vrais soldes plus importants restent visibles.
   const _rrRaw = (r.montant!=null)? (n0(r.montant)+n0(r.taxe)-n0(r.ac1)-n0(r.ac2)-n0(r.ac3)-n0(r.frais_menage)) : null;
   const _rTol = Math.max(2, 0.01*(Math.abs(n0(r.montant))+Math.abs(n0(r.taxe))));
-  let _reste = (_rrRaw==null)? null : (Math.abs(_rrRaw)<=_rTol ? 0 : Math.round(_rrRaw*100)/100);
-  // Source Superhote : il n'y a pas d'acomptes, mais l'API livre l'état de paiement du séjour.
-  // Un séjour réglé est soldé, quoi qu'en dise le calcul par acomptes. Un état absent ou inconnu
-  // ne solde rien : on ne devine pas un encaissement.
-  if(_reste!=null && SOLDE_REGLE(r.paiement)) _reste=0;
+  const _rBrut = (_rrRaw==null)? null : (Math.abs(_rrRaw)<=_rTol ? 0 : Math.round(_rrRaw*100)/100);
+  // Source Superhote : pas d'acomptes, mais l'API livre l'état de paiement du séjour.
+  const _v = VENTILER_SOLDE(r, _rBrut);
+  const _reste = _v.reste, _attendu = _v.attendu;
   return Object.assign({},r,{
     annee:c?c.getFullYear():null, mois:c?c.getMonth()+1:null,
     nuitees:nuit, jours_mois:H, tx_rempl:(nuit!=null&&H)?nuit/H:null, monthsAlloc:_alloc, apporteur:apporteur,
@@ -1116,7 +1133,7 @@ function compute(r){
     comm_immo:Math.round(_cp.immo*100)/100, comm_bibiz_new:Math.round(_cp.bibizNew*100)/100, comm_bibiz_runoff:Math.round(_cp.bibizRunoff*100)/100,
     benefice:(r.montant!=null)?Math.round((r.montant-_cp.total)*100)/100:null,
     cout_nuit:(r.montant!=null&&nuit)?r.montant/nuit:null,
-    reste_a_payer:_reste
+    reste_a_payer:_reste, encaissement_attendu:_attendu
   });
 }
 
@@ -1818,7 +1835,7 @@ function render(){
   document.getElementById('subtitle').textContent=`Source ${state.dataSource==='superhote'?'Superhote (CSV)':'Saisies'} · Exercice ${state.year} · ${state.log==='all'?(visBiens().join(' + ')||'tous biens'):state.log} · ${state.chan==='all'?'tous canaux':state.chan}${state.month!=='all'?' · '+MONTHS[state.month-1]:''} · ${nResa} réservations`;
   const ca=rows.reduce((s,d)=>s+(d.montant||0),0), benef=rows.reduce((s,d)=>s+(d.benefice||0),0), comm=rows.reduce((s,d)=>s+(d.commission||0),0);
   const cImmo=rows.reduce((s,d)=>s+(d.comm_immo||0),0), cBibN=rows.reduce((s,d)=>s+(d.comm_bibiz_new||0),0), cBibR=rows.reduce((s,d)=>s+(d.comm_bibiz_runoff||0),0); const cBibT=cBibN+cBibR;
-  const nuit=rows.reduce((s,d)=>s+(d.nuitees||0),0), taxe=rows.reduce((s,d)=>s+(d.taxe||0),0), reste=rows.reduce((s,d)=>s+(d.reste_a_payer||0),0); const taxeOTA=rows.filter(isOTA).reduce((s,d)=>s+(d.taxe||0),0), taxeSCI=taxe-taxeOTA;
+  const nuit=rows.reduce((s,d)=>s+(d.nuitees||0),0), taxe=rows.reduce((s,d)=>s+(d.taxe||0),0), reste=rows.reduce((s,d)=>s+(d.reste_a_payer||0),0), attendu=rows.reduce((s,d)=>s+(d.encaissement_attendu||0),0); const taxeOTA=rows.filter(isOTA).reduce((s,d)=>s+(d.taxe||0),0), taxeSCI=taxe-taxeOTA;
   const prix=nuit?ca/nuit:null; const _occS=occStats(rows); const occ=_occS.occ;
   const ob=activeObj(), objAnnual=ob.obj*12;
   const isSH=state.dataSource==='superhote';
@@ -1856,7 +1873,12 @@ function render(){
   window.__xiRich.reste={title:'Reste à encaisser',result:eur(reste),
     n1:'Σ des soldes clients encore ouverts',
     n2:['Par résa : montant + taxe − acomptes (1+2+3) − ménage','Source Superhote : un séjour dont l\'API dit qu\'il est réglé est soldé à 0, quels que soient les acomptes.'],
-    n3:(isSH?[srcTag+' : Superhote ne livre pas les acomptes, mais livre l\'état de paiement.','Réglé (payé, ou encaissé par la plateforme) → 0.','Impayé → montant total. Partiellement payé → montant total, donc majorant : l\'API ne dit pas combien a été versé.','Un séjour sans état de paiement connu n\'est jamais supposé réglé.']:['Source : saisies.','Somme des soldes clients ouverts.']),
+    n3:(isSH?[srcTag+' : Superhote ne livre pas les acomptes, mais livre l\'état de paiement.','Réglé (payé, ou pris en charge par la plateforme) → 0.','Impayé → montant total. Partiellement payé → montant total, donc majorant : l\'API ne dit pas combien a été versé.','Un séjour sans état de paiement connu n\'est jamais supposé réglé.','Ce que les plateformes doivent encore verser est compté à part, dans « Versements attendus ».']:['Source : saisies.','Somme des soldes clients ouverts.']),
+    meta:_mdD};
+  window.__xiRich.attendu={title:'Versements attendus',result:eur(attendu),
+    n1:'Σ des montants que les plateformes doivent encore verser',
+    n2:['Séjour réglé côté voyageur, mais pas encore commencé','Airbnb et Booking ne reversent qu\'après l\'arrivée'],
+    n3:['Réglé ne veut pas dire encaissé : un séjour de novembre payé aujourd\'hui est promis, pas reçu.','Direct et site web en sont exclus : là, le virement du client est déjà sur le compte.','Seuil retenu : le début du séjour. Airbnb verse environ 24 h après l\'arrivée, l\'API ne livre pas son calendrier de versement.','À ne pas additionner naïvement au « Reste à encaisser » : l\'un est dû par des voyageurs, l\'autre par des plateformes.'],
     meta:_mdD};
   document.getElementById('kpis').innerHTML=[
     kpiCard(isSH?'Chiffre d\'affaires':'CA brut',eur(ca),`${nResa} réservations · ${nuit} nuitées${isSH?'':' · hors ménage & taxe de séjour'}`,'',
@@ -1868,6 +1890,9 @@ function render(){
     kpiCard('Prix moyen / nuit',eur(prix),`occupation moy. ${pct(occ)}`,'b4',{rich:'prix', txt:`Prix moyen / nuit|CA ÷ nuitées`}),
     kpiCard('Taxes de séjour',eur(taxeSCI),'à reverser (SCI) · dont OTA '+eur(taxeOTA)+' · <button id="taxExtractBtn" class="kbtn" title="Justificatif détaillé de la période sélectionnée">⤓ justificatif</button>','b2',{rich:'taxe', txt:`Taxes de séjour|À reverser (SCI) ${eur(taxeSCI)} · dont OTA ${eur(taxeOTA)}`}),
     kpiCard('Reste à encaisser',eur(reste),isSH?'impayés & partiels · majorant':'soldes clients ouverts','b5',{rich:'reste', txt:`Reste à encaisser|Soldes clients ouverts${isSH?' · impayés et partiellement payés · majorant, l\'API ne dit pas combien a été versé sur un séjour partiel':''}`}),
+    // Tuile propre à la source Superhote : les saisies ne portent pas d'état de paiement,
+    // le montant y serait toujours nul et la tuile n'apprendrait rien.
+    (isSH? kpiCard('Versements attendus',eur(attendu),'plateformes · séjours non commencés','b2',{rich:'attendu', txt:`Versements attendus|Airbnb et Booking reversent après l'arrivée du voyageur|Séjours réglés dont le séjour n'a pas commencé`}) : ''),
   ].join('');
   if(typeof n1Applicable==='function' && n1Applicable()){ try{ n1DecorateDashTiles({ca,benef,comm,prix,taxeSCI,reste}); }catch(e){} }
   const _teb=document.getElementById('taxExtractBtn'); if(_teb)_teb.onclick=genTaxeJustificatif;
