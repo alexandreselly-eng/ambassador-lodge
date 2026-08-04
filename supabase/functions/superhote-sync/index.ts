@@ -17,6 +17,7 @@ import {
   type Propriete,
   type ReservationApi,
 } from './mapping.ts';
+import { corpsSur, diagnostic, peutAlerter, type EtatSync } from './surveillance.ts';
 
 const API_BASE = 'https://connect.superhote.com/api/v2/public';
 const SOURCE = 'superhote_v2';
@@ -60,6 +61,31 @@ function messageErreur(e: unknown): string {
 /** Erreur enrichie du nom de l'etape, pour ne pas chercher laquelle des requetes a echoue. */
 function echec(etape: string, e: unknown): Error {
   return new Error(`${etape} : ${messageErreur(e)}`);
+}
+
+/**
+ * Envoi d'une notification ntfy. Ne leve jamais : une alerte qui plante ne doit pas masquer
+ * la panne qu'elle signale, ni faire echouer une synchro par ailleurs reussie.
+ * Retourne vrai si le message est parti.
+ */
+async function notifier(titre: string, message: string, priorite = 'high', tags = 'warning'): Promise<boolean> {
+  const sujet = Deno.env.get('NTFY_TOPIC');
+  if (!sujet) { console.warn('NTFY_TOPIC absent : aucune alerte envoyee'); return false; }
+  const base = Deno.env.get('NTFY_URL') || 'https://ntfy.sh';
+  try {
+    // Les en-tetes ntfy passent mal les accents : le titre reste en ASCII, le corps est en
+    // UTF-8 et porte le texte lisible.
+    const rep = await fetch(`${base}/${sujet}`, {
+      method: 'POST',
+      headers: { Title: titre, Priority: priorite, Tags: tags },
+      body: corpsSur(message),
+    });
+    if (!rep.ok) { console.error(`ntfy ${rep.status} : ${(await rep.text()).slice(0, 200)}`); return false; }
+    return true;
+  } catch (e) {
+    console.error('Envoi ntfy impossible :', messageErreur(e));
+    return false;
+  }
 }
 
 /**
@@ -170,6 +196,32 @@ Deno.serve(async (req: Request) => {
   const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const TOKEN = Deno.env.get('SUPERHOTE_TOKEN');
 
+  const url = new URL(req.url);
+  const modeSurveillance = url.searchParams.has('surveillance');
+
+  // La surveillance a son propre secret, distinct de la cle de service : le declencheur
+  // externe qui l'appelle n'a besoin que de lire un etat et d'envoyer une notification.
+  // Lui confier la cle de service serait lui donner tous les droits sur la base.
+  if (modeSurveillance) {
+    const attendu = Deno.env.get('SURVEILLANCE_SECRET');
+    const recu = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
+    const autorise = (attendu && recu === attendu) ||
+      (await verifierAppelant(req, SUPABASE_URL, ANON_KEY, SERVICE_KEY)).ok;
+    if (!autorise) return json({ erreur: 'Surveillance : jeton refuse.' }, 401);
+
+    const db = createClient(SUPABASE_URL, SERVICE_KEY);
+    const { data: e } = await db.from('sh_sync_state').select('*').eq('source', SOURCE).maybeSingle();
+    const maintenant = Date.now();
+    const d = diagnostic(e as EtatSync | null, maintenant, Number(Deno.env.get('SEUIL_SILENCE_H') || 36));
+
+    let envoyee = false;
+    if (d.alerte && peutAlerter((e as EtatSync | null)?.alerte_le, maintenant)) {
+      envoyee = await notifier(d.titre, d.message);
+      if (envoyee) await db.from('sh_sync_state').update({ alerte_le: new Date(maintenant).toISOString() }).eq('source', SOURCE);
+    }
+    return json({ niveau: d.niveau, message: d.message, alerte_envoyee: envoyee });
+  }
+
   if (!TOKEN) return json({ erreur: 'Secret SUPERHOTE_TOKEN absent.' }, 500);
 
   const auth = await verifierAppelant(req, SUPABASE_URL, ANON_KEY, SERVICE_KEY);
@@ -260,6 +312,9 @@ Deno.serve(async (req: Request) => {
       last_full_check_at: etat?.last_full_check_at ?? null,
       last_status: 'ok',
       last_error: null,
+      // Un passage reussi remet le compteur anti-repetition a zero : la prochaine panne
+      // alerte immediatement, sans attendre la fin d'une fenetre ouverte par la precedente.
+      alerte_le: null,
     }, { onConflict: 'source' });
 
     const resume = {
@@ -283,6 +338,17 @@ Deno.serve(async (req: Request) => {
     // Le curseur n'est PAS avance en cas d'echec, mais il est reecrit a l'identique :
     // la prochaine execution rejouera exactement la meme fenetre. L'upsert par
     // identifiant rend l'operation idempotente.
+    // L'alerte part avant l'ecriture d'etat : si la base est en cause, elle est le seul
+    // canal qui reste. Une alerte en echec ne masque jamais la panne qu'elle signale.
+    const maintenant = Date.now();
+    let alerteEnvoyee = false;
+    if (peutAlerter((etat as EtatSync | null)?.alerte_le, maintenant)) {
+      alerteEnvoyee = await notifier(
+        'Synchro SuperHote en echec',
+        `La synchronisation a echoue.\nMotif : ${message}\nLes donnees ne bougent plus. La memoire deja validee n'est pas affectee.`,
+      );
+    }
+
     await db.from('sh_sync_state').upsert({
       source: SOURCE,
       last_run_at: debut,
@@ -290,8 +356,9 @@ Deno.serve(async (req: Request) => {
       last_full_check_at: etat?.last_full_check_at ?? null,
       last_status: statutInconnu ? 'statut_inconnu' : 'erreur',
       last_error: message.slice(0, 1000),
+      alerte_le: alerteEnvoyee ? new Date(maintenant).toISOString() : (etat?.alerte_le ?? null),
     }, { onConflict: 'source' });
 
-    return json({ erreur: message }, 500);
+    return json({ erreur: message, alerte_envoyee: alerteEnvoyee }, 500);
   }
 });

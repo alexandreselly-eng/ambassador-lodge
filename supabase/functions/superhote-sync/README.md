@@ -50,13 +50,74 @@ attente au passage suivant, donc par la modale de validation.
 Une ligne `rejete` n'est pas rouverte par un changement de version : un refus délibéré se lève
 à la main.
 
+## Alerte ntfy
+
+Deux pannes de nature différente, et c'est la seconde qui compte :
+
+- **l'échec** : la synchro tourne et rapporte une erreur. Elle s'annonce.
+- **le silence** : la synchro ne tourne plus du tout. `last_status` reste figé sur son dernier
+  `ok`, ce qui ressemble à un fonctionnement normal. C'est ce scénario qui a laissé l'import
+  CSV cassé du 12 au 31/07/2026 sans le moindre signal.
+
+L'échec alerte depuis la fonction elle-même. Le silence demande un appel extérieur :
+
+```
+POST /functions/v1/superhote-sync?surveillance
+Authorization: Bearer <SURVEILLANCE_SECRET>
+```
+
+Ce mode ne synchronise rien. Il lit l'état, et notifie si la synchro est en échec ou muette
+depuis plus de `SEUIL_SILENCE_H` heures (36 par défaut, pour tolérer un passage manqué).
+
+**Il a son propre secret**, distinct de la clé de service : le déclencheur externe n'a besoin
+que de lire un état et d'envoyer une notification. Lui confier la clé de service serait lui
+donner tous les droits sur la base.
+
+### Mise en place
+
+1. Installe l'app **ntfy** ([ntfy.sh](https://ntfy.sh)), gratuite, sans compte.
+2. Choisis un sujet **long et aléatoire**. Sur le serveur public, quiconque connaît le sujet
+   lit les messages : c'est un secret de fait. Les messages ne portent aucune donnée
+   nominative, et sont tronqués à 400 caractères pour limiter ce qu'une erreur inattendue
+   laisserait fuir.
+3. Abonne-toi à ce sujet dans l'app.
+4. Enregistre les secrets :
+
+```sh
+supabase secrets set NTFY_TOPIC="bnb-pilot-<chaine-aleatoire>"
+supabase secrets set SURVEILLANCE_SECRET="$(openssl rand -hex 24)"
+# facultatif : serveur ntfy auto-hébergé, et seuil de silence
+supabase secrets set NTFY_URL="https://ntfy.sh" SEUIL_SILENCE_H="36"
+```
+
+### Anti-répétition
+
+Une alerte par tranche de 6 h. Une alerte qui se répète toutes les dix minutes finit en
+sourdine, et c'est le meilleur moyen de rater la vraie. Tout passage réussi remet le compteur
+à zéro, donc la panne suivante alerte immédiatement.
+
+### Le déclencheur reste à brancher
+
+Le mode surveillance ne s'appelle pas tout seul. Le brancher sur un cron Supabase serait un
+demi-service : **un cron Supabase qui surveille une fonction Supabase ne détecte rien si tout
+Supabase est en pause**, ce qui est précisément un des risques du plan pour un projet en offre
+gratuite. Un déclencheur extérieur, GitHub Actions par exemple, n'a pas ce point de panne
+commun.
+
+### Vérification
+
+Le seul critère qui vaut : **révoquer le token SuperHote, lancer une synchro, et vérifier que
+la notification arrive sur le téléphone**. Une alerte qu'on n'a jamais vue arriver n'est pas
+une alerte.
+
 ## Ce qui reste à faire
 
-- **Lot 4** : cron, alerte e-mail, rapprochement hebdomadaire des suppressions,
-  branchement de `sh_pending_purge()`.
-- **Ne pas brancher le cron tant que rien ne surveille l'échec.** Le badge affiche désormais
-  « Synchro API : ⚠ en échec », ce qui couvre le cas où tu ouvres l'app. Une panne pendant une
-  absence prolongée resterait invisible : c'est l'objet de l'alerte du Lot 4.
+- **Lot 4, reste** : le déclencheur du mode surveillance, le cron de synchronisation, le
+  rapprochement hebdomadaire des suppressions (statut `supprime`, déclaré mais jamais écrit),
+  et le branchement de `sh_pending_purge()`, en base mais jamais appelée.
+- **Ordre recommandé** : le déclencheur de surveillance AVANT le cron de synchronisation.
+  L'inverse installerait dans une fausse sécurité, la panne étant d'autant plus silencieuse
+  que plus personne ne clique.
 
 ## Tests
 
