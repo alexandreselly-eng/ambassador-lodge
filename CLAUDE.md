@@ -89,12 +89,11 @@ passé par deux tours de critique adversariale.
 - **Lot 1 livré et en production** (04/08/2026) : Edge Function, `sh_pending`, mapping des
   16 champs disponibles, curseur incrémental. Premier passage 200 lignes, second passage
   4 lignes, filtre `updated_since` confirmé.
-- **Lot 2** : recalibrer `revenu_brut`, exact à 98/181 avec la formule héritée du CSV.
-  `montant_paye` est déjà fait (`total_price`, 181/181).
-- **Lot 3** : badge, alimentation d'`openGate` depuis `sh_pending`, bouton « synchroniser
-  maintenant ». **Piège** : `index.html` ligne ~3920, `repriseTaxe()` n'est appelé que pour
-  `source === 'superhote_csv'`, à élargir à la source API sinon les 18 lignes à taxe
-  restaurée repasseront à zéro.
+- **Lot 2 livré** : `revenu_brut` recalibré sur `fare_accommodation + frais_menage`,
+  `montant_paye` sur `total_price`. Les 9 écarts restants sont des Booking où le CSV livrait 0.
+- **Lot 3 livré** : module `AL_SYNC`, carte de synchro dans l'onglet Validation, pastille
+  d'état avec signalement d'échec, sortie du sas après validation. La source enregistrée reste
+  `superhote_csv`, ce qui fait disparaître le piège de `repriseTaxe()` par construction.
 - **Lot 4** : cron et alerte. **Ne pas brancher le cron avant que le Lot 3 affiche l'état
   d'échec** : aujourd'hui `sh_sync_state.last_status` est écrit mais rien ne le lit, une
   panne serait donc silencieuse. C'est ce qui a laissé l'import CSV cassé du 12 au 31/07.

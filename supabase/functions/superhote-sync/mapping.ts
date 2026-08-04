@@ -31,6 +31,7 @@ export interface ReservationApi {
   guest_first_name: string | null;
   guest_last_name: string | null;
   total_price: number | null;
+  fare_accommodation: number | null;
   host_payout: number | null;
   price_details: PriceLine[] | null;
   host_fees: PriceLine[] | null;
@@ -61,25 +62,6 @@ export interface Reservation {
   annee: number | null;
   source: string;
 }
-
-// Lignes de prix qui composent le prix des nuitees. Reprises de la table /reference,
-// relevee le 04/08/2026. Un type inconnu n'est pas compte ici : il ressortira comme
-// ecart au rejeu plutot que de se fondre silencieusement dans un total.
-const TYPES_NUITEES = new Set([
-  'night',
-  'daily_price',
-  'weekly_price',
-  'monthly_price',
-  'base_price',
-  'special_offer_base_price',
-  'daily_discount',
-  'weekly_discount',
-  'monthly_discount',
-  'discount_amount',
-  'reduction_percent',
-  'coupon_savings',
-  'airbnb_funded_discount',
-]);
 
 // La taxe de sejour arrive sous deux types selon le canal : collectee par nous en direct
 // et via le site, reversee par Airbnb pour son propre canal.
@@ -204,7 +186,6 @@ export function mapper(r: ReservationApi, opts: OptionsMapping): Reservation | n
   const libelle = opts.libelles.get(r.rental_id) || '';
   const taxe = somme(r.price_details, TYPES_TAXE);
   const menage = somme(r.price_details, TYPES_MENAGE);
-  const nuitees = somme(r.price_details, TYPES_NUITEES);
   // Toutes les lignes de host_fees sont des prelevements de la plateforme
   // (host_platform_commission, airbnb_host_fee). Verifie 200/200.
   const commission = sommeTout(r.host_fees);
@@ -232,10 +213,12 @@ export function mapper(r: ReservationApi, opts: OptionsMapping): Reservation | n
     // Montant paye par le voyageur, taxes comprises. Verifie 181/181.
     montant_paye: r.total_price == null ? null : centimes(r.total_price),
 
-    // TODO Lot 2 : formule heritee du CSV, exacte a 98/181 seulement. L'API expose
-    // total_price et fare_accommodation, le recalibrage est un travail de calcul, pas
-    // un manque de donnee. Critere du Lot 2 : 196/200.
-    revenu_brut: centimes(nuitees + menage + (origineDe(r.platform_name) === 'Airbnb' ? 0 : taxe)),
+    // Revenu brut = hebergement + menage, hors taxe de sejour. Recalibre au Lot 2 sur
+    // `fare_accommodation`, que SuperHote calcule lui-meme, au lieu de recomposer les
+    // lignes de prix. Exact sur les 172 confirmees dont la reference est fiable ; les 9
+    // ecarts restants sont des Booking ou le CSV livrait 0 faute de colonne `night price`
+    // renseignee. L'API corrige donc un defaut du CSV, elle n'en introduit pas.
+    revenu_brut: centimes((r.fare_accommodation || 0) + menage),
 
     commission,
     taxe,

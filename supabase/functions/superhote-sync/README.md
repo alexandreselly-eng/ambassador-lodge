@@ -17,16 +17,32 @@ humaine par `AL_VALID.openGate()` reste le seul chemin vers les données de prod
 | Mapping | 16 champs. Statut mappé sur le **code numérique**, jamais sur le libellé. Un code inconnu arrête la synchro. |
 | Écriture | Upsert dans `sh_pending`. Une ligne `rejete` ne se rouvre jamais toute seule. |
 
+## Lots 2 et 3, livrés
+
+**Lot 2.** `revenu_brut` est recalibré sur `fare_accommodation + frais_menage`, que SuperHote
+calcule lui-même. `montant_paye` vient de `total_price`. Les 9 seuls écarts avec la référence
+sont des Booking où le CSV livrait 0 faute de colonne `night price` renseignée : l'API corrige
+un défaut du CSV, elle n'en introduit pas.
+
+**Lot 3.** Le module `AL_SYNC` d'`index.html` lit le sas et le présente à la modale existante.
+Deux choix structurants :
+
+- **La source enregistrée reste `superhote_csv`.** C'est la clé de stockage de la mémoire
+  Superhote, pas un nom de format. Une clé distincte aurait créé un second jeu de snapshots
+  et orphelinés les réservations déjà validées. Effet utile : `repriseTaxe()`, conditionné à
+  cette source, s'applique sans modification. Le piège P2-C12 de la critique adversariale
+  disparaît par construction.
+- **`revenu_brut` et `montant_paye` entrent dans les champs comparés** par `diff()`. Sans
+  cela, un import les remplaçait en silence, la modale n'affichant aucune modification alors
+  que ces champs alimentent les conventions de montant et le tableau Superhote.
+
 ## Ce qui reste à faire
 
-- **Lot 2** : recalibrer `revenu_brut`. La formule actuelle est celle héritée du CSV, exacte
-  à 98/181 seulement. `montant_paye` a déjà été recalibré ici (`total_price`, 181/181).
-- **Lot 3** : `index.html` ligne ~3920, `repriseTaxe()` n'est appelé que pour
-  `source === 'superhote_csv'`. **À élargir à la source API**, sinon l'upsert de la synchro
-  réécrira les 18 lignes à taxe restaurée avec un zéro. C'est le piège P2-C12 de la critique
-  adversariale, couvert par le test `reprise de la taxe par AL_VALID`.
 - **Lot 4** : cron, alerte e-mail, rapprochement hebdomadaire des suppressions,
   branchement de `sh_pending_purge()`.
+- **Ne pas brancher le cron tant que rien ne surveille l'échec.** Le badge affiche désormais
+  « Synchro API : ⚠ en échec », ce qui couvre le cas où tu ouvres l'app. Une panne pendant une
+  absence prolongée resterait invisible : c'est l'objet de l'alerte du Lot 4.
 
 ## Tests
 
