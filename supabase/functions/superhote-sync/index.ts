@@ -39,6 +39,30 @@ function json(body: unknown, status = 200): Response {
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * Message lisible pour n'importe quoi de jete.
+ * Les erreurs de supabase-js ne sont PAS des Error : ce sont des objets { message, details,
+ * hint, code }. String() en fait « [object Object] », ce qui a masque une colonne manquante
+ * le 04/08/2026. Tout ce qui aide au diagnostic est donc concatene ici.
+ */
+function messageErreur(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === 'object') {
+    const o = e as Record<string, unknown>;
+    const bouts = [o.message, o.details, o.hint, o.code ? `code ${o.code}` : null]
+      .filter((x) => x !== null && x !== undefined && x !== '')
+      .map(String);
+    if (bouts.length) return bouts.join(' · ');
+    try { return JSON.stringify(e); } catch { return String(e); }
+  }
+  return String(e);
+}
+
+/** Erreur enrichie du nom de l'etape, pour ne pas chercher laquelle des requetes a echoue. */
+function echec(etape: string, e: unknown): Error {
+  return new Error(`${etape} : ${messageErreur(e)}`);
+}
+
+/**
  * Appel API avec back-off exponentiel.
  * La limite de debit de SuperHote n'est pas documentee (8 appels d'affilee sans 429 le
  * 31/07 ne prouvent rien), donc on implemente le back-off par defaut plutot que de
@@ -170,7 +194,7 @@ Deno.serve(async (req: Request) => {
     const libelles = new Map<number, string>(rentals.map((r: any) => [r.id, r.name]));
 
     const { data: props, error: errProps } = await db.from('properties').select('nom, superhote_labels');
-    if (errProps) throw errProps;
+    if (errProps) throw echec('Lecture de properties', errProps);
     const proprietes = (props ?? []) as Propriete[];
 
     // 3. Lecture paginee.
@@ -194,7 +218,7 @@ Deno.serve(async (req: Request) => {
         .from('sh_pending')
         .select('id, statut, updated_at, mapping_version')
         .in('id', ids.slice(i, i + 500));
-      if (error) throw error;
+      if (error) throw echec('Lecture de sh_pending (colonne mapping_version presente ?)', error);
       for (const l of data ?? []) existantes.set(l.id, l as LignePending);
     }
 
@@ -217,7 +241,7 @@ Deno.serve(async (req: Request) => {
 
     for (let i = 0; i < aEcrire.length; i += 500) {
       const { error } = await db.from('sh_pending').upsert(aEcrire.slice(i, i + 500), { onConflict: 'id' });
-      if (error) throw error;
+      if (error) throw echec('Ecriture dans sh_pending', error);
     }
 
     // 6. Curseur avance sur le max(updated_at) reellement ecrit, jamais au-dela.
@@ -252,7 +276,7 @@ Deno.serve(async (req: Request) => {
     console.log('Synchro terminee', resume);
     return json(resume);
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
+    const message = messageErreur(e);
     const statutInconnu = e instanceof StatutInconnuError;
     console.error('Synchro en echec :', message);
 
