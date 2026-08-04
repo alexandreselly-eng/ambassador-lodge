@@ -1005,7 +1005,7 @@ function hasUnsavedInput(){
   return false;
 }
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260804-062500';
+const APP_BUILD='20260804-104500';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function forceReload(build){ try{ if(sessionStorage.getItem('al_reloaded_build')===build){ showBanner(); return; } sessionStorage.setItem('al_reloaded_build',build); }catch(e){} location.href=location.pathname+'?v='+Date.now(); }
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
@@ -2675,7 +2675,7 @@ function reRenderActive(){ try{ render(); }catch(e){}
 // ===== Indicateur de dernière synchro (fichier + date) =====
 async function renderSyncBadge(){ const el=document.getElementById('syncBadge'); if(!el)return;
   if(!SUPA){ el.style.display='none'; return; }
-  const SRC=[['superhote_csv','CSV Superhote'],['excel','Excel']];
+  const SRC=[['superhote_csv','Superhote'],['excel','Excel']];
   try{ const {data}=await SUPA.from('data_snapshots').select('source,bien,file_label,updated_at,row_count').in('source',['superhote_csv','excel']);
     const by={}; (data||[]).forEach(r=>{ if(r.bien==='(historique)')return; (by[r.source]=by[r.source]||[]).push(r); }); const now=Date.now();
     el.innerHTML=SRC.map(([s,lbl])=>{ const arr=(by[s]||[]).sort((a,b)=>(b.updated_at||'').localeCompare(a.updated_at||''));
@@ -2686,8 +2686,24 @@ async function renderSyncBadge(){ const el=document.getElementById('syncBadge');
       const ex=`${lbl} — mémoire par bien|${perBien}${stale?'|⚠ Le plus ancien dépasse 3 semaines':''}`.replace(/"/g,'&quot;');
       return `<span class="sb ${stale?'stale':''}" data-explain="${ex}"><span class="dot"></span><span><b>${lbl}</b> : ${arr.length} bien${arr.length>1?'s':''} · maj ${ds}</span></span>`;
     }).join('');
+    el.innerHTML+=await badgeSynchro();
     el.style.display='flex';
   }catch(e){ el.style.display='none'; }
+}
+// Pastille de la synchro API. Un échec doit se voir sans aller le chercher : c'est ce qui a
+// manqué à l'import CSV, resté cassé du 12 au 31/07/2026 sans que rien ne le signale.
+async function badgeSynchro(){
+  if(typeof AL_SYNC==='undefined')return '';
+  const e=await AL_SYNC.etat(); if(!e)return '';
+  const s=e.sync||{}; const n=e.enAttente;
+  const _dt=v=>v?new Date(v).toLocaleString('fr-FR'):'—';
+  if(!s.last_run_at) return `<span class="sb empty" data-explain="Synchro API|Jamais exécutée|Onglet « Validation des données », carte « Synchronisation SuperHote V2 »"><span class="dot"></span><span><b>Synchro API</b> : jamais exécutée</span></span>`;
+  if(s.last_status!=='ok'){
+    const ex=`Synchro API — EN ÉCHEC|Dernier passage : ${_dt(s.last_run_at)}|${(s.last_error||'motif non enregistré')}|Les données ne bougent plus tant que l'échec dure`.replace(/"/g,'&quot;');
+    return `<span class="sb stale" data-explain="${ex}"><span class="dot"></span><span><b>Synchro API</b> : ⚠ en échec</span></span>`;
+  }
+  const ex=`Synchro API|Dernier passage : ${_dt(s.last_run_at)}|Relevé jusqu'au ${_dt(s.last_updated)}${n?'|'+n+' réservation(s) en attente d\'arbitrage':''}`.replace(/"/g,'&quot;');
+  return `<span class="sb ${n?'stale':''}" data-explain="${ex}"><span class="dot"></span><span><b>Synchro API</b> : ${n?(n+' en attente'):'à jour'}</span></span>`;
 }
 function baseOpt({money=false,suffix='',legend=false,max=null}={}){
   return {responsive:true,maintainAspectRatio:false,layout:{padding:{top:state.labels?22:4,right:state.labels?28:4}},
@@ -3826,10 +3842,84 @@ const AL_TARIF = (function(){
 function renderTarif(){ AL_TARIF.init(); }
 if(typeof module!=='undefined') module.exports=AL_TARIF;
 // ===== Validation des imports (CSV Superhote / Excel) + registre Supabase =====
+// ===== Synchronisation API SuperHote V2 — Lot 3 =====
+// Lit le sas « sh_pending », rempli par l'Edge Function superhote-sync, et le présente à la
+// MÊME modale de validation que l'import CSV. Rien n'entre dans data_snapshots sans un clic.
+// La source enregistrée reste 'superhote_csv' : c'est la clé de stockage de la mémoire
+// Superhote, tous canaux confondus. Une clé distincte créerait un second jeu de snapshots
+// et orphelinerait les réservations déjà validées.
+const AL_SYNC = (function(){
+  const SOURCE_SNAPSHOT='superhote_csv';
+  const SOURCE_SYNC='superhote_v2';
+  function supa(){ return (typeof SUPA!=='undefined')?SUPA:null; }
+  function meEmail(){ try{ return (typeof CURRENT_USER!=='undefined'&&CURRENT_USER&&CURRENT_USER.email)||''; }catch(e){ return ''; } }
+
+  /** Compteur du sas + dernier état de la synchro. Retourne null si hors ligne. */
+  async function etat(){
+    const s=supa(); if(!s)return null;
+    try{
+      const [p,e]=await Promise.all([
+        s.from('sh_pending').select('id',{count:'exact',head:true}).eq('statut','en_attente'),
+        s.from('sh_sync_state').select('*').eq('source',SOURCE_SYNC).maybeSingle()
+      ]);
+      return {enAttente:p.count||0, sync:e.data||null};
+    }catch(err){ return null; }
+  }
+
+  /** Les lignes en attente, au schéma de l'app. Copie défensive : la modale mute ses lignes. */
+  async function charger(){
+    const s=supa(); if(!s)throw new Error('Connexion requise');
+    const {data,error}=await s.from('sh_pending').select('id,payload,updated_at')
+      .eq('statut','en_attente').order('updated_at',{ascending:true});
+    if(error)throw error;
+    return (data||[]).map(l=>Object.assign({},l.payload));
+  }
+
+  /** Déclenche la synchro. Le JWT de la session part avec l'appel, la fonction le vérifie. */
+  async function declencher(){
+    const s=supa(); if(!s)throw new Error('Connexion requise');
+    const {data,error}=await s.functions.invoke('superhote-sync',{method:'POST'});
+    if(error){ let d=''; try{ d=await error.context.text(); }catch(_){}
+      throw new Error(d||error.message||'Appel de la fonction en échec'); }
+    if(data&&data.erreur)throw new Error(data.erreur);
+    return data;
+  }
+
+  /** Sort du sas les lignes réellement validées. Celles au libellé inconnu y restent. */
+  async function marquerValides(rows){
+    const s=supa(); if(!s)return 0;
+    const ids=[...new Set((rows||[]).map(r=>r&&r.id).filter(x=>x!=null&&x!=='').map(String))];
+    if(!ids.length)return 0;
+    const {error}=await s.from('sh_pending')
+      .update({statut:'valide',traite_le:new Date().toISOString(),traite_par:meEmail()})
+      .in('id',ids);
+    if(error)throw error;
+    return ids.length;
+  }
+
+  /** Ouvre la modale sur le contenu du sas. */
+  async function ouvrirValidation(){
+    const rows=await charger();
+    if(!rows.length){ if(typeof valToast==='function')valToast('Aucun changement en attente.'); return; }
+    const label='API SuperHote V2 · '+new Date().toLocaleString('fr-FR');
+    AL_VALID.openGate(SOURCE_SNAPSHOT, rows, label, async function(valides){
+      try{ const n=await marquerValides(valides);
+        if(n&&typeof valToast==='function')valToast('✓ '+n+' ligne(s) sortie(s) du sas.');
+      }catch(e){ if(typeof valToast==='function')valToast("Enregistré en base, mais le sas n'a pas pu être marqué : "+(e.message||e), true); }
+      if(typeof renderSyncBadge==='function')renderSyncBadge();
+    });
+  }
+
+  return {etat,charger,declencher,marquerValides,ouvrirValidation,SOURCE_SNAPSHOT,SOURCE_SYNC};
+})();
+
 const AL_VALID = (function(){
   const _eur=(typeof eur==='function')?eur:(n=>n==null?'—':Math.round(n).toLocaleString('fr-FR')+' €');
   const _fd=(typeof fmtDate==='function')?fmtDate:(s=>{if(!s)return '—';const p=String(s).split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0].slice(2):s;});
-  const SRCLBL={superhote_csv:'CSV Superhote',excel:'Excel de référence'};
+  // « superhote_csv » est la clé de stockage historique de data_snapshots. Elle désigne la
+  // mémoire Superhote quel que soit le canal d'arrivée, CSV ou API : le libellé ne mentionne
+  // donc plus le CSV. Renommer la clé orphelinerait les snapshots déjà validés.
+  const SRCLBL={superhote_csv:'Superhote',excel:'Excel de référence'};
   function meEmail(){ try{return (typeof CURRENT_USER!=='undefined'&&CURRENT_USER&&CURRENT_USER.email)||'';}catch(e){return '';} }
   function hash(s){ let h=5381; for(let i=0;i<s.length;i++){h=((h<<5)+h+s.charCodeAt(i))|0;} return (h>>>0).toString(16); }
   function num(x){ if(x==null||x==='')return null; const n=parseFloat(String(x).replace(/[\s  ]/g,'').replace(',','.')); return isNaN(n)?null:Math.round(n*100)/100; }
@@ -3874,7 +3964,10 @@ const AL_VALID = (function(){
     prev.forEach(r=>pm[K(r)]=r); let n=0;
     incoming.forEach(r=>{ if(!r.taxe){ const p=pm[K(r)]; if(p&&p.taxe){ r.taxe=p.taxe; r._taxe_reprise=true; n++; } } });
     return n; }
-  const FIELDS={superhote_csv:['sortie','montant','taxe','frais_menage','plateforme','nb_pers','statut'], excel:['sortie','montant','taxe','frais_menage','origine','nb_pers']};
+  // revenu_brut et montant_paye sont compares depuis le Lot 3 : ils alimentent les conventions
+  // de montant (« brut − ménage », « payé − taxe ») et le tableau Superhote. Sans eux, un import
+  // pouvait les remplacer en silence, la modale n'affichant aucune modification.
+  const FIELDS={superhote_csv:['sortie','montant','montant_paye','revenu_brut','taxe','frais_menage','plateforme','nb_pers','statut'], excel:['sortie','montant','taxe','frais_menage','origine','nb_pers']};
   function diff(source, incoming, prev){ const f=FIELDS[source]||FIELDS.excel; const K=keyer(incoming,prev); const pm={}; (prev||[]).forEach(r=>pm[K(r)]=r); const im={}; incoming.forEach(r=>im[K(r)]=r);
     const added=[],removed=[],modified=[],unchanged=[];
     incoming.forEach(r=>{ const p=pm[K(r)]; if(!p){added.push(r);return;} const ch=[]; f.forEach(fl=>{ const a=(p[fl]==null?'':p[fl]), b=(r[fl]==null?'':r[fl]); if(String(a)!==String(b))ch.push({field:fl,before:a,after:b}); });
@@ -3959,11 +4052,54 @@ const AL_VALID = (function(){
         <label class="valdrop"><input type="file" accept=".csv" data-src="superhote_csv" hidden><b>CSV Superhote</b><span>Choisir un fichier…</span></label>
         <label class="valdrop"><input type="file" accept=".csv,.xlsx,.xls" data-src="excel" hidden><b>Excel de réservations</b><span>Choisir un fichier (.xlsx/.csv)…</span></label>
       </div></div>
+      <div class="card"><h3>Synchronisation SuperHote V2 <span class="hint">API, sans fichier</span></h3>
+        <div class="desc">La synchro relève les réservations modifiées depuis son dernier passage et les dépose dans un sas. Elles n'entrent en mémoire qu'après ta validation, exactement comme un import de fichier.</div>
+        <div id="valSyncZone">Chargement…</div></div>
       <div class="card"><h3>Registre de validation <span class="hint">historique 1 mois</span></h3><div id="valReg" class="scroll" style="max-height:460px">Chargement…</div></div>`;
     z.querySelectorAll('.valdrop input[type=file]').forEach(inp=>inp.onchange=e=>{ const f=e.target.files[0]; if(!f)return; const src=inp.dataset.src; const xlsx=/\.xls/i.test(f.name);
       const rd=new FileReader(); rd.onload=()=>{ try{ const incoming=parseFile(src, xlsx?'':rd.result, xlsx?rd.result:null); if(!incoming.length){alert('Aucune ligne lue dans le fichier.');return;} openGate(src,incoming,f.name); }catch(err){alert('Lecture impossible : '+err.message);} };
       if(xlsx) rd.readAsArrayBuffer(f); else rd.readAsText(f,'utf-8'); e.target.value=''; });
-    renderReg();
+    renderReg(); renderSync();
+  }
+
+  // ---- carte « Synchronisation SuperHote V2 » de l'onglet Validation ----
+  async function renderSync(){ const z=document.getElementById('valSyncZone'); if(!z)return;
+    const e=await AL_SYNC.etat();
+    if(!e){ z.innerHTML='<div class="muted">Connexion requise pour consulter l\'état de la synchronisation.</div>'; return; }
+    const s=e.sync||{};
+    const ok=(s.last_status==='ok');
+    const jamais=!s.last_run_at;
+    const _dt=v=>v?new Date(v).toLocaleString('fr-FR'):'—';
+
+    // L'échec passe AVANT le reste : c'est la seule information qui appelle une action.
+    const echec = ok||jamais ? '' :
+      `<div class="valwarn" style="margin:0 0 8px"><b>⚠ Dernière synchronisation en échec</b><div class="vsub">Le ${_dt(s.last_run_at)} · ${(s.last_error||'motif non enregistré')}</div><div class="vsub">Tant que l'échec dure, les données ne bougent plus. La mémoire déjà validée n'est pas affectée.</div></div>`;
+
+    const n=e.enAttente;
+    const attente = n
+      ? `<div class="valnochg" style="border-left:3px solid var(--gold);text-align:left"><b>${n} réservation(s) en attente d'arbitrage.</b> Rien n'est encore entré en mémoire.</div>`
+      : '<div class="valnochg">Rien en attente. Tout ce qui a été relevé est arbitré.</div>';
+
+    const dernier = jamais ? 'Jamais exécutée.'
+      : ok ? `Dernier passage : ${_dt(s.last_run_at)}. Réservations relevées jusqu'au ${_dt(s.last_updated)}.`
+      : `Dernier passage tenté : ${_dt(s.last_run_at)}.`;
+
+    z.innerHTML=`${echec}${attente}
+      <div class="muted" style="margin:6px 0 10px">${dernier}</div>
+      <div class="valact" style="justify-content:flex-start">
+        <button class="btnv ok" id="syncOpen" ${n?'':'disabled'}>Examiner ${n?('les '+n+' changement(s)'):'les changements'}</button>
+        <button class="btnv sec" id="syncNow">Synchroniser maintenant</button>
+      </div>`;
+
+    const bOpen=z.querySelector('#syncOpen');
+    if(bOpen&&n) bOpen.onclick=()=>{ AL_SYNC.ouvrirValidation().catch(err=>alert('Lecture du sas impossible : '+(err.message||err))); };
+
+    const bNow=z.querySelector('#syncNow');
+    if(bNow) bNow.onclick=async()=>{ bNow.disabled=true; const t=bNow.textContent; bNow.textContent='Synchronisation…';
+      try{ const r=await AL_SYNC.declencher();
+        toast(`✓ ${r.lues} réservation(s) relevée(s) · ${r.en_attente_ecrites} en attente`+(r.libelles_non_reconnus?` · ${r.libelles_non_reconnus} libellé(s) non reconnu(s)`:''));
+      }catch(err){ toast('Synchronisation en échec : '+(err.message||err), true); }
+      bNow.disabled=false; bNow.textContent=t; renderSync(); if(typeof renderSyncBadge==='function')renderSyncBadge(); };
   }
   async function renderReg(){ const el=document.getElementById('valReg'); if(!el)return; const list=await listValidations();
     if(!list.length){ el.innerHTML='<div class="muted" style="padding:10px">Aucune validation enregistrée.</div>'; return; }
@@ -3975,7 +4111,7 @@ const AL_VALID = (function(){
     el.querySelectorAll('.vdet').forEach(b=>b.onclick=()=>{ const r=document.getElementById('vdet'+b.dataset.i); r.style.display=r.style.display==='none'?'table-row':'none'; });
   }
   let _tt; function toast(msg,err){ let t=document.getElementById('valToast'); if(!t){ t=document.createElement('div'); t.id='valToast'; document.body.appendChild(t);} t.textContent=msg; t.style.background=err?'#f85149':'#3fb950'; t.style.color=err?'#fff':'#04220f'; t.style.display='block'; clearTimeout(_tt); _tt=setTimeout(()=>t.style.display='none',4200); }
-  return {render, openGate, diff, parseFile, toast, keyer, repriseTaxe, _hash:hash, _renderReg:renderReg};
+  return {render, openGate, diff, parseFile, toast, keyer, repriseTaxe, renderSync, _hash:hash, _renderReg:renderReg};
 })();
 function renderValidation(){ AL_VALID.render(); }
 function valToast(m,e){ AL_VALID.toast(m,e); }

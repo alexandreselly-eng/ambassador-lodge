@@ -200,6 +200,25 @@ describe('rejeu sur les 204 reservations connues', { skip: fixturesPresentes ? f
     assert.equal([...mappees.values()].filter((m) => m.statut === 'Confirmée').length, 181);
   });
 
+  // Lot 2. La reference vient du CSV, qui livrait 0 sur Booking faute de colonne
+  // « night price » renseignee. L API corrige ce defaut : les seuls ecarts admis sont
+  // ceux ou la reference vaut 0 alors que le sejour a bien un revenu.
+  test('revenu_brut : exact partout ou la reference est fiable', () => {
+    const ecarts = [];
+    const refZero = [];
+    for (const [id, m] of mappees) {
+      if (m.statut !== 'Confirmée') continue;
+      const ref = reference.get(id);
+      if (!ref) continue;
+      if (Math.abs((m.revenu_brut ?? 0) - (ref.revenu_brut ?? 0)) < 0.011) continue;
+      if ((ref.revenu_brut ?? 0) === 0 && (m.revenu_brut ?? 0) > 0) refZero.push({ id, canal: m.origine, obtenu: m.revenu_brut });
+      else ecarts.push({ id, canal: m.origine, attendu: ref.revenu_brut, obtenu: m.revenu_brut });
+    }
+    assert.deepEqual(ecarts, [], 'aucun ecart autre que les zeros du CSV');
+    assert.equal(refZero.length, 9);
+    assert.deepEqual([...new Set(refZero.map((r) => r.canal))], ['Booking'], 'le defaut du CSV ne touchait que Booking');
+  });
+
   test('montant_paye : 181/181 sur les confirmees', () => {
     const ecarts = [];
     for (const [id, m] of mappees) {
