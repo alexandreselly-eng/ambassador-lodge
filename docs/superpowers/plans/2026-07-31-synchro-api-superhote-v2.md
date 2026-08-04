@@ -126,7 +126,7 @@ Vérifié le 31/07 : bnb-pilot dispose déjà d'une authentification Supabase et
 
 | Lot | Contenu | Charge | Critère d'acceptation |
 |---|---|---|---|
-| **1** | Edge Function, pagination, mapping des 16 champs disponibles, `sh_pending`, RLS, curseur `max(updated_at) − 48 h`, gestion du 429 | 1 à 2 j | Rejeu sur les 204 connues **plus** un test sur réservation vivante créée hors saison sur un logement désactivé des canaux, puis modifiée et annulée. Plus : les 18 lignes à taxe perdue ressortent avec leur taxe après passage dans `openGate()`. |
+| **1** | Edge Function, pagination, mapping des 16 champs disponibles, `sh_pending`, RLS, curseur `max(updated_at) − 48 h`, gestion du 429 | 1 à 2 j | Rejeu sur les 204 connues **plus** un test sur réservation vivante créée hors saison sur un logement désactivé des canaux, puis modifiée et annulée. Plus : les 18 lignes à taxe perdue ressortent avec leur taxe après passage dans `openGate()`. **Plus : deux passages consécutifs en conditions réelles, le second devant lire nettement moins de lignes que le premier.** |
 | **2** | Recalibrage de `revenu_brut` et `montant_paye` | 2 h | **196/200**, les 4 écarts étant exactement `24655705` `24655657` `24655674` `24655712`, anomalies de source documentées. Vérifié par calcul le 31/07. |
 | **3** | Badge, alimentation d'`openGate` depuis `sh_pending`, bouton « synchroniser maintenant » | 0,5 à 1 j | La modale affiche les mêmes compteurs qu'un import CSV équivalent |
 | **4** | Cron, journalisation, alerte e-mail, rapprochement hebdomadaire des suppressions | 0,5 j | Test d'échec provoqué : révoquer le token, vérifier la réception effective de l'alerte |
@@ -154,6 +154,9 @@ Scénario non couvert, assumé : si SuperHote supprimait l'export CSV, le repli 
 ## Vérification de bout en bout
 
 1. Déclencher la fonction à la main et vérifier que `sh_pending` se remplit avec le bon nombre de lignes.
+   Puis **la redéclencher aussitôt** : le second passage doit envoyer un `updated_since` et lire nettement
+   moins de lignes. Un seul passage ne prouve rien, il n'emprunte pas le chemin incrémental. Constaté le
+   04/08/2026 : le premier passage était conforme, le second a échoué en 422 sur le format du curseur.
 2. Rejouer le mapping sur les 204 réservations connues et comparer aux valeurs de `data_snapshots` : les 14 champs directs doivent être identiques au centime.
 3. Créer une réservation de test chez SuperHote, **hors saison, sur un logement désactivé des canaux**, la modifier, l'annuler, la supprimer, et vérifier qu'elle traverse correctement les quatre états.
 4. Vérifier que les 18 réservations à taxe perdue ressortent de `openGate()` avec leur taxe reprise.
