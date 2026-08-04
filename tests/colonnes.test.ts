@@ -95,6 +95,43 @@ describe('cohérence des colonnes du tableau des réservations', () => {
     assert.equal(rendreFoot([]), '');
   });
 
+  const grouper = (rows: any[], champ: string) => {
+    const bac: any = { module: { exports: {} } };
+    vm.createContext(bac);
+    vm.runInContext(corps('GROUPER') + '\nmodule.exports = GROUPER;', bac);
+    const g = (bac.module.exports as Function)(rows, champ) as any[];
+    // Recopie dans ce realm : .map() sur un tableau du bac a sable rendrait encore un
+    // tableau du bac a sable, que deepStrictEqual refuserait de comparer.
+    return [...g].map((x) => ({ cle: x.cle, lignes: [...x.lignes] }));
+  };
+
+  test('le regroupement conserve le tri a l interieur de chaque groupe', () => {
+    const rows = [
+      { logement: 'Lodge', entree: '2026-03-01' },
+      { logement: 'Ambassador', entree: '2026-02-01' },
+      { logement: 'Lodge', entree: '2026-01-01' },
+    ];
+    const g = grouper(rows, 'logement');
+    assert.deepEqual(g.map((x) => x.cle), ['Lodge', 'Ambassador'], 'ordre d apparition conserve');
+    assert.deepEqual(
+      g[0].lignes.map((l: any) => l.entree),
+      ['2026-03-01', '2026-01-01'],
+      'le tri demande ne doit pas etre defait par le regroupement',
+    );
+  });
+
+  test('une valeur de groupe absente est nommee, pas silencieuse', () => {
+    const g = grouper([{ origine: '' }, { origine: null }, { origine: 'Airbnb' }], 'origine');
+    assert.deepEqual(g.map((x) => x.cle), ['(non renseigné)', 'Airbnb']);
+    assert.equal(g[0].lignes.length, 2);
+  });
+
+  test('les trois choix de regroupement sont proposes', () => {
+    for (const g of ['none', 'logement', 'origine']) {
+      assert.match(html, new RegExp(`data-grp="${g}"`), `bouton ${g}`);
+    }
+  });
+
   test('la ventilation par mois transporte les deux champs', () => {
     // Sans cela, la colonne serait vide des que le prorata mensuel est actif.
     const src = html.slice(html.indexOf('_split:al.length>1'));
