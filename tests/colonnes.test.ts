@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
 
 const RACINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 const html = readFileSync(join(RACINE, 'index.html'), 'utf8');
@@ -51,6 +52,47 @@ describe('cohérence des colonnes du tableau des réservations', () => {
     const ligne = corps('reservRowHTML');
     assert.match(ligne, /d\.reste_a_payer/);
     assert.match(ligne, /d\.encaissement_attendu/);
+  });
+
+  // reservFootHTML est exécutée plutôt que lue : cinq de ses cellules viennent d'un helper,
+  // les compter dans le source donnerait un faux résultat.
+  const rendreFoot = (rows: any[], label?: string) => {
+    const bac: any = { module: { exports: {} }, eur: (v: number) => `${v} EUR`, css: () => '#000' };
+    vm.createContext(bac);
+    vm.runInContext(corps('reservFootHTML') + '\nmodule.exports = reservFootHTML;', bac);
+    return (bac.module.exports as Function)(rows, label) as string;
+  };
+
+  test('la ligne de totaux couvre exactement toutes les colonnes', () => {
+    const html = rendreFoot([{ nuitees: 2, montant: 100, benefice: 80, reste_a_payer: 0, encaissement_attendu: 50, commission: 20 }]);
+    const cellules = html.match(/<td[^>]*>/g) || [];
+    const colspans = [...html.matchAll(/colspan="(\d+)"/g)].map((m) => Number(m[1]));
+    const couvertes = colspans.reduce((s, n) => s + n, 0) + (cellules.length - colspans.length);
+    assert.equal(couvertes, nStatique, `totaux : ${couvertes} colonnes couvertes contre ${nStatique} en-têtes`);
+  });
+
+  test('la ligne de totaux additionne bien, et compte les sejours', () => {
+    const html = rendreFoot([
+      { nuitees: 2, montant: 100, commission: 10, benefice: 90, reste_a_payer: 30, encaissement_attendu: 0 },
+      { nuitees: 3, montant: 200, commission: 20, benefice: 180, reste_a_payer: 0, encaissement_attendu: 70 },
+    ]);
+    assert.match(html, /2 séjours/);
+    assert.match(html, />5</, 'somme des nuitées');
+    assert.match(html, /300 EUR/, 'somme des montants');
+    assert.match(html, /30 EUR/, 'somme des restes clients');
+    assert.match(html, /70 EUR/, 'somme des versements attendus');
+  });
+
+  test('la commission recalculee par l app prime sur celle de la ligne', () => {
+    // _appComm est la commission recalculee au barème apporteur : c'est elle qui s'affiche
+    // dans la cellule, le total doit donc la suivre.
+    const html = rendreFoot([{ commission: 999, _appComm: 42, montant: 100 }]);
+    assert.match(html, /42 EUR/);
+    assert.ok(!html.includes('999 EUR'), 'la commission brute ne doit pas etre sommee');
+  });
+
+  test('un tableau vide n affiche pas de ligne de totaux', () => {
+    assert.equal(rendreFoot([]), '');
   });
 
   test('la ventilation par mois transporte les deux champs', () => {

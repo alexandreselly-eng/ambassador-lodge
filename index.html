@@ -67,6 +67,9 @@ canvas{cursor:pointer}
 .tbl th{text-align:left;color:var(--muted);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;padding:8px 9px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
 .tbl td{padding:7px 9px;border-bottom:1px solid rgba(40,48,64,.5)}
 .tbl tr:hover td{background:var(--panel2)}.tbl td.num{text-align:right;font-variant-numeric:tabular-nums}
+/* Ligne de totaux : collante en bas pour rester lisible sur une longue liste. */
+.tbl tfoot tr.rtot td{font-weight:700;background:var(--panel);border-top:2px solid var(--line);border-bottom:none;position:sticky;bottom:0}
+.tbl tfoot tr.rtot:hover td{background:var(--panel)}
 .tbl th.num{text-align:right}
 .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10.5px;font-weight:600}
 .pill.amb{background:rgba(212,175,55,.16);color:var(--gold2)}.pill.lodge{background:rgba(63,182,201,.16);color:var(--lodge)}
@@ -433,7 +436,7 @@ td.actions{white-space:nowrap}
       <table class="tbl"><thead id="rthead"><tr>
         <th data-k="logement">Bien</th><th data-k="date_resa">Date résa</th><th data-k="entree">Entrée</th><th data-k="sortie">Sortie</th><th data-k="nuitees">Nuits</th><th data-k="client">Client</th><th data-k="origine">Canal</th>
         <th class="num" data-k="montant">Montant</th><th class="num" data-k="commission">Commission</th><th class="num" data-k="benefice">Bénéfice net</th><th class="num" data-k="reste_a_payer" title="Ce que le voyageur doit encore">Reste à payer</th><th class="num" data-k="encaissement_attendu" title="Ce que la plateforme doit encore verser : séjour réglé mais pas commencé">Versement attendu</th><th data-k="saisi">Saisi par</th><th>Actions</th>
-      </tr></thead><tbody id="rtbody"></tbody></table>
+      </tr></thead><tbody id="rtbody"></tbody><tfoot id="rtfoot"></tfoot></table>
     </div>
   </div>
 </div>
@@ -1005,7 +1008,7 @@ function hasUnsavedInput(){
   return false;
 }
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260804-150000';
+const APP_BUILD='20260804-153000';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function forceReload(build){ try{ if(sessionStorage.getItem('al_reloaded_build')===build){ showBanner(); return; } sessionStorage.setItem('al_reloaded_build',build); }catch(e){} location.href=location.pathname+'?v='+Date.now(); }
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
@@ -2447,6 +2450,27 @@ function reservHeadHTML(){
   // se décalent. Un test le vérifie.
   return `<tr><th>Bien</th><th>Date résa</th><th>Entrée</th><th>Sortie</th><th class="num">Nuits</th><th>Client</th><th>Canal</th><th class="num">Montant</th><th class="num">Commission</th><th class="num">Bénéfice net</th><th class="num" title="Ce que le voyageur doit encore">Reste à payer</th><th class="num" title="Ce que la plateforme doit encore verser : séjour réglé mais pas commencé">Versement attendu</th><th>Saisi par</th><th>Actions</th></tr>`;
 }
+// Ligne de totaux du tableau des réservations. Elle porte sur les lignes REELLEMENT
+// affichées, filtres compris : un total qui ne correspond pas à ce qu'on a sous les yeux
+// est pire que pas de total. La somme des colspan doit valoir le nombre de colonnes de
+// reservHeadHTML, un test le vérifie.
+function reservFootHTML(rows, label){
+  if(!rows || !rows.length) return '';
+  const S=k=>rows.reduce((s,d)=>s+(Number(d[k])||0),0);
+  const comm=rows.reduce((s,d)=>s+(Number(d._appComm!=null?d._appComm:d.commission)||0),0);
+  const n=rows.length;
+  const cell=(v,couleur)=>`<td class="num"${couleur?` style="color:${couleur}"`:''}>${v?eur(v):'—'}</td>`;
+  return `<tr class="rtot">`
+    + `<td colspan="4">${label||'TOTAL'} — ${n} séjour${n>1?'s':''}</td>`
+    + `<td class="num">${S('nuitees')||'—'}</td>`
+    + `<td colspan="2"></td>`
+    + cell(S('montant'))
+    + cell(comm)
+    + cell(S('benefice'), css('--green'))
+    + cell(S('reste_a_payer'), css('--orange'))
+    + cell(S('encaissement_attendu'), css('--blue'))
+    + `<td colspan="2"></td></tr>`;
+}
 function reservRowHTML(d){
   const canAct = d.id!=null;
   const acts = canAct ? `<button class="mini-act" title="Modifier la réservation entière" data-act="edit" data-id="${d.id}">✏️</button><button class="mini-act" title="Historique" data-act="hist" data-id="${d.id}">🕑</button><button class="mini-act del" title="Supprimer" data-act="del" data-id="${d.id}">🗑️</button>` : '<span style="color:var(--muted);font-size:11px">—</span>';
@@ -2496,7 +2520,7 @@ function renderBreakdownTable(cfg){
     if(det && open){
       const dr=rows.filter(d=>d.mois===m+1);
       h+=`<tr class="brk-detail"><td colspan="${cols.length+1}"><div class="brk-detail-in">`
-        + (dr.length? `<table class="tbl"><thead>${reservHeadHTML()}</thead><tbody>${dr.map(reservRowHTML).join('')}</tbody></table>` : `<div style="padding:8px;color:var(--muted)">Aucune réservation ce mois.</div>`)
+        + (dr.length? `<table class="tbl"><thead>${reservHeadHTML()}</thead><tbody>${dr.map(reservRowHTML).join('')}</tbody><tfoot>${reservFootHTML(dr,MONTHS[m])}</tfoot></table>` : `<div style="padding:8px;color:var(--muted)">Aucune réservation ce mois.</div>`)
         + `</div></td></tr>`;
     }
   }
@@ -2573,6 +2597,7 @@ function renderReservs(rows){
   const _clr=document.getElementById('clrApp'); if(_clr)_clr.onclick=()=>{ state.appFilter='all'; render(); };
   document.querySelectorAll('#rthead th[data-k]').forEach(th=>{ th.classList.toggle('sorted',th.dataset.k===key); const base=th.getAttribute('data-base')||th.textContent.replace(/[ ▲▼]+$/,''); th.setAttribute('data-base',base); th.textContent=base+(th.dataset.k===key?(dir>0?' ▲':' ▼'):''); });
   document.getElementById('rtbody').innerHTML=sorted.map(reservRowHTML).join('');
+  const _rtf=document.getElementById('rtfoot'); if(_rtf)_rtf.innerHTML=reservFootHTML(sorted);
   document.querySelectorAll('#rtbody .mini-act').forEach(b=>b.onclick=()=>{
     const id=b.dataset.id, a=b.dataset.act;
     if(a==='edit') actEdit(id); else if(a==='del') actDelete(id); else if(a==='hist') actHistory(id);
