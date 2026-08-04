@@ -29,7 +29,8 @@ header.top{display:flex;justify-content:space-between;align-items:flex-end;flex-
 .fglabel{font-size:10px;letter-spacing:.8px;font-weight:700;text-transform:uppercase;display:flex;align-items:center;gap:6px;opacity:.95}
 .fgrow{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
 .fdiv{align-self:stretch;width:0;border-left:1px solid var(--line)}
-.kbtn{display:inline-block;margin-top:5px;background:var(--panel2);border:1px solid var(--line);color:var(--lodge);border-radius:7px;padding:3px 9px;font-size:11px;font-weight:600;cursor:pointer}.kbtn:hover{border-color:var(--lodge)}
+.kbtn{display:inline-block;margin-top:5px;background:var(--panel2);border:1px solid var(--line);color:var(--lodge);border-radius:7px;padding:3px 9px;font-size:11px;font-weight:600;cursor:pointer}
+.kbtn.on{background:var(--lodge);border-color:var(--lodge);color:var(--bg)}.kbtn:hover{border-color:var(--lodge)}
 .commb{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:16px}.commb-h{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px}.commb-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.commb-c{background:var(--panel2);border-radius:9px;padding:9px 12px}.commb-l{font-size:11px;color:var(--muted);margin-bottom:3px}.commb-v{font-size:18px;font-weight:700}@media(max-width:760px){.commb-row{grid-template-columns:repeat(2,1fr)}}
 .fg{display:flex;flex-direction:column;gap:4px}
 .fg label{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);padding-left:2px}
@@ -67,6 +68,11 @@ canvas{cursor:pointer}
 .tbl th{text-align:left;color:var(--muted);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;padding:8px 9px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
 .tbl td{padding:7px 9px;border-bottom:1px solid rgba(40,48,64,.5)}
 .tbl tr:hover td{background:var(--panel2)}.tbl td.num{text-align:right;font-variant-numeric:tabular-nums}
+/* Lignes de totaux : sous-total de groupe dans le corps, total général dans le pied.
+   Seul le total général est collant, un sous-total doit défiler avec son groupe. */
+.tbl tr.rtot td{font-weight:700;background:var(--panel);border-top:2px solid var(--line);border-bottom:none}
+.tbl tr.rtot:hover td{background:var(--panel)}
+.tbl tfoot tr.rtot td{position:sticky;bottom:0}
 .tbl th.num{text-align:right}
 .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10.5px;font-weight:600}
 .pill.amb{background:rgba(212,175,55,.16);color:var(--gold2)}.pill.lodge{background:rgba(63,182,201,.16);color:var(--lodge)}
@@ -429,11 +435,17 @@ td.actions{white-space:nowrap}
   <div class="card">
     <h3>Détail des réservations <span class="hint" id="rcount"></span></h3>
     <div class="desc">Valeurs recalculées. Cliquez un en-tête pour trier ; « Saisi par » indique l'auteur.</div>
+    <div class="desc" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span>Sous-totaux :</span>
+      <button class="kbtn rgrp" data-grp="none">aucun</button>
+      <button class="kbtn rgrp" data-grp="logement">par bien</button>
+      <button class="kbtn rgrp" data-grp="origine">par canal</button>
+    </div>
     <div class="scroll">
       <table class="tbl"><thead id="rthead"><tr>
         <th data-k="logement">Bien</th><th data-k="date_resa">Date résa</th><th data-k="entree">Entrée</th><th data-k="sortie">Sortie</th><th data-k="nuitees">Nuits</th><th data-k="client">Client</th><th data-k="origine">Canal</th>
         <th class="num" data-k="montant">Montant</th><th class="num" data-k="commission">Commission</th><th class="num" data-k="benefice">Bénéfice net</th><th class="num" data-k="reste_a_payer" title="Ce que le voyageur doit encore">Reste à payer</th><th class="num" data-k="encaissement_attendu" title="Ce que la plateforme doit encore verser : séjour réglé mais pas commencé">Versement attendu</th><th data-k="saisi">Saisi par</th><th>Actions</th>
-      </tr></thead><tbody id="rtbody"></tbody></table>
+      </tr></thead><tbody id="rtbody"></tbody><tfoot id="rtfoot"></tfoot></table>
     </div>
   </div>
 </div>
@@ -1005,7 +1017,7 @@ function hasUnsavedInput(){
   return false;
 }
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260804-150000';
+const APP_BUILD='20260804-160000';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function forceReload(build){ try{ if(sessionStorage.getItem('al_reloaded_build')===build){ showBanner(); return; } sessionStorage.setItem('al_reloaded_build',build); }catch(e){} location.href=location.pathname+'?v='+Date.now(); }
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
@@ -1029,7 +1041,7 @@ let ROWS=[];   // données calculées en mémoire
 let CURRENT_USER=null;
 const state={ year:null, log:'all', chan:'all', month:'all', labels:true, commChan:'all',
   sortChan:'val-desc', sortLog:'val-desc', expDim:'mois', expMes:'montant', expSort:'val-desc',
-  rsort:{key:'entree',dir:-1}, editId:null, unit:'eur', cumul:true,
+  rsort:{key:'entree',dir:-1}, rgroup:'none', editId:null, unit:'eur', cumul:true,
   commAnaPeriod:'annee', commAnaMonth:null, commAnaSort:{key:'comm',dir:-1},
   dataSource:'saisies', shMontantConv:'paye_taxe', appFilter:'all',
   chuteM:(function(){ try{ const a=JSON.parse(localStorage.getItem('al_chuteM')||'null'); if(Array.isArray(a)&&a.length===12) return a.map(v=>{const n=+v; return (isFinite(n)&&n>=0&&n<=1)?n:0.7;}); }catch(e){} return Array(12).fill(0.7); })() };
@@ -2447,6 +2459,35 @@ function reservHeadHTML(){
   // se décalent. Un test le vérifie.
   return `<tr><th>Bien</th><th>Date résa</th><th>Entrée</th><th>Sortie</th><th class="num">Nuits</th><th>Client</th><th>Canal</th><th class="num">Montant</th><th class="num">Commission</th><th class="num">Bénéfice net</th><th class="num" title="Ce que le voyageur doit encore">Reste à payer</th><th class="num" title="Ce que la plateforme doit encore verser : séjour réglé mais pas commencé">Versement attendu</th><th>Saisi par</th><th>Actions</th></tr>`;
 }
+// Ligne de totaux du tableau des réservations. Elle porte sur les lignes REELLEMENT
+// affichées, filtres compris : un total qui ne correspond pas à ce qu'on a sous les yeux
+// est pire que pas de total. La somme des colspan doit valoir le nombre de colonnes de
+// reservHeadHTML, un test le vérifie.
+// Regroupe des lignes DEJA triees, en conservant l'ordre d'apparition des groupes et le tri
+// a l'interieur de chacun : grouper ne doit pas defaire le classement demande par l'utilisateur.
+function GROUPER(rows, champ){
+  const ordre=[], paquets={};
+  (rows||[]).forEach(d=>{ const k=(d&&d[champ])||'(non renseigné)';
+    if(!paquets[k]){ paquets[k]=[]; ordre.push(k); } paquets[k].push(d); });
+  return ordre.map(k=>({cle:k, lignes:paquets[k]}));
+}
+function reservFootHTML(rows, label){
+  if(!rows || !rows.length) return '';
+  const S=k=>rows.reduce((s,d)=>s+(Number(d[k])||0),0);
+  const comm=rows.reduce((s,d)=>s+(Number(d._appComm!=null?d._appComm:d.commission)||0),0);
+  const n=rows.length;
+  const cell=(v,couleur)=>`<td class="num"${couleur?` style="color:${couleur}"`:''}>${v?eur(v):'—'}</td>`;
+  return `<tr class="rtot">`
+    + `<td colspan="4">${label||'TOTAL'} — ${n} séjour${n>1?'s':''}</td>`
+    + `<td class="num">${S('nuitees')||'—'}</td>`
+    + `<td colspan="2"></td>`
+    + cell(S('montant'))
+    + cell(comm)
+    + cell(S('benefice'), css('--green'))
+    + cell(S('reste_a_payer'), css('--orange'))
+    + cell(S('encaissement_attendu'), css('--blue'))
+    + `<td colspan="2"></td></tr>`;
+}
 function reservRowHTML(d){
   const canAct = d.id!=null;
   const acts = canAct ? `<button class="mini-act" title="Modifier la réservation entière" data-act="edit" data-id="${d.id}">✏️</button><button class="mini-act" title="Historique" data-act="hist" data-id="${d.id}">🕑</button><button class="mini-act del" title="Supprimer" data-act="del" data-id="${d.id}">🗑️</button>` : '<span style="color:var(--muted);font-size:11px">—</span>';
@@ -2496,7 +2537,7 @@ function renderBreakdownTable(cfg){
     if(det && open){
       const dr=rows.filter(d=>d.mois===m+1);
       h+=`<tr class="brk-detail"><td colspan="${cols.length+1}"><div class="brk-detail-in">`
-        + (dr.length? `<table class="tbl"><thead>${reservHeadHTML()}</thead><tbody>${dr.map(reservRowHTML).join('')}</tbody></table>` : `<div style="padding:8px;color:var(--muted)">Aucune réservation ce mois.</div>`)
+        + (dr.length? `<table class="tbl"><thead>${reservHeadHTML()}</thead><tbody>${dr.map(reservRowHTML).join('')}</tbody><tfoot>${reservFootHTML(dr,MONTHS[m])}</tfoot></table>` : `<div style="padding:8px;color:var(--muted)">Aucune réservation ce mois.</div>`)
         + `</div></td></tr>`;
     }
   }
@@ -2572,7 +2613,19 @@ function renderReservs(rows){
   document.getElementById('rcount').innerHTML=_rc;
   const _clr=document.getElementById('clrApp'); if(_clr)_clr.onclick=()=>{ state.appFilter='all'; render(); };
   document.querySelectorAll('#rthead th[data-k]').forEach(th=>{ th.classList.toggle('sorted',th.dataset.k===key); const base=th.getAttribute('data-base')||th.textContent.replace(/[ ▲▼]+$/,''); th.setAttribute('data-base',base); th.textContent=base+(th.dataset.k===key?(dir>0?' ▲':' ▼'):''); });
-  document.getElementById('rtbody').innerHTML=sorted.map(reservRowHTML).join('');
+  // Sous-totaux par groupe. Le tri choisi est conservé A L'INTERIEUR de chaque groupe :
+  // grouper ne doit pas défaire le classement demandé.
+  const _grp=state.rgroup||'none';
+  if(_grp==='none'){
+    document.getElementById('rtbody').innerHTML=sorted.map(reservRowHTML).join('');
+  } else {
+    document.getElementById('rtbody').innerHTML=GROUPER(sorted,_grp).map(g=>
+      g.lignes.map(reservRowHTML).join('')+reservFootHTML(g.lignes,g.cle)
+    ).join('');
+  }
+  const _rtf=document.getElementById('rtfoot'); if(_rtf)_rtf.innerHTML=reservFootHTML(sorted,'TOTAL GÉNÉRAL');
+  document.querySelectorAll('.rgrp').forEach(b=>{ b.classList.toggle('on',(state.rgroup||'none')===b.dataset.grp);
+    b.onclick=()=>{ state.rgroup=b.dataset.grp; render(); }; });
   document.querySelectorAll('#rtbody .mini-act').forEach(b=>b.onclick=()=>{
     const id=b.dataset.id, a=b.dataset.act;
     if(a==='edit') actEdit(id); else if(a==='del') actDelete(id); else if(a==='hist') actHistory(id);
