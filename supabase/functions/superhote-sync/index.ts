@@ -111,14 +111,30 @@ async function verifierAppelant(req: Request, supabaseUrl: string, anonKey: stri
   const entete = req.headers.get('Authorization') || '';
   const jeton = entete.replace(/^Bearer\s+/i, '').trim();
   if (!jeton) return { ok: false, motif: 'Authentification requise.' };
-  if (jeton === serviceKey) return { ok: true, appelant: 'cron' };
 
-  const client = createClient(supabaseUrl, anonKey, {
+  // 1. Chemin rapide : la cle de service injectee par la plateforme, sans appel reseau.
+  if (serviceKey && jeton === serviceKey) return { ok: true, appelant: 'cron' };
+
+  // 2. Utilisateur authentifie de l'application (bouton « synchroniser maintenant »).
+  const clientUtilisateur = createClient(supabaseUrl, anonKey, {
     global: { headers: { Authorization: `Bearer ${jeton}` } },
   });
-  const { data, error } = await client.auth.getUser();
-  if (error || !data?.user) return { ok: false, motif: 'Jeton utilisateur invalide.' };
-  return { ok: true, appelant: data.user.email || data.user.id };
+  const { data } = await clientUtilisateur.auth.getUser();
+  if (data?.user) return { ok: true, appelant: data.user.email || data.user.id };
+
+  // 3. Autre cle de service. On teste le PRIVILEGE reel plutot que de comparer a une
+  //    variable d'environnement : le nom de celle-ci varie selon que le projet utilise
+  //    les cles historiques (SUPABASE_SERVICE_ROLE_KEY) ou les nouvelles (sb_secret_).
+  //    listUsers est reserve au role de service : une cle publiable echoue ici.
+  try {
+    const clientAdmin = createClient(supabaseUrl, jeton);
+    const { error } = await clientAdmin.auth.admin.listUsers({ page: 1, perPage: 1 });
+    if (!error) return { ok: true, appelant: 'cron' };
+  } catch (_) {
+    // on retombe sur le refus ci-dessous
+  }
+
+  return { ok: false, motif: 'Jeton non autorise : ni utilisateur connecte, ni cle de service.' };
 }
 
 Deno.serve(async (req: Request) => {
