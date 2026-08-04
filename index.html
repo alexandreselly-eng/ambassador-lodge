@@ -1005,7 +1005,7 @@ function hasUnsavedInput(){
   return false;
 }
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260804-104500';
+const APP_BUILD='20260804-123000';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function forceReload(build){ try{ if(sessionStorage.getItem('al_reloaded_build')===build){ showBanner(); return; } sessionStorage.setItem('al_reloaded_build',build); }catch(e){} location.href=location.pathname+'?v='+Date.now(); }
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
@@ -1081,6 +1081,12 @@ function commCalc(r){ const z={immo:0,bibizNew:0,bibizRunoff:0,total:0};
   else { bnR=b.affnouv.bibiz; }                                      // Nouveau · autre source : Bibiz affaires nouvelles
   return { immo:M*immoR/100, bibizNew:M*bnR/100, bibizRunoff:M*brR/100, total:M*(immoR+bnR+brR)/100 };
 }
+// États de paiement SuperHote qui valent séjour soldé, relevés sur /reference le 04/08/2026.
+// MANAGED_BY_PLATFORM : Airbnb encaisse et reverse, aucun solde n'est possible.
+// PARTIALLY_PAID et UNPAID sont de vrais soldes ouverts. Un code absent ou inconnu ne solde
+// rien : mieux vaut un reste à payer visible et faux qu'un encaissement supposé.
+const PAIEMENTS_SOLDES=['MANAGED_BY_PLATFORM','PAID','PAID_MANUALLY'];
+function SOLDE_REGLE(p){ return !!p && PAIEMENTS_SOLDES.indexOf(p)>=0; }
 function compute(r){
   const c=r.entree?new Date(r.entree+'T00:00:00'):null, d=r.sortie?new Date(r.sortie+'T00:00:00'):null;
   const nuit=(c&&d)?Math.round((d-c)/86400000):null;
@@ -1098,7 +1104,11 @@ function compute(r){
   // les acomptes saisis ne tombent pas au centime près. Les vrais soldes plus importants restent visibles.
   const _rrRaw = (r.montant!=null)? (n0(r.montant)+n0(r.taxe)-n0(r.ac1)-n0(r.ac2)-n0(r.ac3)-n0(r.frais_menage)) : null;
   const _rTol = Math.max(2, 0.01*(Math.abs(n0(r.montant))+Math.abs(n0(r.taxe))));
-  const _reste = (_rrRaw==null)? null : (Math.abs(_rrRaw)<=_rTol ? 0 : Math.round(_rrRaw*100)/100);
+  let _reste = (_rrRaw==null)? null : (Math.abs(_rrRaw)<=_rTol ? 0 : Math.round(_rrRaw*100)/100);
+  // Source Superhote : il n'y a pas d'acomptes, mais l'API livre l'état de paiement du séjour.
+  // Un séjour réglé est soldé, quoi qu'en dise le calcul par acomptes. Un état absent ou inconnu
+  // ne solde rien : on ne devine pas un encaissement.
+  if(_reste!=null && SOLDE_REGLE(r.paiement)) _reste=0;
   return Object.assign({},r,{
     annee:c?c.getFullYear():null, mois:c?c.getMonth()+1:null,
     nuitees:nuit, jours_mois:H, tx_rempl:(nuit!=null&&H)?nuit/H:null, monthsAlloc:_alloc, apporteur:apporteur,
@@ -1343,6 +1353,10 @@ function shToReservation(r){ const conv=state.shMontantConv||'paye_taxe';
   return { logement:r.logement, entree:r.entree, sortie:r.sortie, date_resa:r.date_resa||null,
     origine:r.plateforme||r.origine||'Plateforme', nom:r.nom, prenom:r.prenom, nb_pers:r.nb_pers, nb_adultes:null,
     montant:Math.round(montant*100)/100, taxe:taxe, frais_menage:men||null, ac1:null,ac2:null,ac3:null, obs:'(import Superhote)',
+    // Superhote ne livre pas les acomptes, mais l'API livre l'état de paiement. Sans lui,
+    // compute() en déduit qu'aucun euro n'a été encaissé et affiche un solde sur des séjours
+    // entièrement réglés, notamment tous les Airbnb, où la plateforme collecte et reverse.
+    paiement:(r.paiement||null),
     _sh_comm:(r.commission!=null?r.commission:null) }; }
 // Superhote : commission = barème apporteur (estimé via compute, car le CSV ne porte pas l'apporteur réel), bénéfice = montant − commission — comme les saisies
 function rebuildSH(){ SH_ROWS = SH_RAW.map(shToReservation).map(compute); }
@@ -1841,8 +1855,8 @@ function render(){
     meta:_mdD};
   window.__xiRich.reste={title:'Reste à encaisser',result:eur(reste),
     n1:'Σ des soldes clients encore ouverts',
-    n2:['Par résa : montant + taxe − acomptes (1+2+3) − ménage'],
-    n3:(isSH?['⚠ '+srcTag+' : le CSV ne contient pas les acomptes → reste ≈ montant total.','Non comparable aux saisies.']:['Source : saisies.','Somme des soldes clients ouverts.']),
+    n2:['Par résa : montant + taxe − acomptes (1+2+3) − ménage','Source Superhote : un séjour dont l\'API dit qu\'il est réglé est soldé à 0, quels que soient les acomptes.'],
+    n3:(isSH?[srcTag+' : Superhote ne livre pas les acomptes, mais livre l\'état de paiement.','Réglé (payé, ou encaissé par la plateforme) → 0.','Impayé → montant total. Partiellement payé → montant total, donc majorant : l\'API ne dit pas combien a été versé.','Un séjour sans état de paiement connu n\'est jamais supposé réglé.']:['Source : saisies.','Somme des soldes clients ouverts.']),
     meta:_mdD};
   document.getElementById('kpis').innerHTML=[
     kpiCard(isSH?'Chiffre d\'affaires':'CA brut',eur(ca),`${nResa} réservations · ${nuit} nuitées${isSH?'':' · hors ménage & taxe de séjour'}`,'',
@@ -1853,7 +1867,7 @@ function render(){
       {rich:'comm', txt:`Commissions|Barème apporteur (bien / apporteur / date)${isSH?' · estimé':''}`}),
     kpiCard('Prix moyen / nuit',eur(prix),`occupation moy. ${pct(occ)}`,'b4',{rich:'prix', txt:`Prix moyen / nuit|CA ÷ nuitées`}),
     kpiCard('Taxes de séjour',eur(taxeSCI),'à reverser (SCI) · dont OTA '+eur(taxeOTA)+' · <button id="taxExtractBtn" class="kbtn" title="Justificatif détaillé de la période sélectionnée">⤓ justificatif</button>','b2',{rich:'taxe', txt:`Taxes de séjour|À reverser (SCI) ${eur(taxeSCI)} · dont OTA ${eur(taxeOTA)}`}),
-    kpiCard('Reste à encaisser',eur(reste),isSH?'⚠ acomptes absents du CSV':'soldes clients ouverts','b5',{rich:'reste', txt:`Reste à encaisser|Soldes clients ouverts${isSH?' · ⚠ acomptes absents du CSV':''}`}),
+    kpiCard('Reste à encaisser',eur(reste),isSH?'impayés & partiels · majorant':'soldes clients ouverts','b5',{rich:'reste', txt:`Reste à encaisser|Soldes clients ouverts${isSH?' · impayés et partiellement payés · majorant, l\'API ne dit pas combien a été versé sur un séjour partiel':''}`}),
   ].join('');
   if(typeof n1Applicable==='function' && n1Applicable()){ try{ n1DecorateDashTiles({ca,benef,comm,prix,taxeSCI,reste}); }catch(e){} }
   const _teb=document.getElementById('taxExtractBtn'); if(_teb)_teb.onclick=genTaxeJustificatif;
@@ -3967,7 +3981,7 @@ const AL_VALID = (function(){
   // revenu_brut et montant_paye sont compares depuis le Lot 3 : ils alimentent les conventions
   // de montant (« brut − ménage », « payé − taxe ») et le tableau Superhote. Sans eux, un import
   // pouvait les remplacer en silence, la modale n'affichant aucune modification.
-  const FIELDS={superhote_csv:['sortie','montant','montant_paye','revenu_brut','taxe','frais_menage','plateforme','nb_pers','statut'], excel:['sortie','montant','taxe','frais_menage','origine','nb_pers']};
+  const FIELDS={superhote_csv:['sortie','montant','montant_paye','revenu_brut','taxe','frais_menage','plateforme','nb_pers','statut','paiement'], excel:['sortie','montant','taxe','frais_menage','origine','nb_pers']};
   function diff(source, incoming, prev){ const f=FIELDS[source]||FIELDS.excel; const K=keyer(incoming,prev); const pm={}; (prev||[]).forEach(r=>pm[K(r)]=r); const im={}; incoming.forEach(r=>im[K(r)]=r);
     const added=[],removed=[],modified=[],unchanged=[];
     incoming.forEach(r=>{ const p=pm[K(r)]; if(!p){added.push(r);return;} const ch=[]; f.forEach(fl=>{ const a=(p[fl]==null?'':p[fl]), b=(r[fl]==null?'':r[fl]); if(String(a)!==String(b))ch.push({field:fl,before:a,after:b}); });
