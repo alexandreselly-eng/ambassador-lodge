@@ -70,9 +70,26 @@ describe('fonctions pures', () => {
   });
 
   test('curseur retranche 48 h et tolere un etat vide', () => {
-    assert.equal(curseur('2026-08-04T10:00:00.000Z'), '2026-08-02T10:00:00.000Z');
+    assert.equal(curseur('2026-08-04T10:00:00.000Z'), '2026-08-02T10:00:00+00:00');
     assert.equal(curseur(null), null, 'sans curseur, la synchro doit lire tout l historique');
     assert.equal(curseur('pas une date'), null);
+  });
+
+  // SuperHote valide updated_since contre le motif PHP « Y-m-d\TH:i:sP » et repond 422
+  // sinon : ni millisecondes, ni « Z ». Regression constatee en production le 04/08/2026.
+  test('curseur respecte le format attendu par SuperHote', () => {
+    const attendu = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$/;
+    for (const entree of [
+      '2026-08-04T06:00:25+00:00',   // format renvoye par l API
+      '2026-08-04T10:00:00.000Z',    // format ISO avec millisecondes
+      '2026-08-04T10:00:00Z',
+      '2026-08-04T12:00:00+02:00',   // avec decalage
+    ]) {
+      const c = curseur(entree);
+      assert.match(c!, attendu, `format invalide pour ${entree} : ${c}`);
+      assert.ok(!c!.includes('.'), 'aucune milliseconde');
+      assert.ok(!c!.endsWith('Z'), 'decalage explicite, pas de Z');
+    }
   });
 
   test('regle d upsert : un rejet delibere ne revient jamais tout seul', () => {

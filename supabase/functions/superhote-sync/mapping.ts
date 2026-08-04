@@ -278,10 +278,17 @@ export function decisionUpsert(
   return 'ecrire';
 }
 
-/** Curseur de synchro : max(updated_at) reellement ingere, moins une marge. */
+/**
+ * Curseur de synchro : max(updated_at) reellement ingere, moins une marge.
+ *
+ * Le format est impose par SuperHote, qui valide `updated_since` contre le motif PHP
+ * « Y-m-d\TH:i:sP » et repond 422 sinon. Concretement : pas de millisecondes, et un
+ * decalage explicite « +00:00 » la ou toISOString() ecrit « Z ». Constate en production
+ * le 04/08/2026 au deuxieme passage, le premier n'ayant pas de curseur a envoyer.
+ */
 export function curseur(lastUpdated: string | null, margeHeures = 48): string | null {
   if (!lastUpdated) return null;
   const t = new Date(lastUpdated).getTime();
   if (Number.isNaN(t)) return null;
-  return new Date(t - margeHeures * 3600 * 1000).toISOString();
+  return new Date(t - margeHeures * 3600 * 1000).toISOString().replace(/\.\d{3}Z$/, '+00:00');
 }
