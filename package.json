@@ -1,0 +1,9 @@
+{
+  "name": "bnb-pilot",
+  "private": true,
+  "type": "module",
+  "description": "Pilotage locatif. L'app est le fichier unique index.html ; ce package.json ne sert qu'a lancer les tests.",
+  "scripts": {
+    "test": "node --test 'tests/*.test.ts'"
+  }
+}
