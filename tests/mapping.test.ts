@@ -25,6 +25,7 @@ import {
   origineDe,
   PAIEMENTS_SOLDES,
   StatutInconnuError,
+  VERSION_MAPPING,
   type Propriete,
   type ReservationApi,
 } from '../supabase/functions/superhote-sync/mapping.ts';
@@ -94,25 +95,52 @@ describe('fonctions pures', () => {
     }
   });
 
+  const V = VERSION_MAPPING;
   test('regle d upsert : un rejet delibere ne revient jamais tout seul', () => {
     assert.equal(decisionUpsert(null, '2026-08-04T10:00:00Z'), 'ecrire');
     assert.equal(
-      decisionUpsert({ statut: 'rejete', updated_at: '2026-01-01T00:00:00Z' }, '2026-08-04T10:00:00Z'),
+      decisionUpsert({ statut: 'rejete', updated_at: '2026-01-01T00:00:00Z', mapping_version: V }, '2026-08-04T10:00:00Z'),
       'ignorer',
     );
     assert.equal(
-      decisionUpsert({ statut: 'valide', updated_at: '2026-08-04T10:00:00Z' }, '2026-08-04T10:00:00Z'),
+      decisionUpsert({ statut: 'valide', updated_at: '2026-08-04T10:00:00Z', mapping_version: V }, '2026-08-04T10:00:00Z'),
       'ignorer',
       'une ligne validee et inchangee ne doit pas repasser en attente',
     );
     assert.equal(
-      decisionUpsert({ statut: 'valide', updated_at: '2026-01-01T00:00:00Z' }, '2026-08-04T10:00:00Z'),
+      decisionUpsert({ statut: 'valide', updated_at: '2026-01-01T00:00:00Z', mapping_version: V }, '2026-08-04T10:00:00Z'),
       'ecrire',
       'une ligne validee dont la source a bouge doit etre rearbitree',
     );
     assert.equal(
-      decisionUpsert({ statut: 'en_attente', updated_at: '2026-01-01T00:00:00Z' }, '2026-08-04T10:00:00Z'),
+      decisionUpsert({ statut: 'en_attente', updated_at: '2026-01-01T00:00:00Z', mapping_version: V }, '2026-08-04T10:00:00Z'),
       'ecrire',
+    );
+  });
+
+  // Le defaut du 04/08/2026 : une correction de formule restait invisible sur tout
+  // l'historique deja arbitre, la regle ne regardant que la donnee distante.
+  test('une ligne validee sous un mapping perime est re-proposee', () => {
+    const t = '2026-08-04T10:00:00Z';
+    assert.equal(
+      decisionUpsert({ statut: 'valide', updated_at: t, mapping_version: '2026-08-04.1' }, t),
+      'ecrire',
+      'notre calcul a change : la valeur validee est perimee',
+    );
+    assert.equal(
+      decisionUpsert({ statut: 'valide', updated_at: t, mapping_version: null }, t),
+      'ecrire',
+      'ligne anterieure au versionnement',
+    );
+    assert.equal(
+      decisionUpsert({ statut: 'valide', updated_at: t, mapping_version: V }, t),
+      'ignorer',
+      'meme version et donnee inchangee : rien a refaire',
+    );
+    assert.equal(
+      decisionUpsert({ statut: 'rejete', updated_at: t, mapping_version: '2026-08-04.1' }, t),
+      'ignorer',
+      'un changement de version ne contredit pas un refus delibere',
     );
   });
 

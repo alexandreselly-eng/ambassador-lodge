@@ -12,6 +12,7 @@ import {
   decisionUpsert,
   mapper,
   StatutInconnuError,
+  VERSION_MAPPING,
   type LignePending,
   type Propriete,
   type ReservationApi,
@@ -191,7 +192,7 @@ Deno.serve(async (req: Request) => {
     for (let i = 0; i < ids.length; i += 500) {
       const { data, error } = await db
         .from('sh_pending')
-        .select('id, statut, updated_at')
+        .select('id, statut, updated_at, mapping_version')
         .in('id', ids.slice(i, i + 500));
       if (error) throw error;
       for (const l of data ?? []) existantes.set(l.id, l as LignePending);
@@ -208,6 +209,7 @@ Deno.serve(async (req: Request) => {
         updated_at: m.updated_at,
         fetched_at: debut,
         statut: 'en_attente',
+        mapping_version: VERSION_MAPPING,
         traite_le: null,
         traite_par: null,
       });
@@ -238,6 +240,7 @@ Deno.serve(async (req: Request) => {
 
     const resume = {
       appelant: auth.appelant,
+      version_mapping: VERSION_MAPPING,
       depuis,
       lues: brutes.length,
       demandes_information_ignorees: demandesInfo,
