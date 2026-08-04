@@ -1,0 +1,8 @@
+# Etat local du CLI Supabase (lien au projet, versions relevees) : propre a la machine.
+supabase/.temp/
+
+# Rien d'autre a exclure : l'app est le fichier unique index.html, il n'y a ni
+# dependances installees ni build. Les fixtures de test et les sauvegardes de base
+# vivent hors du depot, dans ~/dev/bnb-pilot-sauvegardes/, parce qu'elles contiennent
+# des noms de voyageurs et que ce depot est public.
+.DS_Store
