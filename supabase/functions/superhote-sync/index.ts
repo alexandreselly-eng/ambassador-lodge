@@ -217,7 +217,13 @@ Deno.serve(async (req: Request) => {
     let envoyee = false;
     if (d.alerte && peutAlerter((e as EtatSync | null)?.alerte_le, maintenant)) {
       envoyee = await notifier(d.titre, d.message);
-      if (envoyee) await db.from('sh_sync_state').update({ alerte_le: new Date(maintenant).toISOString() }).eq('source', SOURCE);
+      if (envoyee) {
+        // Sans cet horodatage, l'anti-repetition ne tient plus : chaque appel du declencheur
+        // renverrait une notification, et une alerte qui se repete finit en sourdine.
+        const { error } = await db.from('sh_sync_state')
+          .update({ alerte_le: new Date(maintenant).toISOString() }).eq('source', SOURCE);
+        if (error) console.error('Horodatage de l alerte impossible :', messageErreur(error));
+      }
     }
     return json({ niveau: d.niveau, message: d.message, alerte_envoyee: envoyee });
   }
@@ -305,7 +311,7 @@ Deno.serve(async (req: Request) => {
       ? maxIngere
       : etat?.last_updated ?? null;
 
-    await db.from('sh_sync_state').upsert({
+    const { error: errEtat } = await db.from('sh_sync_state').upsert({
       source: SOURCE,
       last_run_at: debut,
       last_updated: nouveauCurseur,
@@ -316,6 +322,12 @@ Deno.serve(async (req: Request) => {
       // alerte immediatement, sans attendre la fin d'une fenetre ouverte par la precedente.
       alerte_le: null,
     }, { onConflict: 'source' });
+    // Erreur VERIFIEE, et non ignoree comme elle l'etait : une ecriture d'etat perdue laisse
+    // le curseur fige et la synchro se declare reussie a chaque passage sans jamais avancer.
+    // Constate le 04/08/2026, la surveillance annoncant « aucun passage depuis 9 h » quelques
+    // secondes apres une synchro « reussie ». C'est la panne silencieuse dans le code qui
+    // sert justement a detecter les pannes silencieuses.
+    if (errEtat) throw echec('Ecriture de sh_sync_state', errEtat);
 
     const resume = {
       appelant: auth.appelant,
@@ -349,7 +361,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    await db.from('sh_sync_state').upsert({
+    // Ici l'erreur est journalisee sans etre relancee : on est deja dans le chemin d'erreur,
+    // et l'alerte est partie. Lever a nouveau ne ferait que remplacer un message utile par un
+    // message de plomberie.
+    const { error: errEtat } = await db.from('sh_sync_state').upsert({
       source: SOURCE,
       last_run_at: debut,
       last_updated: etat?.last_updated ?? null,
@@ -358,6 +373,7 @@ Deno.serve(async (req: Request) => {
       last_error: message.slice(0, 1000),
       alerte_le: alerteEnvoyee ? new Date(maintenant).toISOString() : (etat?.alerte_le ?? null),
     }, { onConflict: 'source' });
+    if (errEtat) console.error("Ecriture de l'etat d'erreur impossible :", messageErreur(errEtat));
 
     return json({ erreur: message, alerte_envoyee: alerteEnvoyee }, 500);
   }

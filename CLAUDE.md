@@ -60,6 +60,12 @@ s'exécute qu'à partir de la deuxième fois : curseur, pagination au-delà de l
 reprise après échec, déduplication contre l'existant. Un format de curseur invalide a passé
 28 tests unitaires et un premier passage réel avant d'être découvert au second, le 04/08/2026.
 
+**Toute écriture Supabase vérifie son erreur.** `supabase-js` ne lève pas, il retourne
+`{ error }` : un `await db.from(...).upsert(...)` sans destructuration échoue en silence.
+C'est ce qui a figé le curseur de synchro pendant une journée entière le 04/08/2026, la
+fonction se déclarant réussie à chaque passage. Un test parcourt l'Edge Function et refuse
+toute écriture qui ignore son erreur.
+
 **Incrémenter `VERSION_MAPPING` dès que `mapping.ts` change ce qu'il produit** (formule, champ
 ajouté, règle modifiée). C'est ce qui fait repasser par la modale de validation les lignes déjà
 arbitrées sous un calcul devenu périmé. Sans ça, une correction de formule reste invisible sur
