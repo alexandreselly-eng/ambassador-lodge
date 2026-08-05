@@ -1017,7 +1017,7 @@ function hasUnsavedInput(){
   return false;
 }
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260805-011500';
+const APP_BUILD='20260805-020000';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function forceReload(build){ try{ if(sessionStorage.getItem('al_reloaded_build')===build){ showBanner(); return; } sessionStorage.setItem('al_reloaded_build',build); }catch(e){} location.href=location.pathname+'?v='+Date.now(); }
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
@@ -4109,7 +4109,18 @@ const AL_VALID = (function(){
 
   async function loadSnapshot(source, bien){ const s=supa(); if(!s)return null; try{ const {data}=await s.from('data_snapshots').select('*').eq('source',source).eq('bien',bien).maybeSingle(); return data; }catch(e){return null;} }
   async function listValidations(){ const s=supa(); if(!s)return []; try{ const {data}=await s.from('data_validations').select('*').order('validated_at',{ascending:false}).limit(200); return data||[]; }catch(e){return [];} }
-  async function commit(source,bien,version,prevV,label,d,sub){ if(typeof PREVIEW!=='undefined' && PREVIEW.active){ throw new Error('Lecture seule en mode aperçu.'); } const s=supa(); if(!s) throw new Error('Hors-ligne : connexion requise pour enregistrer la validation.');
+  // Une validation ECRASE integralement les lignes du bien : un jeu partiel efface le reste.
+  // La completude reposait entierement sur l'appelant, sans aucun filet. Le 05/08/2026, un sas
+  // de 2 lignes a propose la suppression de 75 reservations ; seul l'oeil humain s'y opposait.
+  // Ce seuil transforme un clic distrait en refus, quel que soit l'appelant et l'utilisateur.
+  function SUPPRESSION_MASSIVE(supprimees,avant){
+    if(!supprimees||supprimees<=0)return false;
+    return supprimees>=5 || (avant>0 && supprimees/avant>=0.10);
+  }
+  async function commit(source,bien,version,prevV,label,d,sub,autorise){ if(typeof PREVIEW!=='undefined' && PREVIEW.active){ throw new Error('Lecture seule en mode aperçu.'); }
+    const _avant=d.removed.length+d.modified.length+d.unchanged.length;
+    if(SUPPRESSION_MASSIVE(d.removed.length,_avant) && autorise!==true)
+      throw new Error(`Refus de sécurité : ${d.removed.length} suppression(s) sur ${_avant} ligne(s) pour « ${bien} ». Une confirmation explicite est requise.`); const s=supa(); if(!s) throw new Error('Hors-ligne : connexion requise pour enregistrer la validation.');
     const summary={added:d.added.length,modified:d.modified.length,removed:d.removed.length,unchanged:d.unchanged.length,total:sub.length};
     const detail=[].concat(
       d.added.slice(0,500).map(r=>({type:'ajout',logement:r.logement,entree:r.entree,nom:r.nom})),
@@ -4117,6 +4128,14 @@ const AL_VALID = (function(){
       d.modified.slice(0,500).map(m=>({type:'modification',logement:m.logement,entree:m.entree,nom:m.nom,changes:m.changes})));
     const {error}=await s.from('data_validations').insert({source,bien,version,prev_version:prevV,file_label:label,validated_by_email:meEmail(),summary,detail});
     if(error) throw error;
+    // Filet de securite : on archive le jeu qu'on s'apprete a ECRASER. Relu juste avant, pour
+    // archiver exactement ce qui sera remplace. Si l'archivage echoue, rien n'est ecrase :
+    // mieux vaut une validation refusee qu'une validation irreversible.
+    const {data:_precedent}=await s.from('data_snapshots').select('version,row_count,rows,file_label').eq('source',source).eq('bien',bien).maybeSingle();
+    if(_precedent && Array.isArray(_precedent.rows) && _precedent.rows.length){
+      const {error:eh}=await s.from('data_snapshots_historique').insert({source,bien,version:_precedent.version,row_count:_precedent.row_count,rows:_precedent.rows,file_label:_precedent.file_label,remplace_par:meEmail()});
+      if(eh) throw new Error("Sauvegarde du jeu remplacé impossible, rien n'a été écrasé : "+(eh.message||eh));
+    }
     const {error:e2}=await s.from('data_snapshots').upsert({source,bien,version,file_label:label,row_count:sub.length,rows:sub,updated_by:meEmail(),updated_at:new Date().toISOString()},{onConflict:'source,bien'});
     if(e2) throw e2;
     return summary; }
@@ -4159,7 +4178,16 @@ const AL_VALID = (function(){
     m.querySelectorAll('.vunkmap').forEach(btn=>btn.onclick=async()=>{ const sel=m.querySelector('.vunksel[data-l="'+btn.dataset.l+'"]'); const b=sel?sel.value:''; if(!b){alert('Choisissez un bien à associer.');return;}
       btn.disabled=true; btn.textContent='…'; try{ await mapLabel(b,decodeURIComponent(btn.dataset.l)); if(typeof loadProperties==='function')await loadProperties(); close(); openGate(source,incoming,label,applyCb); }catch(e){ btn.disabled=false; btn.textContent='Mapper'; alert('Erreur mapping : '+e.message); } });
     const ok=m.querySelector('#valOk'); if(ok&&canValidate) ok.onclick=async()=>{ ok.disabled=true; ok.textContent='Enregistrement…';
-      try{ for(const g of groups){ await commit(source,g.bien,g.version,g.snap?g.snap.version:null,label,g.d,g.sub); }
+      // Confirmation distincte quand la validation effacerait beaucoup. Le clic habituel ne
+      // doit pas suffire : c'est le geste qu'un utilisateur presse fait sans lire.
+      const _risque=groups.filter(g=>SUPPRESSION_MASSIVE(g.d.removed.length, g.d.removed.length+g.d.modified.length+g.d.unchanged.length));
+      let _autorise=false;
+      if(_risque.length){
+        const _det=_risque.map(g=>`• ${g.bien} : ${g.d.removed.length} suppression(s) sur ${g.d.removed.length+g.d.modified.length+g.d.unchanged.length} ligne(s)`).join('\n');
+        _autorise=confirm(`⚠ SUPPRESSION IMPORTANTE\n\n${_det}\n\nCes réservations seront retirées de la mémoire validée.\nLe jeu remplacé est archivé, mais la restauration se fait à la main.\n\nConfirmer la suppression ?`);
+        if(!_autorise){ ok.disabled=false; ok.textContent='✓ Valider'; return; }
+      }
+      try{ for(const g of groups){ await commit(source,g.bien,g.version,g.snap?g.snap.version:null,label,g.d,g.sub,_autorise); }
         close(); if(applyCb)applyCb(known);
         if(source==='superhote_csv' && typeof loadSuperhoteRows==='function'){ try{ await loadSuperhoteRows(); }catch(e){} }
         if(typeof window.render==='function'){ try{ window.render(); }catch(e){} }
@@ -4236,7 +4264,7 @@ const AL_VALID = (function(){
     el.querySelectorAll('.vdet').forEach(b=>b.onclick=()=>{ const r=document.getElementById('vdet'+b.dataset.i); r.style.display=r.style.display==='none'?'table-row':'none'; });
   }
   let _tt; function toast(msg,err){ let t=document.getElementById('valToast'); if(!t){ t=document.createElement('div'); t.id='valToast'; document.body.appendChild(t);} t.textContent=msg; t.style.background=err?'#f85149':'#3fb950'; t.style.color=err?'#fff':'#04220f'; t.style.display='block'; clearTimeout(_tt); _tt=setTimeout(()=>t.style.display='none',4200); }
-  return {render, openGate, diff, parseFile, toast, keyer, repriseTaxe, renderSync, _hash:hash, _renderReg:renderReg};
+  return {render, openGate, diff, parseFile, toast, keyer, repriseTaxe, renderSync, SUPPRESSION_MASSIVE, _hash:hash, _renderReg:renderReg};
 })();
 function renderValidation(){ AL_VALID.render(); }
 function valToast(m,e){ AL_VALID.toast(m,e); }

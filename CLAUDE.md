@@ -45,6 +45,13 @@ des noms de voyageurs. Fixtures de test, exports CSV et sauvegardes de base vive
 voyageurs doit avoir RLS actif et aucune politique `anon` : la clé publiable est en clair
 dans `index.html`.
 
+**Une validation écrase intégralement les lignes du bien.** `commit()` fait
+`upsert({ rows: sub })`, il ne fusionne pas : tout appelant qui transmet un jeu partiel efface
+le reste. Deux filets depuis le 05/08/2026, à ne pas retirer. `SUPPRESSION_MASSIVE()` refuse
+une validation qui effacerait 5 lignes ou 10 % du bien sans confirmation distincte, et le jeu
+remplacé est archivé dans `data_snapshots_historique` avant écrasement. Si l'archivage échoue,
+rien n'est écrasé.
+
 **Aucune écriture automatique en base.** Tout ce qui entre dans `data_snapshots` passe par
 `AL_VALID.openGate()`, la modale de validation. La synchro API remplit un sas, elle ne
 décide pas. C'est le modèle de sécurité du projet, il a déjà évité des dégâts.
