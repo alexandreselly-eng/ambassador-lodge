@@ -1,0 +1,45 @@
+name: Synchro SuperHote
+
+# Declenche la synchronisation quotidienne. Elle ne fait que remplir le sas sh_pending :
+# RIEN n'entre dans data_snapshots sans une validation humaine dans la modale de l'app.
+# Ce cron ne peut donc pas modifier les donnees de production, seulement proposer.
+#
+# A ne pas brancher avant que la surveillance tourne : une synchro automatique dont la panne
+# serait silencieuse est pire qu'une synchro manuelle. C'est ce qui a laisse l'import CSV
+# casse du 12 au 31/07/2026.
+
+on:
+  schedule:
+    # Une fois par jour, 05h20 UTC, soit 09h20 a La Reunion : le sas est pret quand la journee
+    # commence. Le volume mesure est de 1,7 modification par jour, un passage quotidien suffit.
+    - cron: '20 5 * * *'
+  workflow_dispatch:
+
+jobs:
+  synchroniser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Appeler la synchro
+        env:
+          SECRET: ${{ secrets.DECLENCHEUR_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SECRET:-}" ]; then
+            echo "::error::Secret DECLENCHEUR_SECRET absent du depot."
+            exit 1
+          fi
+          REPONSE=$(curl -sS --max-time 300 -w '\n%{http_code}' -X POST \
+            "https://okehchypcrhpkcptnyxq.supabase.co/functions/v1/superhote-sync" \
+            -H "Authorization: Bearer $SECRET")
+          CODE=$(printf '%s' "$REPONSE" | tail -1)
+          CORPS=$(printf '%s' "$REPONSE" | sed '$d')
+          echo "$CORPS"
+
+          # La fonction alerte deja par ntfy en cas d'echec. L'echec du job est un second
+          # canal, independant de Supabase comme de ntfy.
+          if [ "$CODE" != "200" ]; then
+            echo "::error::La synchro a repondu $CODE."
+            exit 1
+          fi
+
+          printf '%s' "$CORPS" | python3 -c "import sys,json;d=json.load(sys.stdin);print('::notice::%s lue(s), %s en attente d arbitrage'%(d.get('lues',0),d.get('en_attente_ecrites',0)));n=d.get('libelles_non_reconnus');print('::warning::%s libelle(s) de logement non reconnu(s)'%n) if n else None"

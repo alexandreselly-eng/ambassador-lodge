@@ -166,6 +166,14 @@ async function verifierAppelant(req: Request, supabaseUrl: string, anonKey: stri
   // 1. Chemin rapide : la cle de service injectee par la plateforme, sans appel reseau.
   if (serviceKey && jeton === serviceKey) return { ok: true, appelant: 'cron' };
 
+  // 1 bis. Jeton de declenchement, destine aux planificateurs exterieurs.
+  // Il n'ouvre AUCUN acces a la base : il autorise seulement a demander a cette fonction de
+  // faire son travail, laquelle utilise sa propre cle de service en interne. C'est ce qui
+  // permet de le confier a GitHub Actions sur un depot public sans y deposer une cle de
+  // service, qui donnerait tous les droits sur les donnees.
+  const declencheur = Deno.env.get('DECLENCHEUR_SECRET');
+  if (declencheur && jeton === declencheur) return { ok: true, appelant: 'declencheur' };
+
   // 2. Utilisateur authentifie de l'application (bouton « synchroniser maintenant »).
   const clientUtilisateur = createClient(supabaseUrl, anonKey, {
     global: { headers: { Authorization: `Bearer ${jeton}` } },
@@ -219,9 +227,9 @@ Deno.serve(async (req: Request) => {
   // externe qui l'appelle n'a besoin que de lire un etat et d'envoyer une notification.
   // Lui confier la cle de service serait lui donner tous les droits sur la base.
   if (modeSurveillance) {
-    const attendu = Deno.env.get('SURVEILLANCE_SECRET');
     const recu = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
-    const autorise = (attendu && recu === attendu) ||
+    const jetons = [Deno.env.get('DECLENCHEUR_SECRET'), Deno.env.get('SURVEILLANCE_SECRET')].filter(Boolean);
+    const autorise = (recu && jetons.some((j) => j === recu)) ||
       (await verifierAppelant(req, SUPABASE_URL, ANON_KEY, SERVICE_KEY)).ok;
     if (!autorise) return json({ erreur: 'Surveillance : jeton refuse.' }, 401);
 
