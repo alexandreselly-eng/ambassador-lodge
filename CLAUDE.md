@@ -85,16 +85,34 @@ entre guillemets.
 ## Commandes utiles
 
 ```sh
-npm test                      # 29 tests : mapping, règles d'upsert, reprise de taxe
+npm test                      # mapping, règles d'upsert, reprise de taxe, garde-fous
 open index.html               # l'app en local, mode hors ligne
 ```
 
-Synchro SuperHote, depuis une **session SSH** sur le M3 (le CLI Supabase est authentifié
-là, et le préfixe `!` de Claude Code n'ouvre pas de TTY) :
+## Accès et outils authentifiés
 
-```sh
-supabase functions deploy superhote-sync
-```
+Claude pilote tout lui-même, sans faire taper de commandes. Deux fichiers y suffisent, en
+`chmod 600`, hors dépôt, à lire avec `grep` puis `cut` et **jamais** avec `source` :
+
+| Fichier | Contenu | Sert à |
+|---|---|---|
+| `~/.supabase-jeton.env` | jeton d'accès personnel Supabase | CLI Supabase : deploy, secrets, clés |
+| `~/.supabase-bnb.env` | clé `sb_secret_` du projet | appeler l'Edge Function |
+| `~/.superhote.env` | token API SuperHote | régénérer les fixtures |
+
+Raccourcis dans `~/bin/`, un mot chacun :
+
+| Commande | |
+|---|---|
+| `bnb-sync` | lance la synchro · `bnb-sync surveillance` teste l'alerte |
+| `bnb-deploy` | déploie l'Edge Function |
+| `bnb-cle` | récupère la clé secrète (`--reveal`, le CLI la masque par défaut) |
+| `bnb-cles` | liste les clés sans leurs valeurs |
+| `bnb-sql` | copie une migration dans le presse-papiers |
+
+**La clé secrète se sélectionne par `type == 'secret'`, jamais par son nom** : la nouvelle
+génération s'appelle `default`, et filtrer sur `service_role` retomberait sur la clé historique,
+désactivée le 05/08/2026.
 
 Détail du déploiement et régénération des fixtures :
 `supabase/functions/superhote-sync/README.md`.
