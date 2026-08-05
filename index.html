@@ -1017,7 +1017,7 @@ function hasUnsavedInput(){
   return false;
 }
 // ===== Détecteur de nouvelle version (anti-cache) =====
-const APP_BUILD='20260804-160000';
+const APP_BUILD='20260805-011500';
 (function(){ if(typeof window==='undefined'||typeof document==='undefined')return; let done=false;
   function forceReload(build){ try{ if(sessionStorage.getItem('al_reloaded_build')===build){ showBanner(); return; } sessionStorage.setItem('al_reloaded_build',build); }catch(e){} location.href=location.pathname+'?v='+Date.now(); }
   function showBanner(){ if(done||document.getElementById('newVerBar')||!document.body)return; done=true;
@@ -3963,13 +3963,41 @@ const AL_SYNC = (function(){
     }catch(err){ return null; }
   }
 
-  /** Les lignes en attente, au schéma de l'app. Copie défensive : la modale mute ses lignes. */
+  /**
+   * État complet à soumettre à la validation : la mémoire déjà validée, sur laquelle on
+   * APPLIQUE le contenu du sas.
+   *
+   * Ne surtout pas renvoyer le sas seul. diff() compte comme suppression toute ligne présente
+   * en mémoire et absente de l'entrant : un sas de 2 lignes proposerait donc d'effacer les 198
+   * autres. Le piège ne se voit pas au premier import, qui recharge tout, seulement dans le
+   * régime normal du delta quotidien. Constaté le 05/08/2026, la modale annonçant la
+   * suppression de 75 réservations.
+   *
+   * Copie défensive systématique : openGate mute les lignes qu'on lui passe.
+   */
   async function charger(){
     const s=supa(); if(!s)throw new Error('Connexion requise');
-    const {data,error}=await s.from('sh_pending').select('id,payload,updated_at')
-      .eq('statut','en_attente').order('updated_at',{ascending:true});
+    const {data:sas,error}=await s.from('sh_pending').select('id,payload,updated_at,statut')
+      .in('statut',['en_attente','supprime']).order('updated_at',{ascending:true});
     if(error)throw error;
-    return (data||[]).map(l=>Object.assign({},l.payload));
+    if(!sas||!sas.length)return [];
+
+    const {data:snaps,error:e2}=await s.from('data_snapshots').select('bien,rows').eq('source',SOURCE_SNAPSHOT);
+    if(e2)throw e2;
+
+    // Mémoire actuelle, tous biens confondus. Les lignes sans identifiant sont conservées
+    // telles quelles : les perdre reviendrait à les proposer en suppression.
+    const parId={}, sansId=[];
+    (snaps||[]).forEach(sn=>{ if(sn.bien==='(historique)')return;
+      (sn.rows||[]).forEach(r=>{ const id=(r&&r.id!=null&&r.id!=='')?String(r.id):null;
+        if(id) parId[id]=Object.assign({},r); else sansId.push(Object.assign({},r)); }); });
+
+    // Application du sas par-dessus.
+    sas.forEach(l=>{ const id=String(l.id);
+      if(l.statut==='supprime') delete parId[id];      // seule suppression légitime
+      else parId[id]=Object.assign({},l.payload); });
+
+    return sansId.concat(Object.keys(parId).map(k=>parId[k]));
   }
 
   /** Déclenche la synchro. Le JWT de la session part avec l'appel, la fonction le vérifie. */
