@@ -192,9 +192,25 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-  const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
-  const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+  // Supabase a deux generations de cles : les historiques, des JWT en « eyJ… », et les
+  // nouvelles, en « sb_publishable_ » et « sb_secret_ ». Desactiver les historiques coupe
+  // SUPABASE_ANON_KEY et SUPABASE_SERVICE_ROLE_KEY, donc la synchro, si elle ne lit que
+  // celles-la. On prend la premiere disponible, en commencant par la plus recente.
+  //
+  // CLE_SECRETE et CLE_PUBLIABLE sont des noms libres, a renseigner a la main si la
+  // plateforme n'injecte rien : le prefixe SUPABASE_ est reserve et refuse par
+  // `supabase secrets set`.
+  const ANON_KEY = Deno.env.get('CLE_PUBLIABLE') || Deno.env.get('SUPABASE_PUBLISHABLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY') || '';
+  const SERVICE_KEY = Deno.env.get('CLE_SECRETE') || Deno.env.get('SUPABASE_SECRET_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
   const TOKEN = Deno.env.get('SUPERHOTE_TOKEN');
+
+  if (!SERVICE_KEY) {
+    return json({
+      erreur: "Aucune cle de service disponible. Si les cles historiques viennent d'etre " +
+        "desactivees, enregistrer la nouvelle : supabase secrets set CLE_SECRETE=\"sb_secret_...\"",
+    }, 500);
+  }
 
   const url = new URL(req.url);
   const modeSurveillance = url.searchParams.has('surveillance');
