@@ -1,0 +1,54 @@
+name: Surveillance de la synchro
+
+# Le detecteur de fumee. Il appelle le mode surveillance de l'Edge Function, qui alerte par
+# ntfy si la synchro est en echec OU muette depuis plus de 36 h.
+#
+# Pourquoi ici et pas dans un cron Supabase : un cron Supabase qui surveille une fonction
+# Supabase ne detecte rien si tout Supabase est en pause ou en panne. Le surveillant ne doit
+# pas partager le point de panne du surveille.
+#
+# Le secret DECLENCHEUR_SECRET n'ouvre aucun acces a la base : il autorise seulement a demander
+# a la fonction de faire son travail. Une cle de service dans les secrets d'un depot PUBLIC
+# serait un tout autre risque.
+
+on:
+  schedule:
+    # Quatre fois par jour. Le seuil de silence etant de 36 h, une panne est vue en une demi-
+    # journee au pire. GitHub decale les crons planifies de quelques minutes, sans importance.
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Appeler le mode surveillance
+        env:
+          SECRET: ${{ secrets.DECLENCHEUR_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SECRET:-}" ]; then
+            echo "::error::Secret DECLENCHEUR_SECRET absent du depot."
+            exit 1
+          fi
+          REPONSE=$(curl -sS --max-time 60 -w '\n%{http_code}' -X POST \
+            "https://okehchypcrhpkcptnyxq.supabase.co/functions/v1/superhote-sync?surveillance" \
+            -H "Authorization: Bearer $SECRET")
+          CODE=$(printf '%s' "$REPONSE" | tail -1)
+          CORPS=$(printf '%s' "$REPONSE" | sed '$d')
+          echo "$CORPS"
+
+          # Un echec d'appel est lui-meme une panne : si la fonction ne repond pas, l'alerte
+          # ntfy ne partira pas non plus. L'echec du job est alors le seul signal restant,
+          # d'ou le exit 1 qui declenche la notification GitHub.
+          if [ "$CODE" != "200" ]; then
+            echo "::error::La fonction a repondu $CODE. L'alerte ntfy ne peut pas partir d'elle-meme dans ce cas."
+            exit 1
+          fi
+
+          NIVEAU=$(printf '%s' "$CORPS" | python3 -c "import sys,json;print(json.load(sys.stdin).get('niveau','?'))")
+          echo "Niveau : $NIVEAU"
+          case "$NIVEAU" in
+            ok|jamais) ;;
+            *) echo "::warning::Synchro en etat « $NIVEAU ». Une alerte ntfy a du partir." ;;
+          esac
