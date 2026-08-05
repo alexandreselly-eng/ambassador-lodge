@@ -52,6 +52,16 @@ une validation qui effacerait 5 lignes ou 10 % du bien sans confirmation distinc
 remplacé est archivé dans `data_snapshots_historique` avant écrasement. Si l'archivage échoue,
 rien n'est écrasé.
 
+**Deux garde-fous à deux niveaux, aux seuils volontairement différents.** `SUPPRESSION_MASSIVE()`
+dans `index.html` arrête l'**accident** : 5 lignes ou 10 % du bien, avec confirmation possible à
+l'écran. Le déclencheur `garde_fou_effacement` sur `data_snapshots` arrête la **catastrophe** :
+plus de la moitié d'un bien, ou la suppression de la ligne entière, quel que soit le client, y
+compris un appel direct à l'API avec une clé de service. Aligner les deux seuils ferait échouer
+toute suppression légitime confirmée à l'écran sur une erreur SQL incompréhensible.
+
+L'échappatoire est `set local app.effacement_autorise = 'oui'`, impossible à poser depuis
+l'application : un effacement massif exige une session SQL, donc un geste conscient.
+
 **Aucune écriture automatique en base.** Tout ce qui entre dans `data_snapshots` passe par
 `AL_VALID.openGate()`, la modale de validation. La synchro API remplit un sas, elle ne
 décide pas. C'est le modèle de sécurité du projet, il a déjà évité des dégâts.
