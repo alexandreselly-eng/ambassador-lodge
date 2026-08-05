@@ -140,10 +140,24 @@ passé par deux tours de critique adversariale.
 - **Lot 3 livré** : module `AL_SYNC`, carte de synchro dans l'onglet Validation, pastille
   d'état avec signalement d'échec, sortie du sas après validation. La source enregistrée reste
   `superhote_csv`, ce qui fait disparaître le piège de `repriseTaxe()` par construction.
-- **Lot 4** : cron et alerte. **Ne pas brancher le cron avant que le Lot 3 affiche l'état
-  d'échec** : aujourd'hui `sh_sync_state.last_status` est écrit mais rien ne le lit, une
-  panne serait donc silencieuse. C'est ce qui a laissé l'import CSV cassé du 12 au 31/07.
+- **Lot 4 livré pour l'essentiel** (05/08/2026) : alerte ntfy sur échec **et sur silence**,
+  déclenchée par deux workflows GitHub Actions, volontairement hors de Supabase pour ne pas
+  partager le point de panne du surveillé. Surveillance 4×/jour, synchro quotidienne à 09h20
+  heure Réunion. Le secret `DECLENCHEUR_SECRET` n'ouvre aucun accès à la base, ce qui permet
+  de le confier à un dépôt public.
+- **Lot 4, ce qui reste** : la détection des suppressions (statut `supprime` déclaré partout,
+  jamais écrit ; `last_full_check_at` jamais renseigné) et le branchement de
+  `sh_pending_purge()`, en base mais jamais appelée.
 
-Hors code, en attente : le **ticket au support SuperHote** pour les 1 368 € de taxe de
-séjour perdus lors de leur migration V1 vers V2. Brouillon dans
-`~/dev/bnb-pilot-sauvegardes/ticket-superhote-taxe-sejour.md`.
+Jamais vérifié, à faire un jour : le **test sur réservation vivante** du Lot 1, créer une
+réservation hors saison sur un logement désactivé des canaux, la modifier, l'annuler.
+
+Hors code : le **ticket au support SuperHote** pour les 1 368 € de taxe de séjour perdus lors
+de leur migration V1 vers V2 a été **envoyé le 05/08/2026**, réponse en attente. Le contenu
+est dans `~/dev/bnb-pilot-sauvegardes/ticket-superhote-taxe-sejour.md`.
+
+À leur réponse, deux issues et deux conduites :
+- **ils restaurent la taxe** → la synchro la verra revenir et la modale proposera de remonter
+  les 18 lignes. Rien à coder.
+- **la donnée est perdue chez eux** → nos valeurs restent justes, `repriseTaxe()` les conserve
+  depuis l'export V1 du 11/07. Le sujet devient déclaratif, plus informatique.
