@@ -1,4 +1,4 @@
-doctrine: 1.2
+doctrine: 1.4
 nom: bnb-pilot
 niveau: 2
 runtime: statique
