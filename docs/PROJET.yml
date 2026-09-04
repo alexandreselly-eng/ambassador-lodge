@@ -1,0 +1,15 @@
+doctrine: 1.4
+nom: bnb-pilot
+niveau: 2
+runtime: statique
+cree_le: 2026-06-26
+adopte_le: 2026-09-04
+
+squelette:
+  commande_installation: null      # aucune dependance
+  commande_build: null             # aucun build, fichier servi tel quel
+  commande_test: npm test
+  fichier_entree: index.html
+  artefact_attendu: null
+  url_publique: https://alexandreselly-eng.github.io/ambassador-lodge/
+  branche_deploiement: main
